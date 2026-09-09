@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
-      "package": "app.mibo.mobile",
+      "package": "com.mibokids.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -18,7 +18,7 @@
       }
     },
     "ios": {
-      "bundleIdentifier": "app.mibo.mobile",
+      "bundleIdentifier": "com.mibokids.app",
       "supportsTablet": true
     },
     "plugins": [

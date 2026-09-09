@@ -31,7 +31,7 @@ Exit: two kids, two devices, real chores, offline works, per-day opens visible i
 - Apple sign-in, iOS build, App Store listing (en), privacy labels, COPPA-facing privacy policy
 - expo-updates channels, production EAS profiles
 - Play listing after iOS; Hebrew store copy later
-- Name "Mibo", bundle id `app.mibo.mobile`; store listing in `docs/spec/05-store-listing.md`. Icons still outstanding.
+- Name "Mibo", bundle id `com.mibokids.app`; store listing in `docs/spec/05-store-listing.md`. Icons still outstanding.
 
 ## Risks
 - **Second-child paywall at day 14** — highest-risk decision; kid side stays fully usable; watch `paywall_shown{gate=child_quota}` → churn.

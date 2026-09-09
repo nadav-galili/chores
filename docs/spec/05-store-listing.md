@@ -1,6 +1,8 @@
 # Store listing
 
-Name: **Mibo**. Bundle identifier and Android package: `app.mibo.mobile`.
+Name: **Mibo**. Bundle identifier and Android package: `com.mibokids.app`.
+
+"Kids" appears in the identifier only, never in the brand. The store title and the icon on the child's phone say "Mibo": a 10-year-old is exactly the age at which being handed something labelled "Kids" reads as an insult, and she is half the M1 test. The identifier uses the compound because bare `mibo` is a crowded namespace — ten unrelated apps across both stores — while `mibokids` is empty on both.
 
 The brand is child-facing and the keyword tail is parent-facing. A parent finds the app by searching "chores"; the icon on the child's phone says only "Mibo". No competitor names the child's side — all eight screened (Chorsee, Chores & Allowance Bot, Joon, Homey, S'moresUp, Greenlight, BusyKid, Sweepy) use parent-search vocabulary in the title, including Joon, whose product is itself a virtual pet.
 
@@ -39,6 +41,6 @@ The **title is a growth lever** and is expected to change with ASO iteration; ke
 
 ## Outstanding
 
-- `mibo.app` must be purchased before launch — it was listed on Afternic at $8,999 BIN when checked, and a BIN listing can be pulled or repriced. `app.mibo.mobile` assumes it.
+- `mibokids.app` is unregistered and costs about $15 to hand-register. Worth taking to hold the name; the bundle id does not depend on it. (`mibo.app` was $8,999 BIN on Afternic — not needed under this identifier.)
 - A trademark clearance search on MIBO before first store submission. The screen found zero live US class 9 or 42 registrations and no in-niche store collision, but TMview is not an official register and absence of a hit is not clearance.
 - Icons and the pet's placeholder art.
