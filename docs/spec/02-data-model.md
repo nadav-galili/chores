@@ -33,6 +33,7 @@ Balance = `SUM(coins)` minus reserved open redemptions. Owed money = `SUM(money_
 
 - **xp_events**: id = uuid5('xp', ledger_entry_id) · child_id · xp (signed) · ref_entry_id · created_at. Mirrors earn/bonus/streak/clawback 1:1. Pet level = threshold table over `SUM(xp)`.
 - **day_summaries**: child_id · chore_date (PK) · due_count · done_count · complete · streak_after. Recomputed on every completion/rejection. Streak = walk back while `complete` or `due_count = 0`.
+- **growth_entries**: **id = uuid5('grow', child_id, chore_date)** · household_id · child_id · chore_date · created_at. Appended once when a day summary first becomes `complete`. Grove stage = `COUNT(*)` per child; never a stored column. Unlike `xp_events`, this table has **no** clawback counterpart — a rejection claws back coins and XP and breaks the streak, but never deletes or reverses a growth entry. Append-only, `ON CONFLICT DO NOTHING`. (ADR-0011)
 
 ## Rewards
 - **rewards**: id · household_id (null = built-in) · title · icon · cost_coins · is_builtin · active · sort · updated_at · deleted_at

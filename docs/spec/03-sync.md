@@ -29,7 +29,7 @@ Parent "today" screen additionally polls every 60 s while open.
 | revoked device | `/sync` → 401 `device_revoked`; app wipes local DB |
 
 ## Device scope
-- **Kid device:** its child row, assigned chores, its instances (today ±14 days), its completions, ledger, xp, day_summaries, active rewards, its redemptions. `change_log` is filtered by the token's `child_id` server-side; sibling isolation is structural.
+- **Kid device:** its child row, assigned chores, its instances (today ±14 days), its completions, ledger, xp, day_summaries, growth entries, active rewards, its redemptions. `change_log` is filtered by the token's `child_id` server-side; sibling isolation is structural.
 - **Parent device:** whole household minus tokens/secrets. History depth gated by entitlement on pull.
 
 ## Photos
