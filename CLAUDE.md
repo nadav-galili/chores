@@ -7,13 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A kids chores and allowance app (iOS + Android) where the child is the primary user. No code exists yet; the design is complete and approved. Read in this order before doing anything:
 
 1. `CONTEXT.md` — the glossary. Use its terms verbatim (Instance, Chore Date, Day Complete, Clawback, Kid Device, ...). Don't drift to the `_Avoid_` synonyms.
-2. `docs/adr/` — nine decisions that look wrong without context. Do not "fix" them: children are not identity-provider users (0001), the ledger is append-only with deterministic ids (0002), instances are materialized not computed (0003), coins and pet XP are separate (0004), Hono + Drizzle on both server and device (0006), pnpm/Node not Bun (0007), one REST `/sync` endpoint (0008), children are anonymous in analytics (0009).
+2. `docs/adr/` — eleven decisions that look wrong without context. Do not "fix" them: children are not identity-provider users (0001), the ledger is append-only with deterministic ids (0002), instances are materialized not computed (0003), coins and pet XP are separate (0004), Hono + Drizzle on both server and device (0006), pnpm/Node not Bun (0007), one REST `/sync` endpoint (0008), children are anonymous in analytics (0009), deterministic ids use one fixed namespace (0010), the grove is append-only and never clawed back (0011).
 3. `docs/spec/` — product rules, data model, sync protocol, milestones, and the **approved dependency list**. Any dependency not on that list must be asked for first.
 4. `BUILD-PROMPT.md` — the original brief; product constraints there are settled, not open.
 
 ## Ticket workflow
 
-Issues live in GitHub Issues on `nadav-galili/chores` via `gh`; conventions in `docs/agents/issue-tracker.md`, labels in `docs/agents/triage-labels.md`. Issue #1 is the M1 spec; #2–#16 are its tracer-bullet tickets with native "blocked by" edges. #1 stays open and unedited until every ticket is closed.
+Issues live in GitHub Issues on `nadav-galili/chores` via `gh`; conventions in `docs/agents/issue-tracker.md`, labels in `docs/agents/triage-labels.md`. Issue #1 is the M1 spec; #2–#18 are its tracer-bullet tickets with native "blocked by" edges. #1 stays open until every ticket is closed, and is edited only to keep it true to the milestone's scope — never to record progress.
 
 Greenfield rule: all work lands directly on `main`. No feature branches, no PRs, until the first store release.
 
@@ -60,6 +60,7 @@ No UI tests, no mocking of Postgres or SQLite, no handler-level unit tests.
 
 - Balance is always `SUM(coins)`; never store a balance column.
 - Ledger, XP and completion rows are never updated or deleted; corrections are clawback entries.
+- Growth entries are append-only and have **no** clawback: a rejection costs coins and the streak, never a tree. Grove stage is always `COUNT(*)`, never a stored column. (ADR-0011)
 - Every date-keyed row stores a household-local `chore_date`; never do date arithmetic on instants.
 - A kid device token scopes every query to one child; sibling isolation is enforced server-side, not in UI.
 - Child data is first name only; nothing about a child goes to analytics or third parties.

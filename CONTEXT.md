@@ -92,6 +92,22 @@ A chore date with no instances due for a child. Neither breaks nor extends the s
 **Streak**:
 The number of consecutive chore dates, ignoring frozen days, that were day complete for a child.
 
+**Grove**:
+The cumulative record of a household's effort: one tree per child, standing in a shared grove. Grows only; never shrinks.
+_Avoid_: Garden, forest, world, map
+
+**Tree**:
+One child's growth within the grove. Its stage is the count of that child's growth entries.
+_Avoid_: Plant, sapling, progress bar
+
+**Growth Entry**:
+An append-only row appended when a chore date is day complete for a child, with id `uuid5('grow', child_id, chore_date)`. Never updated, never deleted, and never reversed — there is no clawback counterpart. (ADR-0011)
+_Avoid_: Growth event, tree row, day record
+
+**Grove Stage**:
+A child's tree stage, always `COUNT(*)` of their growth entries. Never a stored column.
+_Avoid_: Tree level, growth count, progress
+
 **Bonus**:
 Coins and XP granted beyond per-chore earnings: the daily bonus for day complete and streak bonuses at milestone lengths.
 
