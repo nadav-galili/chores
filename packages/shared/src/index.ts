@@ -6,3 +6,5 @@ export * from './day-summary.ts';
 export * from './ledger.ts';
 export * from './pet.ts';
 export * from './entitlement.ts';
+export * from './child.ts';
+export { uuid7 } from './uuid7.ts';

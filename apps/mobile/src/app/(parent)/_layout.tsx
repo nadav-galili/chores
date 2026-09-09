@@ -1,5 +1,56 @@
-import { Stack } from 'expo-router';
+import { useAuth } from '@clerk/expo';
+import { Redirect, Stack, usePathname } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+import { Button, ErrorText, Screen, Title } from '@/components/ui';
+import { HouseholdProvider, useHousehold } from '@/lib/household-context';
+
+function Loading() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center' }}>
+      <ActivityIndicator />
+    </View>
+  );
+}
+
+/** Signed in → needs a household → create-household; has one → the children list. */
+function HouseholdGate() {
+  const state = useHousehold();
+  const pathname = usePathname();
+  if (state.status === 'loading') return <Loading />;
+  if (state.status === 'error') {
+    return (
+      <Screen>
+        <Title>Could not reach Mibo</Title>
+        <ErrorText>{state.message}</ErrorText>
+        <Button title="Try again" onPress={() => void state.refresh()} />
+      </Screen>
+    );
+  }
+  const onCreate = pathname === '/create-household';
+  if (state.status === 'ready' && state.me.household === null && !onCreate) {
+    return <Redirect href="/(parent)/create-household" />;
+  }
+  if (state.status === 'ready' && state.me.household !== null && onCreate) {
+    return <Redirect href="/(parent)" />;
+  }
+  return <Stack screenOptions={{ headerShown: false }} />;
+}
 
 export default function ParentLayout() {
-  return <Stack />;
+  const { isLoaded, isSignedIn } = useAuth();
+  const pathname = usePathname();
+  if (!isLoaded) return <Loading />;
+  if (!isSignedIn) {
+    return pathname === '/sign-in' ? (
+      <Stack screenOptions={{ headerShown: false }} />
+    ) : (
+      <Redirect href="/(parent)/sign-in" />
+    );
+  }
+  if (pathname === '/sign-in') return <Redirect href="/(parent)" />;
+  return (
+    <HouseholdProvider>
+      <HouseholdGate />
+    </HouseholdProvider>
+  );
 }
