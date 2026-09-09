@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, choreDate } from './chore-date.ts';
+import { addDays, choreDate, daysBetween, resolveChoreDate } from './chore-date.ts';
 
 const at = (iso: string) => new Date(iso);
 
@@ -96,5 +96,47 @@ describe('addDays', () => {
     expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
     expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
     expect(addDays('2027-02-28', 1)).toBe('2027-03-01');
+  });
+});
+
+describe('daysBetween', () => {
+  it('counts calendar days in both directions and across a month end', () => {
+    expect(daysBetween('2026-09-09', '2026-09-09')).toBe(0);
+    expect(daysBetween('2026-09-09', '2026-09-10')).toBe(1);
+    expect(daysBetween('2026-09-09', '2026-09-08')).toBe(-1);
+    expect(daysBetween('2026-08-31', '2026-09-01')).toBe(1);
+  });
+
+  it('is unaffected by DST: a spring-forward day still counts as one', () => {
+    expect(daysBetween('2026-03-27', '2026-03-28')).toBe(1);
+    expect(daysBetween('2026-03-01', '2026-04-01')).toBe(31);
+  });
+});
+
+describe('resolveChoreDate', () => {
+  it('trusts a device clock that agrees or is off by a day', () => {
+    expect(resolveChoreDate('2026-09-09', '2026-09-09')).toEqual({
+      chore_date: '2026-09-09',
+      date_adjusted: false,
+    });
+    expect(resolveChoreDate('2026-09-10', '2026-09-09')).toEqual({
+      chore_date: '2026-09-10',
+      date_adjusted: false,
+    });
+    expect(resolveChoreDate('2026-09-08', '2026-09-09')).toEqual({
+      chore_date: '2026-09-08',
+      date_adjusted: false,
+    });
+  });
+
+  it('overrides and flags a clock off by more than a day', () => {
+    expect(resolveChoreDate('2026-09-11', '2026-09-09')).toEqual({
+      chore_date: '2026-09-09',
+      date_adjusted: true,
+    });
+    expect(resolveChoreDate('2020-01-01', '2026-09-09')).toEqual({
+      chore_date: '2026-09-09',
+      date_adjusted: true,
+    });
   });
 });

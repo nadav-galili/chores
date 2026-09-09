@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { addDays, type IsoDate } from './chore-date.ts';
+import { rejectReasonSchema } from './ops.ts';
 
 /** A kid device holds its instances for today ±14 days (docs/spec/03-sync.md, device scope). */
 export const INSTANCE_WINDOW_DAYS = 14;
@@ -36,8 +37,14 @@ export const syncChangeSchema = z.object({
 export type SyncChange = z.infer<typeof syncChangeSchema>;
 
 export const syncResponseSchema = z.object({
-  acked: z.array(z.object({ op_id: z.string().uuid() })),
-  rejected: z.array(z.object({ op_id: z.string().uuid(), reason: z.string() })),
+  acked: z.array(
+    z.object({
+      op_id: z.string().uuid(),
+      /** The server wrote a different chore_date than the op claimed; the device drops its own. */
+      date_adjusted: z.boolean().optional(),
+    }),
+  ),
+  rejected: z.array(z.object({ op_id: z.string().uuid(), reason: rejectReasonSchema })),
   changes: z.array(syncChangeSchema),
   /** Persist this; send it back on the next pull. */
   cursor: z.number().int().min(0),

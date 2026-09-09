@@ -1,8 +1,6 @@
 import { z } from 'zod';
+import { isoDateSchema } from './chore-date.ts';
 import { choreKindSchema } from './materialize.ts';
-
-/** Household-local calendar date, `YYYY-MM-DD`. */
-export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
 /** Every bit of the weekday mask, Mon=0 … Sun=6. */
 export const ALL_WEEKDAYS = 0b111_1111;

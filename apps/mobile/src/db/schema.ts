@@ -6,7 +6,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import type { ChoreClocks } from '@chores/shared';
+import type { ChoreClocks, RejectReason } from '@chores/shared';
 
 /**
  * The kid-scoped subset of the server's data model (docs/spec/03-sync.md, device scope), with the
@@ -84,7 +84,9 @@ export const completions = sqliteTable('completions', {
   completed_at: text('completed_at').notNull(),
   device_id: text('device_id'),
   photo_key: text('photo_key'),
-  status: text('status', { enum: ['accepted', 'pending_photo', 'rejected'] }).notNull(),
+  status: text('status', {
+    enum: ['accepted', 'pending_photo', 'rejected', 'undone'],
+  }).notNull(),
   rejected_by: text('rejected_by'),
   rejected_at: text('rejected_at'),
   created_at: text('created_at').notNull(),
@@ -155,6 +157,26 @@ export const redemptions = sqliteTable('redemptions', {
   requested_at: text('requested_at').notNull(),
   decided_at: text('decided_at'),
   decided_by: text('decided_by'),
+});
+
+/**
+ * Ops written locally and not yet acknowledged (docs/spec/03-sync.md). A row leaves the queue
+ * only when the server acks it; one the server refuses stays behind as `rejected` with its reason,
+ * so a stuck op is visible instead of retried forever.
+ */
+export const outbox = sqliteTable('outbox', {
+  op_id: text('op_id').primaryKey(),
+  type: text('type', { enum: ['complete', 'uncomplete'] }).notNull(),
+  payload: json<Record<string, unknown>>('payload').notNull(),
+  created_at: text('created_at').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  /** Nothing is sent before this instant; it moves out on every failed attempt. */
+  next_attempt_at: text('next_attempt_at').notNull(),
+  status: text('status', { enum: ['pending', 'rejected'] })
+    .notNull()
+    .default('pending'),
+  /** Why the server refused it; only ever set on a `rejected` row. */
+  reason: text('reason').$type<RejectReason>(),
 });
 
 /** One row: how far this device has pulled the change log. */

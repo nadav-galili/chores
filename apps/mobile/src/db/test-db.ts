@@ -6,11 +6,11 @@ import * as schema from './schema';
 import type { DeviceDb } from './types';
 
 /**
- * Test seam 3: the same Drizzle schema over an in-memory SQLite (Node's built-in), migrated from
- * the very SQL the app bundles. Never imported by app code.
+ * Test seam 3: the same Drizzle schema over SQLite (Node's built-in), migrated from the very SQL
+ * the app bundles. Never imported by app code.
  */
-export async function openTestDb(): Promise<DeviceDb> {
-  const sqlite = new DatabaseSync(':memory:');
+export async function openTestDbAt(file: string): Promise<{ db: DeviceDb; close: () => void }> {
+  const sqlite = new DatabaseSync(file);
   const db = drizzle(
     async (sql, params, method) => {
       const stmt = sqlite.prepare(sql);
@@ -26,5 +26,10 @@ export async function openTestDb(): Promise<DeviceDb> {
   await migrate(db, async (queries) => queries.forEach((q) => sqlite.exec(q)), {
     migrationsFolder: path.resolve(import.meta.dirname, '../../drizzle'),
   });
-  return db;
+  return { db, close: () => sqlite.close() };
+}
+
+/** The common case: a database that lives only for one test. */
+export async function openTestDb(): Promise<DeviceDb> {
+  return (await openTestDbAt(':memory:')).db;
 }

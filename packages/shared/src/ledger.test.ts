@@ -3,12 +3,15 @@ import {
   COINS_PER_CHORE,
   DAY_COMPLETE_BONUS,
   STREAK_BONUS,
+  growthEntriesFor,
+  growthId,
   reconcileLedger,
   type LedgerCompletion,
   type LedgerEntry,
   type LedgerInstance,
   type ReconcileInput,
 } from './ledger.ts';
+import type { IsoDate } from './chore-date.ts';
 import { uuid5 } from './uuid5.ts';
 
 const household = '9d0b8a7c-1111-4222-8333-444455556666';
@@ -387,5 +390,47 @@ describe('reconcileLedger: properties', () => {
       expect(after.entries.length, `seed ${seed}`).toBe(entries.length);
       expect(sum(after.entries), `seed ${seed}`).toBe(sum(entries));
     }
+  });
+});
+
+describe('growthEntriesFor', () => {
+  const summaries = (
+    days: { date: IsoDate; complete: boolean }[],
+  ): Parameters<typeof growthEntriesFor>[2] =>
+    days.map((d) => ({
+      child_id: noa,
+      chore_date: d.date,
+      due_count: 1,
+      done_count: d.complete ? 1 : 0,
+      complete: d.complete,
+      streak_after: 0,
+    }));
+
+  it('appends one entry per day-complete date, with the deterministic id', () => {
+    const entries = growthEntriesFor(
+      household,
+      noa,
+      summaries([
+        { date: '2026-09-08', complete: true },
+        { date: '2026-09-09', complete: false },
+      ]),
+      at,
+    );
+    expect(entries).toEqual([
+      {
+        id: growthId(noa, '2026-09-08'),
+        household_id: household,
+        child_id: noa,
+        chore_date: '2026-09-08',
+        created_at: at,
+      },
+    ]);
+  });
+
+  it('is stable, so re-running it inserts nothing new', () => {
+    const days = summaries([{ date: '2026-09-08', complete: true }]);
+    expect(growthEntriesFor(household, noa, days, at)).toEqual(
+      growthEntriesFor(household, noa, days, at),
+    );
   });
 });

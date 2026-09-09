@@ -52,13 +52,24 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
       />
       <View style={styles.header}>
         <Text style={little ? styles.greetingLittle : styles.greeting}>Hi {today.firstName}!</Text>
-        {!little && (
-          <Text style={styles.streak}>
-            🔥 {today.streak} day{today.streak === 1 ? '' : 's'}
-          </Text>
-        )}
+        <View style={styles.tallies}>
+          <Text style={styles.coinTally}>{today.coins} 🪙</Text>
+          {!little && (
+            <Text style={styles.streak}>
+              🔥 {today.streak} day{today.streak === 1 ? '' : 's'}
+            </Text>
+          )}
+        </View>
       </View>
       {today.offline && <Text style={styles.offline}>Showing what’s saved on this device.</Text>}
+      {today.refused > 0 && (
+        <Pressable style={styles.refused} onPress={today.dismissRefused}>
+          <Text style={styles.refusedText}>
+            {today.refused === 1 ? 'One tap didn’t save.' : `${today.refused} taps didn’t save.`}{' '}
+            Tap to hide.
+          </Text>
+        </Pressable>
+      )}
       <FlatList
         key={today.uiMode}
         data={today.items}
@@ -66,7 +77,14 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
         numColumns={little ? 2 : 1}
         columnWrapperStyle={little ? styles.tileRow : undefined}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => (little ? <Tile item={item} /> : <Row item={item} />)}
+        extraData={today.coins}
+        renderItem={({ item }) =>
+          little ? (
+            <Tile item={item} onPress={() => today.toggle(item)} />
+          ) : (
+            <Row item={item} onPress={() => today.toggle(item)} />
+          )
+        }
         ListEmptyComponent={
           today.status === 'ready' ? (
             <Text style={little ? styles.emptyLittle : styles.empty}>
@@ -79,28 +97,42 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
   );
 }
 
-/** Little mode: one big icon per chore, the title underneath. */
-function Tile({ item }: { item: TodayItem }) {
+/** Little mode: one big icon per chore, the title underneath. Tapping it toggles done. */
+function Tile({ item, onPress }: { item: TodayItem; onPress: () => void }) {
+  const done = item.status === 'done';
   return (
-    <View style={styles.tile}>
-      <Text style={styles.tileIcon}>{item.icon ?? '⭐'}</Text>
+    <Pressable
+      style={[styles.tile, done && styles.tileDone]}
+      onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: done }}
+      accessibilityLabel={item.title}
+    >
+      <Text style={styles.tileIcon}>{done ? '✅' : (item.icon ?? '⭐')}</Text>
       <Text style={styles.tileTitle} numberOfLines={2}>
         {item.title}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
 /** Big mode: a compact row with the coins the chore pays. */
-function Row({ item }: { item: TodayItem }) {
+function Row({ item, onPress }: { item: TodayItem; onPress: () => void }) {
+  const done = item.status === 'done';
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowIcon}>{item.icon ?? '⭐'}</Text>
-      <Text style={styles.rowTitle} numberOfLines={1}>
+    <Pressable
+      style={[styles.row, done && styles.rowDone]}
+      onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: done }}
+      accessibilityLabel={item.title}
+    >
+      <Text style={styles.rowIcon}>{done ? '✅' : (item.icon ?? '⭐')}</Text>
+      <Text style={[styles.rowTitle, done && styles.rowTitleDone]} numberOfLines={1}>
         {item.title}
       </Text>
       <Text style={styles.coins}>+{COINS_PER_CHORE} 🪙</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -110,8 +142,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   greeting: { fontSize: 28, fontWeight: '700' },
   greetingLittle: { fontSize: 36, fontWeight: '700' },
+  tallies: { alignItems: 'flex-end' },
+  coinTally: { fontSize: 20, fontWeight: '700' },
   streak: { fontSize: 18, fontWeight: '600', color: '#e65100' },
   offline: { color: '#777', marginTop: 4 },
+  refused: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FDE7E7',
+  },
+  refusedText: { color: '#8a1c1c', fontWeight: '600' },
   list: { paddingVertical: 16, gap: 12 },
   tileRow: { gap: 12 },
   tile: {
@@ -124,6 +165,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
+  tileDone: { backgroundColor: '#DFF5E1' },
   tileIcon: { fontSize: 64 },
   tileTitle: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
   row: {
@@ -135,8 +177,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#f4f4f4',
   },
+  rowDone: { backgroundColor: '#DFF5E1' },
   rowIcon: { fontSize: 28 },
   rowTitle: { flex: 1, fontSize: 18, fontWeight: '500' },
+  rowTitleDone: { textDecorationLine: 'line-through', color: '#6b6b6b' },
   coins: { fontSize: 16, fontWeight: '600', color: '#555' },
   empty: { textAlign: 'center', color: '#777', marginTop: 32, fontSize: 16 },
   emptyLittle: { textAlign: 'center', marginTop: 32, fontSize: 28 },

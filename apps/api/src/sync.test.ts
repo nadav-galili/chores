@@ -246,11 +246,11 @@ describe('POST /sync pull', () => {
     expect(await res.json()).toEqual({ error: 'device_mismatch' });
   });
 
-  it('rejects ops it does not know yet instead of dropping them', async () => {
+  it('rejects ops it does not know instead of dropping them', async () => {
     const { noa } = await setup('user_ops');
     const opId = uuid7();
     const { status, body } = await sync(noa.session, 0, [
-      { op_id: opId, type: 'complete', payload: {} },
+      { op_id: opId, type: 'decide_redemption', payload: {} },
     ]);
     expect(status).toBe(200);
     expect(body.acked).toEqual([]);

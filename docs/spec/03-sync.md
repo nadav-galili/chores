@@ -6,7 +6,7 @@ Local-first. Every write is one SQLite transaction: domain rows + outbox op. The
 1. Write locally (e.g. completion + instance=done + ledger earn/bonus/streak + xp) and enqueue `{op_id, type, payload}`.
 2. Drain outbox on write, on foreground, and after a push. `POST /sync {device_id, cursor, ops[]}` with retry + backoff; ops stay until acked.
 3. Server applies each op idempotently (`applied_ops`), validates token scope and chore_date, writes the same deterministic rows.
-4. Response: `acked[]`, `rejected[]` (with reason), `changes[]` since cursor, new cursor.
+4. Response: `acked[]` (each with `date_adjusted` when the server wrote a different chore_date), `rejected[]` (with reason), `changes[]` since cursor, new cursor. A rejected op leaves the outbox and is surfaced, never retried; anything else (network, 5xx) stays queued and is retried with backoff.
 5. Device upserts changes into SQLite; deterministic ids make server rows identical to optimistic rows.
 
 Parent "today" screen additionally polls every 60 s while open.
@@ -25,6 +25,8 @@ Parent "today" screen additionally polls every 60 s while open.
 | reject after kid `uncomplete` | no-op, returned `already_undone` |
 | two parents decide a redemption | first in server order wins; other gets `already_decided`; device replaces optimistic state on pull |
 | kid completes a chore a parent deleted | accepted and paid; history shows "removed" title |
+| kid completes a chore they are no longer assigned | accepted only if the instance already exists, else `unknown_chore` |
+| kid undoes a completion after its chore date | rejected `too_late`; only a parent can change a past day |
 | device clock wrong | chore_date ±1 day accepted, else server value + `date_adjusted` |
 | revoked device | `/sync` → 401 `device_revoked`; app wipes local DB |
 

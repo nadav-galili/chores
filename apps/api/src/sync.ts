@@ -8,6 +8,7 @@ import {
 } from '@chores/shared';
 import { and, asc, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { applyOps, reconcileChild, type OpContext } from './apply-ops.ts';
 import type { Db } from './db/client.ts';
 import { changeLog, choreAssignees, choreInstances, chores, households } from './db/schema.ts';
 import { requireKidDevice, type DeviceEnv } from './device-auth.ts';
@@ -35,13 +36,12 @@ async function assignedChores(tx: Tx, childId: string) {
  */
 async function materializeToday(
   tx: Tx,
-  householdId: string,
+  household: typeof households.$inferSelect,
   childId: string,
   assigned: ChoreRow[],
   now: Date,
 ) {
-  const [household] = await tx.select().from(households).where(eq(households.id, householdId));
-  const today = choreDate(now, household!.tz, household!.dayBoundaryHour);
+  const today = choreDate(now, household.tz, household.dayBoundaryHour);
   const materializable: MaterializableChore[] = assigned.map((r) => ({
     id: r.id,
     household_id: r.householdId,
@@ -73,8 +73,9 @@ async function materializeToday(
 }
 
 /**
- * `POST /sync` for a kid device (docs/spec/03-sync.md). Pull only for now: the change log since
- * `cursor`, filtered server-side to what this one child may see, so sibling isolation is structural.
+ * `POST /sync` for a kid device (docs/spec/03-sync.md): apply the outbox, then return the change
+ * log since `cursor`, filtered server-side to what this one child may see, so sibling isolation is
+ * structural. Ops land before the pull, so their rows come back in the same response.
  */
 export function syncRoutes(db: Db, pageSize: number) {
   const app = new Hono<DeviceEnv>();
@@ -90,9 +91,24 @@ export function syncRoutes(db: Db, pageSize: number) {
     const householdId = c.get('householdId');
     const { cursor, ops } = body.data;
 
+    const now = new Date();
     const response = await db.transaction(async (tx) => {
+      const [household] = await tx.select().from(households).where(eq(households.id, householdId));
+      const ctx: OpContext = {
+        deviceId: c.get('deviceId'),
+        childId,
+        householdId,
+        household: household!,
+        now,
+      };
+      // Materialize first: what is due today decides whether a tap completes the day, so the
+      // ops must land against the full list, not whatever happened to exist already.
       const assigned = await assignedChores(tx, childId);
-      const today = await materializeToday(tx, householdId, childId, assigned, new Date());
+      const today = await materializeToday(tx, household!, childId, assigned, now);
+
+      const applied = await applyOps(tx, ctx, ops);
+      if (applied.changed) await reconcileChild(tx, ctx);
+
       const window = instanceWindow(today);
       const visibleChores = assigned.map((r) => r.id);
 
@@ -120,8 +136,8 @@ export function syncRoutes(db: Db, pageSize: number) {
 
       const page = rows.slice(0, pageSize);
       const result: SyncResponse = {
-        acked: [],
-        rejected: ops.map((op) => ({ op_id: op.op_id, reason: 'unknown_op' })),
+        acked: applied.acked,
+        rejected: applied.rejected,
         changes: page.map((r) => ({
           seq: r.seq,
           table: r.table,

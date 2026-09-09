@@ -29,6 +29,13 @@
       "when": 1788980476475,
       "tag": "0003_instances",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788981272182,
+      "tag": "0004_completions",
+      "breakpoints": true
     }
   ]
 }

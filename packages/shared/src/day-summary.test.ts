@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   currentStreak,
   summarizeDays,
+  summariesThatMoved,
+  type DaySummary,
   type SummaryCompletion,
   type SummaryInstance,
 } from './day-summary.ts';
@@ -101,5 +103,31 @@ describe('currentStreak', () => {
     expect(currentStreak(summarizeDays(noa, [d1, d2], [done(d1)]), '2026-09-03')).toBe(0);
     expect(currentStreak(summarizeDays(noa, [d1], [done(d1)]), '2026-09-05')).toBe(1);
     expect(currentStreak([], '2026-09-05')).toBe(0);
+  });
+});
+
+describe('summariesThatMoved', () => {
+  const day = (chore_date: string, over: Partial<DaySummary> = {}): DaySummary => ({
+    child_id: 'noa',
+    chore_date,
+    due_count: 2,
+    done_count: 1,
+    complete: false,
+    streak_after: 0,
+    ...over,
+  });
+
+  it('keeps days that are new or whose numbers changed', () => {
+    const stored = [day('2026-09-08'), day('2026-09-09')];
+    const moved = summariesThatMoved(
+      [day('2026-09-08'), day('2026-09-09', { done_count: 2, complete: true }), day('2026-09-10')],
+      stored,
+    );
+    expect(moved.map((s) => s.chore_date)).toEqual(['2026-09-09', '2026-09-10']);
+  });
+
+  it('keeps nothing when the recomputed days match what is stored', () => {
+    const days = [day('2026-09-08'), day('2026-09-09')];
+    expect(summariesThatMoved(days, days)).toEqual([]);
   });
 });

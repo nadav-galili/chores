@@ -189,3 +189,137 @@ export const changeLog = pgTable('change_log', {
   row: jsonb('row').notNull(),
   at: timestamptz('at').notNull().defaultNow(),
 });
+
+export const completionStatusEnum = pgEnum('completion_status', [
+  'accepted',
+  'pending_photo',
+  'rejected',
+  'undone',
+]);
+export const ledgerKindEnum = pgEnum('ledger_kind', [
+  'earn',
+  'bonus',
+  'streak',
+  'clawback',
+  'redeem',
+  'payout',
+  'adjust',
+]);
+export const ledgerRefTypeEnum = pgEnum('ledger_ref_type', [
+  'completion',
+  'chore_date',
+  'ledger_entry',
+]);
+
+/**
+ * A child marking an instance done. Append-only: the row is written once and afterwards only its
+ * status moves (a parent's rejection, the child's own same-day undo). Completion of a deleted
+ * chore is accepted and paid (docs/spec/03-sync.md, conflict rules).
+ */
+export const completions = pgTable(
+  'completions',
+  {
+    id: uuid('id').primaryKey(),
+    instanceId: uuid('instance_id').notNull(),
+    choreId: uuid('chore_id')
+      .notNull()
+      .references(() => chores.id),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    choreDate: localDate('chore_date').notNull(),
+    completedAt: timestamptz('completed_at').notNull(),
+    deviceId: uuid('device_id'),
+    photoKey: text('photo_key'),
+    status: completionStatusEnum('status').notNull(),
+    rejectedBy: uuid('rejected_by').references(() => parents.id),
+    rejectedAt: timestamptz('rejected_at'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('completions_child_date').on(t.childId, t.choreDate)],
+);
+
+/** Append-only and signed; a child's balance is always `SUM(coins)` (ADR-0002). */
+export const ledgerEntries = pgTable(
+  'ledger_entries',
+  {
+    id: uuid('id').primaryKey(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    kind: ledgerKindEnum('kind').notNull(),
+    coins: integer('coins').notNull(),
+    /** Minor units of the household currency; only payouts carry one. */
+    moneyAmount: integer('money_amount'),
+    refType: ledgerRefTypeEnum('ref_type'),
+    refId: text('ref_id'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    createdBy: text('created_by'),
+  },
+  (t) => [index('ledger_entries_child').on(t.childId)],
+);
+
+/** Mirrors every earn/bonus/streak/clawback 1:1; pet level is a threshold over `SUM(xp)`. */
+export const xpEvents = pgTable(
+  'xp_events',
+  {
+    id: uuid('id').primaryKey(),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    xp: integer('xp').notNull(),
+    refEntryId: uuid('ref_entry_id')
+      .notNull()
+      .references(() => ledgerEntries.id),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('xp_events_child').on(t.childId)],
+);
+
+/** Recomputed on every completion and rejection; the only row here that is ever updated. */
+export const daySummaries = pgTable(
+  'day_summaries',
+  {
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    choreDate: localDate('chore_date').notNull(),
+    dueCount: integer('due_count').notNull(),
+    doneCount: integer('done_count').notNull(),
+    complete: boolean('complete').notNull(),
+    streakAfter: integer('streak_after').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.childId, t.choreDate] })],
+);
+
+/** Append-only, never clawed back: a rejection costs coins and the streak, never a tree (ADR-0011). */
+export const growthEntries = pgTable(
+  'growth_entries',
+  {
+    id: uuid('id').primaryKey(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    choreDate: localDate('chore_date').notNull(),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('growth_entries_child').on(t.childId)],
+);
+
+/** Every op the server has already applied, with what it answered; a replay reads this and stops. */
+export const appliedOps = pgTable('applied_ops', {
+  opId: uuid('op_id').primaryKey(),
+  deviceId: uuid('device_id').notNull(),
+  /** The `acked`/`rejected` entry to return again, verbatim. */
+  result: jsonb('result').notNull(),
+  at: timestamptz('at').notNull().defaultNow(),
+});

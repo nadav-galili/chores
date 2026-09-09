@@ -19,7 +19,7 @@ import type { DeviceDb } from '@/db/types';
 const STATE_ROW = 1;
 
 /** Explicit BEGIN/COMMIT so the same code runs on the sync (expo) and async (test) drivers. */
-async function inTransaction<T>(db: DeviceDb, fn: () => Promise<T>): Promise<T> {
+export async function inTransaction<T>(db: DeviceDb, fn: () => Promise<T>): Promise<T> {
   await db.run(sql`begin`);
   try {
     const result = await fn();

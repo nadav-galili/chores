@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import type { IsoDate } from './chore-date.ts';
 
-export const completionStatusSchema = z.enum(['accepted', 'pending_photo', 'rejected']);
+/**
+ * `undone` is the child's own same-day undo of their tap: completions are never deleted, so the
+ * row stays and stops counting (docs/spec/02-data-model.md, completions).
+ */
+export const completionStatusSchema = z.enum(['accepted', 'pending_photo', 'rejected', 'undone']);
 export type CompletionStatus = z.infer<typeof completionStatusSchema>;
 
 /** One `day_summaries` row: what a child was due and did on one chore date. */
@@ -81,4 +85,25 @@ export function currentStreak(summaries: readonly DaySummary[], today: IsoDate):
     .filter((s) => s.chore_date < today)
     .sort((a, b) => (a.chore_date < b.chore_date ? 1 : -1));
   return before[0]?.streak_after ?? 0;
+}
+
+/**
+ * The summaries whose numbers actually moved against the ones already stored. Recomputing a
+ * child's days on every tap would otherwise rewrite every row and fill the change log with
+ * updates that say nothing; both the server and the device diff first.
+ */
+export function summariesThatMoved(
+  recomputed: readonly DaySummary[],
+  stored: readonly DaySummary[],
+): DaySummary[] {
+  const held = new Map(stored.map((s) => [s.chore_date, s]));
+  const same = (a: DaySummary, b: DaySummary) =>
+    a.due_count === b.due_count &&
+    a.done_count === b.done_count &&
+    a.complete === b.complete &&
+    a.streak_after === b.streak_after;
+  return recomputed.filter((s) => {
+    const before = held.get(s.chore_date);
+    return !before || !same(before, s);
+  });
 }

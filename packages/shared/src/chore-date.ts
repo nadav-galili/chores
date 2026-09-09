@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /** Household-local calendar date, `YYYY-MM-DD`. Never a UTC date. */
 export type IsoDate = string;
 
@@ -39,4 +41,29 @@ export function addDays(date: IsoDate, days: number): IsoDate {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
   const moved = new Date(Date.UTC(y, m - 1, d + days));
   return moved.toISOString().slice(0, 10);
+}
+
+/** `YYYY-MM-DD`, the only shape a chore date ever has on the wire. */
+export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
+
+/** Whole days from `from` to `to`, signed. Calendar arithmetic only. */
+export function daysBetween(from: IsoDate, to: IsoDate): number {
+  const utc = (date: IsoDate) => {
+    const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(to) - utc(from)) / (24 * HOUR_MS));
+}
+
+export type ResolvedChoreDate = { chore_date: IsoDate; date_adjusted: boolean };
+
+/**
+ * The chore date to write when a device claims one and the server computes another from
+ * `completed_at`: a device clock off by up to a day is trusted, anything further is overridden
+ * and flagged (docs/spec/02-data-model.md, timezone rules).
+ */
+export function resolveChoreDate(claimed: IsoDate, computed: IsoDate): ResolvedChoreDate {
+  return Math.abs(daysBetween(computed, claimed)) <= 1
+    ? { chore_date: claimed, date_adjusted: false }
+    : { chore_date: computed, date_adjusted: true };
 }
