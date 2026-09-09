@@ -68,4 +68,4 @@ No UI tests, no mocking of Postgres or SQLite, no handler-level unit tests.
 
 ## Working style (from the brief)
 
-Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. Placeholders until the naming session: app name "Chores", package `net.mobilebrain.chores`, pet "Pip".
+Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. App name "Mibo", bundle id and Android package `app.mibo.mobile` (see `docs/spec/05-store-listing.md`). Pet name is per-child: a parent sets a starting name, the child may rename it. The npm scope `@chores/shared`, the repo, the Railway project and `NAMESPACE_CHORES` keep the original name — `NAMESPACE_CHORES` is frozen by ADR-0010 and must never change.

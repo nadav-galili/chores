@@ -1,4 +1,4 @@
-# Chores
+# Mibo
 
 A kids chores and allowance app where the child is the primary user. Parents set up chores and rewards; children complete chores on their own device, offline if needed, and are rewarded instantly.
 
