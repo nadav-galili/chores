@@ -29,7 +29,7 @@ When a ticket exposes a gap in the spec, resolve it in the ticket's comments and
 ## Layout and commands (per ADR-0007)
 
 - `apps/mobile` — Expo SDK 57 + expo-router, one binary with `(parent)` and `(kid)` route groups under `src/app/`, role picker on first launch persisted in expo-secure-store. expo-sqlite + Drizzle local DB with an outbox table arrive in later tickets.
-- `apps/api` — Hono on `@hono/node-server`, Drizzle + `postgres`, `Dockerfile` + `railway.json` for Railway, migrations in `drizzle/` applied on process start (`src/db/migrate.ts`), minute cron in-process (later ticket).
+- `apps/api` — Hono on `@hono/node-server`, Drizzle + `postgres`, `Dockerfile` (repo-root `railway.json`) for Railway, migrations in `drizzle/` applied on process start (`src/db/migrate.ts`), minute cron in-process (later ticket).
 - `packages/shared` — `@chores/shared`: zod schemas and all pure logic. Runs unchanged on device and server. This is where the correctness-critical tests live.
 
 Tooling: pnpm workspaces + Turborepo, Node 22, `node-linker=hoisted`, TypeScript 6 strict, ESLint flat config at the root, Prettier, Vitest per workspace, GitHub Actions (`.github/workflows/ci.yml`) running typecheck, lint, test on PR and on main.
