@@ -44,6 +44,8 @@ pnpm --filter mobile android                           # local dev-client build 
 cd apps/mobile && eas build -p android --profile development   # EAS dev build (internal APK)
 ```
 
+Railway: project `chores`, service `api` (Dockerfile via `RAILWAY_DOCKERFILE_PATH=apps/api/Dockerfile`, `DATABASE_URL` referenced from the `Postgres` service). Deploy with `railway up --service api --ci` from the repo root. Live: https://api-production-c5c7.up.railway.app/health
+
 Local Postgres for API tests: `docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`, then `DATABASE_URL=postgres://postgres:postgres@localhost:5499/chores`.
 
 ## Testing seams (pre-agreed for `/tdd`; these three only)
