@@ -5,6 +5,7 @@ import {
   displayedPetLevel,
   petLevel,
   petMood,
+  petProgress,
 } from './pet.ts';
 import type { DaySummary } from './day-summary.ts';
 
@@ -55,5 +56,35 @@ describe('petMood', () => {
   it('is sleepy with no summary for today or a frozen day', () => {
     expect(petMood(undefined)).toBe('sleepy');
     expect(petMood(summary(0, 0))).toBe('sleepy');
+  });
+});
+
+describe('petProgress', () => {
+  it('fills the bar across the band of the current level', () => {
+    expect(petProgress(0, 1)).toMatchObject({ level: 1, into: 0, needed: 100, fraction: 0 });
+    expect(petProgress(50, 1)).toMatchObject({ level: 1, into: 50, needed: 100, fraction: 0.5 });
+    expect(petProgress(100, 1)).toMatchObject({ level: 2, into: 0, needed: 200, fraction: 0 });
+    expect(petProgress(200, 1)).toMatchObject({ level: 2, into: 100, needed: 200, fraction: 0.5 });
+  });
+
+  it('is full and going nowhere at the top level', () => {
+    expect(petProgress(1500, 1)).toMatchObject({
+      level: 5,
+      into: 0,
+      needed: 0,
+      fraction: 1,
+      atMax: true,
+    });
+    expect(petProgress(99_999, 5).atMax).toBe(true);
+  });
+
+  it('follows the displayed level, so a clawback empties the bar instead of dropping a level', () => {
+    // Level 3 was reached and shown; XP then fell back into level 2's band.
+    expect(petProgress(250, 3)).toMatchObject({ level: 3, into: 0, needed: 400, fraction: 0 });
+  });
+
+  it('carries the total XP through untouched', () => {
+    expect(petProgress(250, 1).xp).toBe(250);
+    expect(petProgress(-40, 1)).toMatchObject({ level: 1, into: 0, fraction: 0 });
   });
 });

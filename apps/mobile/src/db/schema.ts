@@ -179,6 +179,26 @@ export const outbox = sqliteTable('outbox', {
   reason: text('reason').$type<RejectReason>(),
 });
 
+/**
+ * Feature flags, fetched in parent mode and cached here: kid mode never calls the flag service,
+ * and must work offline (docs/spec/01-product.md, analytics). A flag with no row falls back to
+ * its default, so a device that has never seen a parent still behaves.
+ */
+export const flags = sqliteTable('flags', {
+  key: text('key').primaryKey(),
+  enabled: bool('enabled').notNull(),
+  updated_at: text('updated_at').notNull(),
+});
+
+/**
+ * What the child has already been told about their pet. `shown_level` only ever rises: XP can be
+ * clawed back, but a pet the child has seen at level 3 is never demoted (docs/spec/01-product.md).
+ */
+export const petState = sqliteTable('pet_state', {
+  child_id: text('child_id').primaryKey(),
+  shown_level: integer('shown_level').notNull().default(1),
+});
+
 /** One row: how far this device has pulled the change log. */
 export const syncState = sqliteTable('sync_state', {
   id: integer('id').primaryKey(),

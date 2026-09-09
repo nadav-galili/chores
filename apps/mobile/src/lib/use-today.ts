@@ -1,4 +1,10 @@
-import { choreDate, currentStreak, type DeviceSession, type UiMode } from '@chores/shared';
+import {
+  COINS_PER_CHORE,
+  choreDate,
+  currentStreak,
+  type DeviceSession,
+  type UiMode,
+} from '@chores/shared';
 import { eq } from 'drizzle-orm';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,6 +15,7 @@ import type { DeviceDb } from '@/db/types';
 import { materializeToday, todayList, type TodayItem } from '@/sync/engine';
 import { balanceOf, tapContext, tapToggle, type ChildContext } from '@/sync/local';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
+import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
 import { ApiError, createDeviceApi } from '@/lib/api';
 
@@ -25,6 +32,22 @@ export type TodayState = {
   offline: boolean;
   /** Taps the server refused. They are never retried, so the child has to be told. */
   refused: number;
+  /** Level, mood and XP bar, from the shared rules over local rows. */
+  pet: PetView;
+};
+
+/**
+ * One done moment: what the child sees the instant they tap. Created synchronously in the tap
+ * handler, before any database work, so the pet starts reacting in the same frame as the tap
+ * (the `pet_reacted` event measures from `at` in a later ticket).
+ */
+export type DoneReaction = {
+  /** New on every tap, so a second tap restarts the animation. */
+  key: number;
+  /** What the tap paid. Starts at the per-chore rate and rises if the tap completed the day. */
+  coins: number;
+  /** `Date.now()` at the tap itself. */
+  at: number;
 };
 
 export type Today = TodayState & {
@@ -32,6 +55,18 @@ export type Today = TodayState & {
   toggle: (item: TodayItem) => void;
   /** The child has seen the refusals; stop showing them. */
   dismissRefused: () => void;
+  /** The done moment to play, or null. Set in the same tick as the tap. */
+  reaction: DoneReaction | null;
+  /** The animation has finished playing. */
+  clearReaction: () => void;
+};
+
+/** What the header draws before the first read lands. */
+const PET_PLACEHOLDER: PetView = {
+  enabled: true,
+  name: 'Pet',
+  mood: 'sleepy',
+  progress: { level: 1, xp: 0, into: 0, needed: 100, fraction: 0, atMax: false },
 };
 
 /**
@@ -48,7 +83,10 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     coins: 0,
     offline: false,
     refused: 0,
+    pet: { ...PET_PLACEHOLDER, name: session.child.pet_name },
   });
+  const [reaction, setReaction] = useState<DoneReaction | null>(null);
+  const taps = useRef(0);
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
 
@@ -70,12 +108,13 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     async (db: DeviceDb, offline: boolean) => {
       const date = choreDate(new Date(), tz, boundary);
       await materializeToday(db, childId, date);
-      const [items, rows, summaries, coins, refused] = await Promise.all([
+      const [items, rows, summaries, coins, refused, pet] = await Promise.all([
         todayList(db, childId, date),
         db.select().from(children).where(eq(children.id, childId)),
         db.select().from(daySummaries).where(eq(daySummaries.child_id, childId)),
         balanceOf(db, childId),
         rejectedOps(db),
+        showPet(db, childId, date),
       ]);
       setState({
         status: 'ready',
@@ -86,6 +125,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         coins,
         offline,
         refused: refused.length,
+        pet,
       });
     },
     [childId, tz, boundary, joinedUiMode, joinedName],
@@ -105,16 +145,28 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
 
   const toggle = useCallback(
     (item: TodayItem) => {
+      // Start the done moment in this very tick: the pet must react to the tap, not to SQLite.
+      // Undoing is not a celebration, so only a chore going done gets one.
+      if (item.status !== 'done') {
+        setReaction({ key: (taps.current += 1), coins: COINS_PER_CHORE, at: Date.now() });
+      }
       void (async () => {
         const db = await openDeviceDb();
-        await tapToggle(db, tapContext(child), item);
+        const paid = await tapToggle(db, tapContext(child), item);
         // The child sees the new coins and streak before anything reaches the network.
         await readLocal(db, state.offline);
+        // A tap that completed the day paid a bonus too. The animation is already running; this
+        // only corrects the number on it, from what the tap itself wrote.
+        if (paid > COINS_PER_CHORE) {
+          setReaction((r) => (r === null ? r : { ...r, coins: paid }));
+        }
         await refresh();
       })();
     },
     [child, readLocal, refresh, state.offline],
   );
+
+  const clearReaction = useCallback(() => setReaction(null), []);
 
   const dismissRefused = useCallback(() => {
     void (async () => {
@@ -137,5 +189,5 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     return () => sub.remove();
   }, [refresh]);
 
-  return { ...state, toggle, dismissRefused };
+  return { ...state, toggle, dismissRefused, reaction, clearReaction };
 }

@@ -15,6 +15,13 @@
       "when": 1788981978868,
       "tag": "0001_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788987623531,
+      "tag": "0002_pet",
+      "breakpoints": true
     }
   ]
 }

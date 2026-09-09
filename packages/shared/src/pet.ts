@@ -29,3 +29,37 @@ export function petMood(today: Pick<DaySummary, 'complete' | 'done_count'> | und
   if (today.done_count > 0) return 'content';
   return 'sleepy';
 }
+
+/** Where the XP bar stands: the band of the level being shown, and how far into it the child is. */
+export type PetProgress = {
+  /** The level on screen — `displayedPetLevel`, so it never drops. */
+  level: number;
+  /** Total XP, `SUM(xp)`. */
+  xp: number;
+  /** XP earned into the current level's band, never negative. */
+  into: number;
+  /** The band's width. Zero at the top level, where there is nothing left to fill. */
+  needed: number;
+  /** `into / needed`, 0..1. One at the top level. */
+  fraction: number;
+  atMax: boolean;
+};
+
+/**
+ * The XP bar for a child holding `totalXp` whose pet has already been shown at `shownLevel`.
+ *
+ * The bar follows the displayed level rather than the earned one, so a clawback empties the bar
+ * instead of demoting the pet: the child keeps what they were told they had (docs/spec/01-product.md,
+ * "UI level is monotonic even if XP is clawed back").
+ */
+export function petProgress(totalXp: number, shownLevel: number): PetProgress {
+  const level = displayedPetLevel(totalXp, shownLevel);
+  if (level >= PET_MAX_LEVEL) {
+    return { level: PET_MAX_LEVEL, xp: totalXp, into: 0, needed: 0, fraction: 1, atMax: true };
+  }
+  const floor = PET_LEVEL_THRESHOLDS[level - 1]!;
+  const next = PET_LEVEL_THRESHOLDS[level]!;
+  const needed = next - floor;
+  const into = Math.min(Math.max(totalXp - floor, 0), needed);
+  return { level, xp: totalXp, into, needed, fraction: into / needed, atMax: false };
+}

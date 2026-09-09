@@ -246,3 +246,42 @@ describe('the server writing the same facts', () => {
     expect(row!.status).toBe('done');
   });
 });
+
+describe('what a tap reports it paid', () => {
+  it('pays the chore rate, and the day bonus too when the tap finishes the day', async () => {
+    const a = await seedChore('Dishes');
+    const b = await seedChore('Bed');
+
+    expect(await tapDone(db, ctx(), a)).toBe(COINS_PER_CHORE);
+    expect(await tapDone(db, ctx(), b)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+  });
+
+  it('reports the clawback when the same tap undoes', async () => {
+    const instance = await seedChore();
+    await tapDone(db, ctx(), instance);
+    expect(await tapUndo(db, ctx(), instance)).toBe(-(COINS_PER_CHORE + DAY_COMPLETE_BONUS));
+  });
+
+  it('reports nothing for an undo with no completion to undo', async () => {
+    const instance = await seedChore();
+    expect(await tapUndo(db, ctx(), instance)).toBe(0);
+  });
+
+  it('counts only this tap, not entries a pull landed alongside it', async () => {
+    const instance = await seedChore();
+    // A ledger row from somewhere else entirely, already on the device.
+    await db.insert(ledgerEntries).values({
+      id: uuid7(),
+      household_id: householdId,
+      child_id: childId,
+      kind: 'adjust',
+      coins: 500,
+      money_amount: null,
+      ref_type: null,
+      ref_id: null,
+      created_at: T,
+      created_by: null,
+    });
+    expect(await tapDone(db, ctx(), instance)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+  });
+});

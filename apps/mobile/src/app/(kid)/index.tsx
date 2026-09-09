@@ -2,6 +2,9 @@ import { COINS_PER_CHORE } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { DoneMoment } from '@/components/done-moment';
+import { PetFigure } from '@/components/pet';
+import { StreakBadge } from '@/components/streak-badge';
 import { wipeDeviceDb } from '@/db/client';
 import { createDeviceApi } from '@/lib/api';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
@@ -51,14 +54,25 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
         importantForAccessibility="no-hide-descendants"
       />
       <View style={styles.header}>
+        {today.status === 'ready' && today.pet.enabled && (
+          <Pressable
+            onPress={() => router.push('/(kid)/pet')}
+            accessibilityRole="button"
+            accessibilityLabel={`${today.pet.name}, level ${today.pet.progress.level}`}
+          >
+            <PetFigure
+              name={today.pet.name}
+              level={today.pet.progress.level}
+              mood={today.pet.mood}
+              size={64}
+              showStage={false}
+            />
+          </Pressable>
+        )}
         <Text style={little ? styles.greetingLittle : styles.greeting}>Hi {today.firstName}!</Text>
         <View style={styles.tallies}>
           <Text style={styles.coinTally}>{today.coins} 🪙</Text>
-          {!little && (
-            <Text style={styles.streak}>
-              🔥 {today.streak} day{today.streak === 1 ? '' : 's'}
-            </Text>
-          )}
+          {!little && <StreakBadge days={today.streak} />}
         </View>
       </View>
       {today.offline && <Text style={styles.offline}>Showing what’s saved on this device.</Text>}
@@ -93,6 +107,22 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
           ) : null
         }
       />
+      {today.reaction && (
+        <DoneMoment
+          key={today.reaction.key}
+          reaction={today.reaction}
+          // The pet always reacts happily to a completion, whatever the rest of the day looks
+          // like; the header pet goes on showing today's real mood.
+          pet={{
+            enabled: today.pet.enabled,
+            name: today.pet.name,
+            level: today.pet.progress.level,
+            mood: 'happy',
+          }}
+          streak={today.streak}
+          onDone={today.clearReaction}
+        />
+      )}
     </View>
   );
 }
@@ -139,12 +169,11 @@ function Row({ item, onPress }: { item: TodayItem; onPress: () => void }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingTop: 56, paddingHorizontal: 16 },
   secretCorner: { position: 'absolute', top: 0, right: 0, width: 72, height: 72, zIndex: 1 },
-  header: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   greeting: { fontSize: 28, fontWeight: '700' },
   greetingLittle: { fontSize: 36, fontWeight: '700' },
   tallies: { alignItems: 'flex-end' },
   coinTally: { fontSize: 20, fontWeight: '700' },
-  streak: { fontSize: 18, fontWeight: '600', color: '#e65100' },
   offline: { color: '#777', marginTop: 4 },
   refused: {
     marginTop: 8,

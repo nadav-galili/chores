@@ -52,7 +52,7 @@ const GRANT_KINDS = ['earn', 'bonus', 'streak', 'clawback'] as const;
  * comes from the stored summary of the day before — a row the server wrote. That makes the numbers
  * here the same ones the server reaches from the full history.
  */
-export async function reconcileLocal(db: DeviceDb, ctx: TapContext): Promise<void> {
+export async function reconcileLocal(db: DeviceDb, ctx: TapContext): Promise<number> {
   const [instances, completionRows, entries, stored] = await Promise.all([
     db
       .select({ id: choreInstances.id, chore_date: choreInstances.chore_date })
@@ -116,15 +116,23 @@ export async function reconcileLocal(db: DeviceDb, ctx: TapContext): Promise<voi
 
   const grove = growthEntriesFor(ctx.householdId, ctx.childId, result.summaries, created_at);
   if (grove.length) await db.insert(growthEntries).values(grove).onConflictDoNothing();
+
+  // What this reconciliation moved the balance by: the earn plus any bonus the tap triggered, or
+  // the clawbacks an undo produced. The caller shows this number; reading the balance before and
+  // after would also pick up whatever a concurrent pull happened to apply.
+  return result.entries.reduce((coins, e) => coins + e.coins, 0);
 }
 
-/** The child taps a chore done: it counts now, offline, and syncs later. */
+/**
+ * The child taps a chore done: it counts now, offline, and syncs later. Returns the coins the tap
+ * paid — the per-chore rate, plus the day and streak bonuses if it completed the day.
+ */
 export async function tapDone(
   db: DeviceDb,
   ctx: TapContext,
   instance: { id: string; chore_id: string },
-): Promise<void> {
-  await inTransaction(db, async () => {
+): Promise<number> {
+  return inTransaction(db, async () => {
     const completion_id = uuid7();
     const completed_at = ctx.now.toISOString();
     await db
@@ -146,7 +154,7 @@ export async function tapDone(
       .update(choreInstances)
       .set({ status: 'done' })
       .where(eq(choreInstances.id, instance.id));
-    await reconcileLocal(db, ctx);
+    const paid = await reconcileLocal(db, ctx);
     await enqueueOp(
       db,
       {
@@ -161,6 +169,7 @@ export async function tapDone(
       },
       ctx.now,
     );
+    return paid;
   });
 }
 
@@ -173,8 +182,8 @@ export async function tapUndo(
   db: DeviceDb,
   ctx: TapContext,
   instance: { id: string },
-): Promise<void> {
-  await inTransaction(db, async () => {
+): Promise<number> {
+  return inTransaction(db, async () => {
     const [completion] = await db
       .select()
       .from(completions)
@@ -186,29 +195,29 @@ export async function tapUndo(
           eq(completions.status, 'accepted'),
         ),
       );
-    if (!completion) return;
+    if (!completion) return 0;
     await db.update(completions).set({ status: 'undone' }).where(eq(completions.id, completion.id));
     await db
       .update(choreInstances)
       .set({ status: 'due' })
       .where(eq(choreInstances.id, instance.id));
-    await reconcileLocal(db, ctx);
+    const clawed = await reconcileLocal(db, ctx);
     await enqueueOp(
       db,
       { op_id: uuid7(), type: 'uncomplete', payload: { completion_id: completion.id } },
       ctx.now,
     );
+    return clawed;
   });
 }
 
-/** One tap: done if it is not, undone if it is. */
+/** One tap: done if it is not, undone if it is. Returns the coins it moved, signed. */
 export async function tapToggle(
   db: DeviceDb,
   ctx: TapContext,
   instance: { id: string; chore_id: string; status: InstanceStatus },
-): Promise<void> {
-  if (instance.status === 'done') await tapUndo(db, ctx, instance);
-  else await tapDone(db, ctx, instance);
+): Promise<number> {
+  return instance.status === 'done' ? tapUndo(db, ctx, instance) : tapDone(db, ctx, instance);
 }
 
 /** A child's balance: always `SUM(coins)`, never a stored column (ADR-0002). */
