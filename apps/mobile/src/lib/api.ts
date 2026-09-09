@@ -1,4 +1,12 @@
-import type { Child, ChildInput, CreateHouseholdInput, Household, Parent } from '@chores/shared';
+import type {
+  Child,
+  ChildInput,
+  Chore,
+  CreateHouseholdInput,
+  Household,
+  Parent,
+  UpsertChoreOp,
+} from '@chores/shared';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -31,7 +39,7 @@ async function call<T>(getToken: GetToken, path: string, init: RequestInit = {})
   return (await res.json()) as T;
 }
 
-const json = (method: 'POST' | 'PATCH', body: unknown): RequestInit => ({
+const json = (method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: unknown): RequestInit => ({
   method,
   body: JSON.stringify(body),
 });
@@ -46,6 +54,16 @@ export function createApi(getToken: GetToken) {
       call<Child>(getToken, `/households/${householdId}/children`, json('POST', input)),
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
+    listChores: (householdId: string) =>
+      call<Chore[]>(getToken, `/households/${householdId}/chores`),
+    upsertChore: (householdId: string, choreId: string, op: UpsertChoreOp) =>
+      call<Chore>(getToken, `/households/${householdId}/chores/${choreId}`, json('PUT', op)),
+    deleteChore: (householdId: string, choreId: string) =>
+      call<Chore>(
+        getToken,
+        `/households/${householdId}/chores/${choreId}`,
+        json('DELETE', { updated_at: new Date().toISOString() }),
+      ),
   };
 }
 

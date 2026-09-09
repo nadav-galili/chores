@@ -6,6 +6,7 @@ import type { Db } from './db/client.ts';
 import { children, households, parents } from './db/schema.ts';
 import { childToApi, householdToApi, parentToApi } from './serialize.ts';
 import { parseBody } from './parse-body.ts';
+import { householdScope, type ScopedEnv } from './scope.ts';
 
 type Env = { Variables: AuthVariables };
 
@@ -69,16 +70,8 @@ export function householdRoutes(db: Db) {
     );
   });
 
-  // Every route below is scoped to the caller's own household; any other id is 404.
-  const scoped = new Hono<Env & { Variables: { householdId: string } }>();
-  scoped.use('/households/:householdId/*', async (c, next) => {
-    const parent = await parentOf(c.get('clerkUserId'));
-    if (!parent || parent.householdId !== c.req.param('householdId')) {
-      return c.json({ error: 'not_found' }, 404);
-    }
-    c.set('householdId', parent.householdId);
-    await next();
-  });
+  const scoped = new Hono<ScopedEnv>();
+  scoped.use('/households/:householdId/*', householdScope(db));
 
   scoped.get('/households/:householdId/children', async (c) => {
     return c.json((await listChildren(c.get('householdId'))).map(childToApi));

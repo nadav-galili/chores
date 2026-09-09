@@ -15,6 +15,13 @@
       "when": 1788975751838,
       "tag": "0001_people",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788976796323,
+      "tag": "0002_chores",
+      "breakpoints": true
     }
   ]
 }

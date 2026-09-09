@@ -1,9 +1,24 @@
-import { integer, pgEnum, pgTable, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigserial,
+  boolean,
+  date,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import type { ChoreClocks } from '@chores/shared';
 
 export const currencyEnum = pgEnum('currency', ['ILS', 'USD']);
 export const entitlementEnum = pgEnum('entitlement', ['free', 'premium']);
 export const uiModeEnum = pgEnum('ui_mode', ['little', 'big']);
 export const platformEnum = pgEnum('platform', ['ios', 'android']);
+export const choreKindEnum = pgEnum('chore_kind', ['once', 'daily', 'weekdays']);
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -86,4 +101,56 @@ export const joinCodes = pgTable('join_codes', {
   expiresAt: timestamptz('expires_at').notNull(),
   redeemedAt: timestamptz('redeemed_at'),
   redeemedDeviceId: uuid('redeemed_device_id').references(() => childDevices.id),
+});
+
+const localDate = (name: string) => date(name, { mode: 'string' });
+
+export const chores = pgTable('chores', {
+  id: uuid('id').primaryKey(),
+  householdId: uuid('household_id')
+    .notNull()
+    .references(() => households.id),
+  title: text('title').notNull(),
+  icon: text('icon'),
+  kind: choreKindEnum('kind').notNull(),
+  /** Bit mask, Mon=0 … Sun=6; only read for `weekdays`. */
+  weekdayMask: smallint('weekday_mask'),
+  startDate: localDate('start_date'),
+  endDate: localDate('end_date'),
+  dueDate: localDate('due_date'),
+  requiresPhoto: boolean('requires_photo').notNull().default(false),
+  version: integer('version').notNull().default(1),
+  /** The latest writer clock that landed on any field. */
+  updatedAt: timestamptz('updated_at').notNull(),
+  updatedBy: uuid('updated_by')
+    .notNull()
+    .references(() => parents.id),
+  deletedAt: timestamptz('deleted_at'),
+  /** Writer clock per field, for last-writer-wins merges (docs/spec/03-sync.md). */
+  fieldClocks: jsonb('field_clocks').$type<ChoreClocks>().notNull().default({}),
+});
+
+export const choreAssignees = pgTable(
+  'chore_assignees',
+  {
+    choreId: uuid('chore_id')
+      .notNull()
+      .references(() => chores.id),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+  },
+  (t) => [primaryKey({ columns: [t.choreId, t.childId] })],
+);
+
+/** Written by the `log_change` trigger (see the migration); never by application code. */
+export const changeLog = pgTable('change_log', {
+  seq: bigserial('seq', { mode: 'number' }).primaryKey(),
+  householdId: uuid('household_id').notNull(),
+  childId: uuid('child_id'),
+  table: text('table').notNull(),
+  rowId: uuid('row_id').notNull(),
+  op: text('op').notNull(),
+  row: jsonb('row').notNull(),
+  at: timestamptz('at').notNull().defaultNow(),
 });

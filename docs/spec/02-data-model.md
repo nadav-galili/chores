@@ -11,7 +11,7 @@ Postgres is the source of truth. Devices hold a scoped subset in expo-sqlite wit
 - **join_codes**: code (6 chars, unique while live) · household_id · child_id · created_by · expires_at · redeemed_at · redeemed_device_id
 
 ## Chores
-- **chores**: id · household_id · title · icon · kind (once|daily|weekdays) · weekday_mask · start_date · end_date · due_date · requires_photo · version · updated_at · updated_by · deleted_at
+- **chores**: id · household_id · title · icon · kind (once|daily|weekdays) · weekday_mask · start_date · end_date · due_date · requires_photo · version · updated_at · updated_by · deleted_at · field_clocks (jsonb: field → writer `updated_at` of its last landed write; what makes last-writer-wins *per field* possible when ops arrive out of order)
 - **chore_assignees**: chore_id · child_id (PK)
 - **chore_instances**: **id = uuid5(chore_id, child_id, chore_date)** · chore_id · child_id · household_id · chore_date (DATE) · status (due|done|pending_photo|redo) · unique(chore_id, child_id, chore_date). Materialized by the device on day open and by server cron at the household boundary, `ON CONFLICT DO NOTHING`.
 - **completions**: id · instance_id · chore_id · child_id · household_id · chore_date · completed_at (UTC) · device_id · photo_key · status (accepted|pending_photo|rejected) · rejected_by · rejected_at · created_at. Append-only. Completion of a deleted chore is accepted and paid.

@@ -34,6 +34,7 @@ export default function ChildrenList() {
         )}
       />
       <Button title="Add a child" onPress={() => router.push('/(parent)/children/new')} />
+      <Button title="Chores" onPress={() => router.push('/(parent)/chores')} secondary />
       <Button title="Sign out" onPress={() => void signOut()} secondary />
     </Screen>
   );

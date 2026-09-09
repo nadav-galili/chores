@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { requireClerkUser, type VerifyToken } from './auth.ts';
 import type { Db } from './db/client.ts';
+import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
 
 export type AppOptions = { verifyToken: VerifyToken };
@@ -18,6 +19,7 @@ export function createApp(db: Db, { verifyToken }: AppOptions) {
   app.use('/households/*', requireClerkUser(verifyToken));
   app.use('/households', requireClerkUser(verifyToken));
   app.route('/', householdRoutes(db));
+  app.route('/', choreRoutes(db));
 
   return app;
 }
