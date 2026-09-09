@@ -10,6 +10,8 @@ import type {
   DeviceSession,
   Parent,
   RedeemJoinCodeInput,
+  SyncRequest,
+  SyncResponse,
   UpsertChoreOp,
 } from '@chores/shared';
 
@@ -91,5 +93,6 @@ export function createDeviceApi(deviceToken: string) {
   const getToken: GetToken = () => Promise.resolve(deviceToken);
   return {
     me: () => call<DeviceMe>(getToken, '/device/me'),
+    sync: (body: SyncRequest) => call<SyncResponse>(getToken, '/sync', json('POST', body)),
   };
 }

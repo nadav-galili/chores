@@ -4,5 +4,7 @@ dist
 .turbo
 pnpm-lock.yaml
 apps/api/drizzle/meta
+apps/mobile/drizzle/meta
 docs/
 *.md
+apps/mobile/src/db/migrations.ts

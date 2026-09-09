@@ -10,3 +10,4 @@ export * from './child.ts';
 export { uuid7 } from './uuid7.ts';
 export * from './chore.ts';
 export * from './join-code.ts';
+export * from './sync.ts';

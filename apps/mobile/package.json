@@ -8,11 +8,13 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate && tsx scripts/bundle-migrations.ts"
   },
   "dependencies": {
     "@chores/shared": "workspace:*",
     "@clerk/expo": "^4.6.5",
+    "drizzle-orm": "^0.45.2",
     "expo": "~57.0.21",
     "expo-auth-session": "~57.0.11",
     "expo-constants": "~57.0.17",
@@ -23,6 +25,7 @@
     "expo-router": "~57.0.20",
     "expo-secure-store": "~57.0.0",
     "expo-splash-screen": "~57.0.8",
+    "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.2",
     "react": "19.2.3",
@@ -32,6 +35,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.13",
     "typescript": "~6.0.3",
     "vitest": "^3.2.0"
   }

@@ -247,6 +247,9 @@ describe('change_log', () => {
     }>(sql`select "table", op, child_id, row_id, household_id from change_log
            where household_id = ${s.household.id} order by seq`);
     expect(rows.map((r) => [r.table, r.op, r.child_id])).toEqual([
+      // A child's own row is scoped to that child, so its kid device can pull it.
+      ['children', 'insert', s.childIds[0]],
+      ['children', 'insert', s.childIds[1]],
       ['chores', 'insert', null],
       ['chore_assignees', 'insert', s.childIds[0]],
       ['chores', 'update', null],
@@ -254,7 +257,7 @@ describe('change_log', () => {
       ['chore_assignees', 'insert', s.childIds[1]],
       ['chores', 'update', null],
     ]);
-    expect(new Set(rows.map((r) => r.row_id))).toEqual(new Set([id]));
+    expect(new Set(rows.map((r) => r.row_id))).toEqual(new Set([id, ...s.childIds]));
   });
 });
 

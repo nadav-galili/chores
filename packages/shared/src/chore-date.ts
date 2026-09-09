@@ -33,3 +33,10 @@ export function choreDate(instant: Date, tz: string, dayBoundaryHour: number): I
     parts.find((p) => p.type === type)?.value ?? '';
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
+
+/** `date` moved by `days` on the calendar. Local-date arithmetic only, so DST cannot shift it. */
+export function addDays(date: IsoDate, days: number): IsoDate {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const moved = new Date(Date.UTC(y, m - 1, d + days));
+  return moved.toISOString().slice(0, 10);
+}

@@ -22,7 +22,7 @@ export async function clearDeviceSession(): Promise<void> {
 type State =
   { status: 'loading'; session: null } | { status: 'ready'; session: DeviceSession | null };
 
-type DeviceSessionValue = State & {
+export type DeviceSessionValue = State & {
   save: (session: DeviceSession) => Promise<void>;
   clear: () => Promise<void>;
 };

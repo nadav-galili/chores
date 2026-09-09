@@ -2,6 +2,7 @@ import {
   bigserial,
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -10,6 +11,7 @@ import {
   smallint,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { ChoreClocks } from '@chores/shared';
@@ -19,6 +21,12 @@ export const entitlementEnum = pgEnum('entitlement', ['free', 'premium']);
 export const uiModeEnum = pgEnum('ui_mode', ['little', 'big']);
 export const platformEnum = pgEnum('platform', ['ios', 'android']);
 export const choreKindEnum = pgEnum('chore_kind', ['once', 'daily', 'weekdays']);
+export const instanceStatusEnum = pgEnum('instance_status', [
+  'due',
+  'done',
+  'pending_photo',
+  'redo',
+]);
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -141,6 +149,33 @@ export const choreAssignees = pgTable(
       .references(() => children.id),
   },
   (t) => [primaryKey({ columns: [t.choreId, t.childId] })],
+);
+
+/**
+ * One occurrence of a chore for one child on one chore date; id = uuid5(chore, child, date).
+ * Materialized by the device on day open, by the server cron at the household boundary and
+ * lazily by the server on a kid pull; `ON CONFLICT DO NOTHING` makes the race harmless (ADR-0003).
+ */
+export const choreInstances = pgTable(
+  'chore_instances',
+  {
+    id: uuid('id').primaryKey(),
+    choreId: uuid('chore_id')
+      .notNull()
+      .references(() => chores.id),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    choreDate: localDate('chore_date').notNull(),
+    status: instanceStatusEnum('status').notNull().default('due'),
+  },
+  (t) => [
+    uniqueIndex('chore_instances_chore_child_date').on(t.choreId, t.childId, t.choreDate),
+    index('chore_instances_child_date').on(t.childId, t.choreDate),
+  ],
 );
 
 /** Written by the `log_change` trigger (see the migration); never by application code. */

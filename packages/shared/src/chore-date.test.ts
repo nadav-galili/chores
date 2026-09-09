@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { choreDate } from './chore-date.ts';
+import { addDays, choreDate } from './chore-date.ts';
 
 const at = (iso: string) => new Date(iso);
 
@@ -81,5 +81,20 @@ describe('choreDate', () => {
 
   it('rejects an unknown timezone', () => {
     expect(() => choreDate(at('2026-09-09T00:00:00Z'), 'Mars/Olympus', 0)).toThrow(RangeError);
+  });
+});
+
+describe('addDays', () => {
+  it('is calendar arithmetic on the local date, no timezone involved', () => {
+    expect(addDays('2026-09-09', 0)).toBe('2026-09-09');
+    expect(addDays('2026-09-09', 14)).toBe('2026-09-23');
+    expect(addDays('2026-09-09', -14)).toBe('2026-08-26');
+  });
+
+  it('crosses month and year ends and leap days', () => {
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2027-02-28', 1)).toBe('2027-03-01');
   });
 });
