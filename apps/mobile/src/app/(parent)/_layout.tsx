@@ -1,16 +1,7 @@
 import { useAuth } from '@clerk/expo';
 import { Redirect, Stack, usePathname } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
-import { Button, ErrorText, Screen, Title } from '@/components/ui';
+import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
-
-function Loading() {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center' }}>
-      <ActivityIndicator />
-    </View>
-  );
-}
 
 /** Signed in → needs a household → create-household; has one → the children list. */
 function HouseholdGate() {

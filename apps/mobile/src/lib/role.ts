@@ -11,3 +11,7 @@ export async function getRole(): Promise<Role | null> {
 export async function setRole(role: Role): Promise<void> {
   await SecureStore.setItemAsync(KEY, role);
 }
+
+export async function clearRole(): Promise<void> {
+  await SecureStore.deleteItemAsync(KEY);
+}

@@ -1,7 +1,23 @@
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 
 export function Screen({ children }: { children: React.ReactNode }) {
   return <View style={styles.screen}>{children}</View>;
+}
+
+export function Loading() {
+  return (
+    <View style={styles.loading}>
+      <ActivityIndicator />
+    </View>
+  );
 }
 
 export function Title({ children }: { children: string }) {
@@ -76,6 +92,7 @@ export function ErrorText({ children }: { children: string | null }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 24, gap: 16, justifyContent: 'center' },
+  loading: { flex: 1, justifyContent: 'center' },
   title: { fontSize: 24, fontWeight: '600', marginBottom: 8 },
   field: { gap: 6 },
   label: { fontSize: 14, color: '#555' },

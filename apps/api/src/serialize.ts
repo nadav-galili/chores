@@ -1,4 +1,12 @@
-import type { Child, Chore, ChoreFields, Household, Parent } from '@chores/shared';
+import type {
+  Child,
+  Chore,
+  ChoreFields,
+  Household,
+  ChildSummary,
+  HouseholdSummary,
+  Parent,
+} from '@chores/shared';
 import type { children, chores, households, parents } from './db/schema.ts';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -70,4 +78,13 @@ export function choreToApi(row: typeof chores.$inferSelect, assignees: string[])
     updated_by: row.updatedBy,
     deleted_at: iso(row.deletedAt),
   };
+}
+
+/** First name only: the kid device never learns anything else about the child. */
+export function childSummaryToApi(row: typeof children.$inferSelect): ChildSummary {
+  return { id: row.id, first_name: row.firstName, ui_mode: row.uiMode, pet_name: row.petName };
+}
+
+export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
+  return { id: row.id, tz: row.tz, day_boundary_hour: row.dayBoundaryHour };
 }

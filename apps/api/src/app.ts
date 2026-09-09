@@ -4,10 +4,18 @@ import { requireClerkUser, type VerifyToken } from './auth.ts';
 import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
+import { joinRoutes } from './join.ts';
+import type { RateLimit } from './rate-limit.ts';
 
-export type AppOptions = { verifyToken: VerifyToken };
+export type AppOptions = {
+  verifyToken: VerifyToken;
+  /** Attempts per client at the public redeem endpoint; a 6-char code must not be guessable. */
+  redeemLimit?: RateLimit;
+};
 
-export function createApp(db: Db, { verifyToken }: AppOptions) {
+const DEFAULT_REDEEM_LIMIT: RateLimit = { max: 10, windowMs: 15 * 60 * 1000 };
+
+export function createApp(db: Db, { verifyToken, redeemLimit }: AppOptions) {
   const app = new Hono();
 
   app.get('/health', async (c) => {
@@ -20,6 +28,7 @@ export function createApp(db: Db, { verifyToken }: AppOptions) {
   app.use('/households', requireClerkUser(verifyToken));
   app.route('/', householdRoutes(db));
   app.route('/', choreRoutes(db));
+  app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT));
 
   return app;
 }

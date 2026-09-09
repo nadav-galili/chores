@@ -8,10 +8,12 @@ export function ChildForm({
   title,
   initial = empty,
   onSubmit,
+  footer,
 }: {
   title: string;
   initial?: ChildInput;
   onSubmit: (input: ChildInput) => Promise<void>;
+  footer?: React.ReactNode;
 }) {
   const [firstName, setFirstName] = useState(initial.first_name);
   const [uiMode, setUiMode] = useState<UiMode>(initial.ui_mode);
@@ -64,6 +66,7 @@ export function ChildForm({
       />
       <ErrorText>{error}</ErrorText>
       <Button title="Save" onPress={submit} disabled={busy} />
+      {footer}
     </Screen>
   );
 }

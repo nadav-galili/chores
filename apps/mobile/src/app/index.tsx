@@ -16,8 +16,9 @@ export default function RolePicker() {
   if (role === undefined) return null;
   if (role !== null) return <Redirect href={ROLE_HOME[role]} />;
 
+  // A parent is remembered now; a kid device is remembered only once it has redeemed a join code.
   const choose = async (r: Role) => {
-    await setRole(r);
+    if (r === 'parent') await setRole(r);
     router.replace(ROLE_HOME[r]);
   };
 

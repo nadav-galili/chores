@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChildForm } from '@/components/child-form';
+import { Button } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 
 export default function EditChild() {
@@ -25,6 +26,15 @@ export default function EditChild() {
         await state.refresh();
         router.back();
       }}
+      footer={
+        <Button
+          title="Show join code"
+          secondary
+          onPress={() =>
+            router.push({ pathname: '/(parent)/children/[id]/join-code', params: { id: child.id } })
+          }
+        />
+      }
     />
   );
 }

@@ -4,7 +4,12 @@ import type {
   Chore,
   CreateHouseholdInput,
   Household,
+  IssuedJoinCode,
+  ChildSummary,
+  HouseholdSummary,
+  DeviceSession,
   Parent,
+  RedeemJoinCodeInput,
   UpsertChoreOp,
 } from '@chores/shared';
 
@@ -54,6 +59,10 @@ export function createApi(getToken: GetToken) {
       call<Child>(getToken, `/households/${householdId}/children`, json('POST', input)),
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
+    issueJoinCode: (householdId: string, childId: string) =>
+      call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
+        method: 'POST',
+      }),
     listChores: (householdId: string) =>
       call<Chore[]>(getToken, `/households/${householdId}/chores`),
     upsertChore: (householdId: string, choreId: string, op: UpsertChoreOp) =>
@@ -68,3 +77,19 @@ export function createApi(getToken: GetToken) {
 }
 
 export type Api = ReturnType<typeof createApi>;
+
+const noToken: GetToken = () => Promise.resolve(null);
+
+/** Public: turns a join code into this device's kid session. */
+export const redeemJoinCode = (input: RedeemJoinCodeInput) =>
+  call<DeviceSession>(noToken, '/join-codes/redeem', json('POST', input));
+
+export type DeviceMe = { child: ChildSummary; household: HouseholdSummary };
+
+/** The kid-side surface; every call carries the device token, which alone decides the child. */
+export function createDeviceApi(deviceToken: string) {
+  const getToken: GetToken = () => Promise.resolve(deviceToken);
+  return {
+    me: () => call<DeviceMe>(getToken, '/device/me'),
+  };
+}
