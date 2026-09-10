@@ -7,6 +7,7 @@ import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { wipeDeviceDb } from '@/db/client';
+import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
 import { formatNumber, t } from '@/lib/i18n';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
@@ -34,9 +35,11 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
     // Once per token; a save above rewrites `session` and must not loop.
   }, [session.device_token]);
 
-  // A revoked device wipes its local copy and goes back to the code screen.
+  // A revoked device wipes its local copy and goes back to the code screen. Its analytics anon id
+  // is rotated on revoke (ADR-0009), so the client that holds the old one goes too.
   const onRevoked = useCallback(async () => {
     router.replace({ pathname: '/(kid)/join', params: { reason: 'revoked' } });
+    await shutdownAnalytics();
     await wipeDeviceDb();
     await device.clear();
     await clearRole();

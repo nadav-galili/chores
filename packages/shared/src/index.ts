@@ -19,3 +19,4 @@ export * from './schedule.ts';
 export * from './notification.ts';
 export * from './locale.ts';
 export * from './i18n/index.ts';
+export * from './analytics.ts';

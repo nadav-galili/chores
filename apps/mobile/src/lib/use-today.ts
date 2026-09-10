@@ -1,8 +1,14 @@
 import {
   COINS_PER_CHORE,
+  choreCompleted,
   choreDate,
   currentStreak,
+  groveGrew,
+  kidAppOpen,
+  kidDayComplete,
+  petReacted,
   type DeviceSession,
+  type IsoDate,
   type UiMode,
 } from '@chores/shared';
 import { eq } from 'drizzle-orm';
@@ -19,7 +25,9 @@ import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
+import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
+import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { arrangeKidReminder } from '@/lib/notifications';
 
 export type TodayState = {
@@ -86,6 +94,29 @@ const grovePlaceholder = (childId: string): GroveView => {
 };
 
 /**
+ * What the local rows have just said, reported once each (ADR-0009). Every one of these is a
+ * question about a day or a threshold, and this runs on every open, every focus and after every
+ * tap, so what makes them events rather than readings is the device's own record of what it has
+ * already said — see `sync/analytics`.
+ *
+ * Nothing is marked as said before there is anywhere to say it: this runs on the first read,
+ * which can beat the client coming up, and a day marked open without an event would be a day
+ * silently lost.
+ */
+async function reportDay(
+  db: DeviceDb,
+  today: IsoDate,
+  day: { complete: boolean; streak: number; stage: number },
+): Promise<void> {
+  if (!analyticsReady()) return;
+  if (await markOpen(db, today)) capture(kidAppOpen());
+  if (day.complete && (await markDayComplete(db, today))) {
+    capture(kidDayComplete({ streak: day.streak }));
+  }
+  if (await markGroveStage(db, day.stage)) capture(groveGrew({ stage: day.stage }));
+}
+
+/**
  * Today's list, read from SQLite only: materialize today, show it, then sync and show it again.
  * Runs on open, on focus, whenever the app returns to the foreground, and after every tap.
  */
@@ -143,12 +174,13 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           serverHoldsToken(db),
         ]);
       stage.current = grove.ownTree.stage;
+      const streak = currentStreak(summaries, date);
       setState({
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
         uiMode: rows[0]?.ui_mode ?? joinedUiMode,
         items,
-        streak: currentStreak(summaries, date),
+        streak,
         coins,
         offline,
         refused: refused.length,
@@ -156,6 +188,11 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         grove,
         reminderTime: rows[0]?.reminder_time ?? null,
         pushRegistered,
+      });
+      await reportDay(db, date, {
+        complete: summaries.some((s) => s.chore_date === date && s.complete),
+        streak,
+        stage: grove.ownTree.stage,
       });
     },
     [childId, tz, boundary, joinedUiMode, joinedName],
@@ -189,6 +226,9 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         const db = await openDeviceDb();
         const grown = stage.current;
         const paid = await tapToggle(db, tapContext(child), item);
+        // The tap has counted, in SQLite, whether or not there is a network — which is the whole
+        // offline promise, and why the event carries whether there was one.
+        if (item.status !== 'done') capture(choreCompleted({ offline: state.offline }));
         // The child sees the new coins, streak and tree before anything reaches the network.
         await readLocal(db, state.offline);
         // The animation is already running; this only corrects it, from what the tap itself
@@ -202,6 +242,13 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     [child, readLocal, refresh, state.offline],
   );
 
+  // How long the child waited for the pet: the reaction is created in the tap's own tick, so the
+  // first render carrying it is the frame the pet appears in. Once per tap, by its key.
+  useEffect(() => {
+    if (reaction) capture(petReacted({ tapped_at: reaction.at, shown_at: Date.now() }));
+    // The key changes on every tap; nothing else about the reaction re-fires this.
+  }, [reaction?.key]);
+
   const clearReaction = useCallback(() => setReaction(null), []);
 
   const dismissRefused = useCallback(() => {
@@ -211,6 +258,12 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       await readLocal(db, state.offline);
     })();
   }, [readLocal, state.offline]);
+
+  // This device's analytics identity: the anon id from its join, and nothing about the child
+  // (ADR-0009). Kid mode never asks PostHog for anything, so there is nothing to await.
+  useEffect(() => {
+    void startKidAnalytics(session);
+  }, [session.analytics_anon_id, session.child.ui_mode, session.household.id]);
 
   useFocusEffect(
     useCallback(() => {

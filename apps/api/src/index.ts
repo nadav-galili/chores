@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { posthogAnalytics } from './analytics.ts';
 import { createApp } from './app.ts';
 import { clerkVerifyToken } from './auth.ts';
 import { startCron } from './cron.ts';
@@ -18,7 +19,15 @@ await runMigrations(db);
 // The minute cron lives in this process: one container, one household clock per row (ADR-0003).
 startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
 
-const app = createApp(db, { verifyToken: clerkVerifyToken(clerkSecretKey) });
+const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY);
+
+const app = createApp(db, { verifyToken: clerkVerifyToken(clerkSecretKey), analytics });
 serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
   console.log(`api listening on :${info.port}`);
+});
+
+// Events are batched, so a container going away has to be given the chance to send what it holds
+// — and analytics is never load-bearing, so a flush that fails must not hold the process open.
+process.on('SIGTERM', () => {
+  void analytics.shutdown().finally(() => process.exit(0));
 });

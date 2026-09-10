@@ -221,6 +221,24 @@ export const notificationState = sqliteTable('notification_state', {
   updated_at: text('updated_at').notNull(),
 });
 
+/**
+ * One row: what this device has already reported to analytics, so a daily event is daily and a
+ * growth is a growth (ADR-0009). Kept here rather than in memory because the questions are about
+ * days and the app is relaunched many times a day; a restart must not look like another open.
+ */
+export const analyticsState = sqliteTable('analytics_state', {
+  id: integer('id').primaryKey(),
+  /** The last chore date this device reported an open for. */
+  opened_on: text('opened_on'),
+  /** The last chore date this device reported a Day Complete for. */
+  completed_on: text('completed_on'),
+  /**
+   * The child's Grove Stage as last reported; null until this device has read one. A stage only
+   * ever rises (ADR-0011), and the first stage a device reads is what it already had, not growth.
+   */
+  grove_stage: integer('grove_stage'),
+});
+
 /** One row: how far this device has pulled the change log. */
 export const syncState = sqliteTable('sync_state', {
   id: integer('id').primaryKey(),

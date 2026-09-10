@@ -1,6 +1,7 @@
 import {
   JOIN_CODE_TTL_MS,
   generateJoinCode,
+  joinCodeRedeemed,
   joinCodeStatus,
   redeemJoinCodeInputSchema,
   uuid7,
@@ -10,6 +11,7 @@ import {
 import { randomInt, randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import { childDevices, children, households, joinCodes } from './db/schema.ts';
 import {
@@ -56,7 +58,7 @@ async function claimCode(
 }
 
 /** Join codes: a parent issues one per child; a kid device redeems it, publicly. */
-export function joinRoutes(db: Db, redeemLimit: RateLimit) {
+export function joinRoutes(db: Db, redeemLimit: RateLimit, analytics: Analytics) {
   const app = new Hono();
 
   const scoped = new Hono<ScopedEnv>();
@@ -148,6 +150,16 @@ export function joinRoutes(db: Db, redeemLimit: RateLimit) {
       return { session };
     });
     if ('error' in result) return c.json({ error: result.error }, result.status);
+    // The device's own anon id, used here for the first time: the join is the first thing this
+    // device ever reports, and the only party it is reported as is itself (ADR-0009).
+    analytics.capture({
+      distinctId: result.session.analytics_anon_id,
+      event: joinCodeRedeemed({
+        ui_mode: result.session.child.ui_mode,
+        household_id: result.session.household.id,
+        platform: body.data.platform,
+      }),
+    });
     return c.json(result.session, 201);
   });
 

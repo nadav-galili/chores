@@ -37,6 +37,27 @@ export async function readFlag(db: DeviceDb, key: FlagKey): Promise<boolean> {
  * Stores what parent mode last saw, so kid mode can read it offline. Parent mode does the
  * fetching in a later ticket; this is the cache it writes through.
  */
+/**
+ * Writes through what parent mode's flag fetch answered. Only the flags a kid screen reads are
+ * kept; a flag the project does not define is left at whatever the cache last knew, and only an
+ * explicit `false` turns an experience off — a boolean flag answers with a boolean and a
+ * multivariate one with its variant name, and any variant is still the experience being on.
+ */
+export async function cacheFetchedFlags(
+  db: DeviceDb,
+  fetched: Record<string, unknown>,
+  now: Date,
+): Promise<FlagKey[]> {
+  const cached: FlagKey[] = [];
+  for (const key of [PET_ENABLED, GROVE_ENABLED] satisfies FlagKey[]) {
+    const value = fetched[key];
+    if (value === undefined) continue;
+    await cacheFlag(db, key, value !== false, now);
+    cached.push(key);
+  }
+  return cached;
+}
+
 export async function cacheFlag(
   db: DeviceDb,
   key: FlagKey,

@@ -20,6 +20,7 @@
     "expo-server-sdk": "^7.2.0",
     "hono": "^4.9.0",
     "postgres": "^3.4.7",
+    "posthog-node": "^5.51.8",
     "zod": "^3.25.0"
   },
   "devDependencies": {

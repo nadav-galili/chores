@@ -38,6 +38,13 @@ export default {
       "when": 1789026445981,
       "tag": "0004_device_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789031107837,
+      "tag": "0005_analytics",
+      "breakpoints": true
     }
   ]
 },
@@ -47,5 +54,6 @@ export default {
     m0002: "CREATE TABLE `flags` (\n\t`key` text PRIMARY KEY NOT NULL,\n\t`enabled` integer NOT NULL,\n\t`updated_at` text NOT NULL\n);\n--> statement-breakpoint\nCREATE TABLE `pet_state` (\n\t`child_id` text PRIMARY KEY NOT NULL,\n\t`shown_level` integer DEFAULT 1 NOT NULL\n);\n",
     m0003: "CREATE TABLE `notification_state` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`push_token` text,\n\t`reminder_time` text,\n\t`updated_at` text NOT NULL\n);\n",
     m0004: "ALTER TABLE `notification_state` ADD `locale` text;",
+    m0005: "CREATE TABLE `analytics_state` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`opened_on` text,\n\t`completed_on` text,\n\t`grove_stage` integer\n);\n",
   },
 };
