@@ -64,7 +64,9 @@ Five bodies, one creature. A small round garden bird — a robin or a wren, not 
 
 The stage names are ADR-0012's: egg, hatchling, fledgling, full, splendid. (`pet-art.ts` currently labels level 3 "Chick" against a placeholder emoji; the swap ticket reconciles that label with these names.)
 
-The bird faces three-quarters to the viewer's left in every stage. The eye is a simple dark round dot with a single small light catch — never a drawn pupil, never eyelashes, never a human expression. Warm and calm, not cute-aggressive.
+The bird faces three-quarters to the viewer's left in stages 1 to 4. **Stage 5 is the exception: it turns to face the viewer, chest out, tail cocked upright.** That is deliberate and it is the thing that makes splendid readable — see the pass 1 re-render below. Do not "correct" it back into profile.
+
+The eye is a simple dark round dot with a single small light catch — never a drawn pupil, never eyelashes, never a human expression. Warm and calm, not cute-aggressive.
 
 ### 1. `pet-l1` — egg
 
@@ -112,7 +114,9 @@ The bird faces three-quarters to the viewer's left in every stage. The eye is a 
 
 > Edit this image. Keep the same bird — the same small round garden bird, the same face, the same soft gouache botanical style, the same brush handling and paper grain, the same lighting from the upper left, the same flat `#F2F6F1` background, the same framing and the same scale. This is the same creature at its best, not a different species. Change four things and make each one obvious in the silhouette alone: the back deepens to a rich forest green-brown near `#2F6B4F`, clearly darker and greener than before; the tail grows markedly longer and fuller and lifts to a jaunty upward angle; the breast is a warmer, creamier cream with soft fine barring; and the bird stands taller and more upright, chest out, rather than hunched. Beside it on the pale sage-green `#8CBF9E` moss stands a small leafy sprig with three or four leaves, tall enough to be visible in outline. Still a plain garden bird — no crest, no long trailing plumes, no peacock tail, no iridescence, no gold. Keep the muted natural palette. No text, no letters, no numbers, no watermark, no signature, no border, no drop shadow, no outline stroke, no cartoon bevel, no glossy highlight, no sparkle, no 3D render, no vector look.
 
-**Pass 1 correction.** The first `pet-l5` differed from `pet-l4` only by a slightly greener back and a small leaf sprig, and the two were not tellable apart at 40 points. This is the top of the ladder and has to read as an arrival, so the prompt now asks for four changes rather than one and requires each to show in the outline. Re-render `pet-l5` from `pet-l4` with this wording.
+**Pass 1 correction, and the re-render.** The first `pet-l5` differed from `pet-l4` only by a slightly greener back and a small leaf sprig, and the two were not tellable apart at 40 points. This is the top of the ladder and has to read as an arrival, so the prompt was rewritten to ask for four changes rather than one and to require each to show in the outline. The re-render delivered: the cocked upright tail alone separates it from `pet-l4` at 40 points, and the barred breast and taller stance carry at full size.
+
+It also turned the bird to face the viewer, which the wording did not ask for and the stage rule above forbade. That is kept, because a front-on chest-out pose is exactly what "arrival" looks like and it is half of why the silhouette now reads. The stage rule is amended rather than the render. The one thing the re-render did not deliver is the deep forest-green back — the wing keeps an olive cast and no more. Not worth another attempt: nothing about this stage depends on the hue, and the silhouette is doing the work.
 
 | model | seed | date | notes |
 |---|---|---|---|
@@ -326,7 +330,7 @@ The models return large square PNGs — Nano Banana returned 1254×1254 for ever
 
 1. **Rename to the manifest.** The generation tool's filename is not the target filename. `mimbo-icon.png` is `icon`; leading spaces and copy suffixes go.
 2. **Drop the painted background on the seventeen in-app assets.** The pet bodies and tree forms come back with `#F2F6F1` painted in, and pass 1 measured it landing anywhere from `rgb(240,244,240)` to `rgb(243,246,242)` — within three of the token and not equal to each other. Against the app's exact `ground` token each one is a faint visible tile, and every asset a slightly different one. Key the flat background out to transparent and let the token show through. This also frees the same art to sit on the parent theme's `#F5F7F5`.
-3. **Put the eight trees on one ground line.** Trim each tree to its content, then pad it back to a square canvas with the bottom of the ground patch at exactly 90% of the canvas height and the trunk centred horizontally. Verify by trimming all eight again and confirming one identical bottom edge. The pet bodies already align — pass 1 measured all five within one pixel — but run the same check on them.
+3. **Put each ladder on one ground line.** Trim every tree to its content, then pad it back to a square canvas with the bottom of the ground patch at exactly 90% of the canvas height and the trunk centred horizontally. Verify by trimming all eight again and confirming one identical bottom edge. **Run the same trim-and-repad over the five pet bodies**, at 85%: pass 1's original five happened to align within a pixel, and the single `pet-l5` re-render immediately broke that by 43 pixels. A baseline that holds only until the next re-generation is not a baseline, so both ladders are aligned here rather than trusted.
 4. **Resize to the manifest canvas and convert.** Down to 512, 768, 1536×512 or 1024 as the manifest says, then WebP lossy at quality 82–88 for the seventeen in-app assets, alpha preserved. Downscaling from 1254 is fine; never upscale.
 5. **Check the two masked assets before believing them.** Composite `android-icon-foreground` over `android-icon-background`, mask it to a centred circle of 61% of the canvas, and look at the result. If a beak, a tail or a leaf tip is cut, scale the foreground down and repeat. Do the same with a squircle. This is the check that pass 1 failed.
 
@@ -383,7 +387,7 @@ Run wider than planned: all twenty-one were generated in one sitting on Nano Ban
 |---|---|---|---|---|
 | all 21 | Nano Banana | not recorded | 2026-09-10 | style accepted; three faults, listed below |
 
-Source renders are 1254×1254 PNG (the ground 2172×724), which is above every manifest canvas, so all of it downscales.
+Source renders are 1254×1254 PNG (the ground 2172×724), which is above every manifest canvas, so all of it downscales. They live outside the repo, in the developer's `~/Downloads/mimbo-assets`, until the swap ticket brings the processed versions in. Two names there do not match the manifest and the swap must not guess: `mimbo-icon.png` is `icon`, and **`pet-l5-new.png` is the accepted `pet-l5`** — the `pet-l5.png` beside it is the rejected first render.
 
 **What it showed.**
 
@@ -409,7 +413,10 @@ Two smaller things, both handled in post rather than by re-rendering: the painte
 | 4 | `pet-l5` rewritten to ask for four silhouette-visible changes instead of one | entry 5 |
 | 5 | In-app assets now ship with the painted background keyed out to alpha, on the theme's `ground` token instead of a baked one | manifest note, **Export and post-process** step 2 |
 | 6 | Whole **Export and post-process** section added: rename, key out, align, resize and convert, mask-check | new section |
+| 7 | Stage 5 excepted from the three-quarter pose rule — splendid faces the viewer — and the pet bodies added to the ground-line alignment step | pet preamble, **Export and post-process** step 3 |
 
-**What has to be re-rendered:** `pet-l5` only, from `pet-l4`, with the corrected prompt. Faults 1 and 2 are fixed in post-process and need no new render, and the other nineteen assets stand.
+**What had to be re-rendered:** `pet-l5` only. Faults 1 and 2 are fixed in post-process and need no new render, and the other nineteen assets stand.
+
+**Re-render, same day — accepted.** `pet-l5` regenerated from `pet-l4` against the corrected prompt. It reads clearly apart from `pet-l4` at 40 points on the cocked tail alone, so fault 3 is closed. Two notes carried into the entry above: it turned the bird front-on, which is kept and the stage rule amended to match; and its ground-patch bottom landed at y=1080 against the other four pets' y=1037. That 3.4% drift is the same fault as the trees', on the one asset pass 1 had cited as evidence the pets did not need aligning — so **Export and post-process** step 3 runs over the pet bodies too, not as a spot check but as the same trim-and-repad the trees get. One re-render was enough to show that no ladder holds its own baseline across a re-generation.
 
 A second pass is only needed if a later pass forces a change to the style block itself. A correction confined to one entry is verified by that entry's re-render.
