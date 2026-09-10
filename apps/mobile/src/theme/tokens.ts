@@ -1,0 +1,91 @@
+/**
+ * The raw token values. Names are semantic — what a value is *for*, never what
+ * hue it happens to be — so that retuning the palette is a value change here and
+ * nothing else. One colour means "act"; the Coin colour is reserved for Coin
+ * display alone and is referenced by no button, chip, badge or chrome.
+ *
+ * Colours live in the mobile app, not in `packages/shared`: that workspace is
+ * zod schemas and correctness-critical pure logic, and a palette is neither.
+ *
+ * See issue #19 for the visual direction these values come from.
+ */
+
+export type ColorTokens = {
+  /** The page behind everything. */
+  ground: string;
+  /** Cards and rows that sit on the ground. */
+  surface: string;
+  /** The one colour that means "act". Buttons, active chips, links. */
+  action: string;
+  /** The Grove's living green. Illustrations and growth affordances only. */
+  growth: string;
+  /** Reserved: Coin display and nothing else. No button, chip, badge or chrome. */
+  coin: string;
+  /** Primary text. */
+  text: string;
+  /** Secondary text, borders, placeholders. */
+  muted: string;
+  /** Destructive actions and error copy. */
+  danger: string;
+};
+
+/** Calm & natural at full strength — the child's world. */
+export const kidColors: ColorTokens = {
+  ground: '#F2F6F1',
+  surface: '#FFFFFF',
+  action: '#2F6B4F',
+  growth: '#8CBF9E',
+  coin: '#E9B949',
+  text: '#1B2A22',
+  muted: '#5F7168',
+  danger: '#B3261E',
+};
+
+/** The same tokens in a quieter key — desaturated, for the evening admin pass. */
+export const parentColors: ColorTokens = {
+  ground: '#F5F7F5',
+  surface: '#FFFFFF',
+  action: '#35594A',
+  growth: '#A6BCAF',
+  coin: '#C9A64E',
+  text: '#23302A',
+  muted: '#6C7A73',
+  danger: '#9C3A33',
+};
+
+// Every theme shares these two objects, so they are frozen at runtime and not
+// merely `as const`: one stray write would otherwise reach all three themes.
+export const space = Object.freeze({
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+} as const);
+
+export const radius = Object.freeze({
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  pill: 999,
+} as const);
+
+/** Rubik 600 carries display and title; everything else stays on the system font. */
+export const displayFontFamily = 'Rubik-SemiBold';
+
+/** Base sizes, shared by both modes. `little` differs by one multiplier, below. */
+export const typeSizes = {
+  display: 34,
+  title: 26,
+  heading: 20,
+  body: 17,
+  label: 15,
+  caption: 13,
+} as const;
+
+export type TypeStep = keyof typeof typeSizes;
+
+/** The single place `little` mode grows type. Tune child legibility here. */
+export const LITTLE_TYPE_MULTIPLIER = 1.15;
