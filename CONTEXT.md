@@ -18,6 +18,10 @@ _Avoid_: Admin, user, guardian
 A member of a household who completes chores. Identified only by first name; never has an email, password or identity-provider account.
 _Avoid_: Kid (in code and docs; fine in UI copy), user, member
 
+**Partner**:
+The household's second parent, in UI copy. Added by the first parent by email; they become a Parent on their first sign-in with that address.
+_Avoid_: Spouse, co-parent, invitee
+
 **Kid Device**:
 A phone or tablet bound to exactly one child by redeeming a join code. Holds a device token scoped to that child.
 _Avoid_: Child account, child login

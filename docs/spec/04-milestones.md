@@ -16,7 +16,7 @@ Exit: two kids, two devices, real chores, offline works, per-day opens visible i
 - Reject + clawback; "redo" on kid side
 - Built-in reward catalog, request → approve/decline, reservation
 - Expo push: tokens, four kinds, digest content, minute cron, push-triggered pull
-- Second parent invite link, parent PIN
+- Parent PIN
 - Devices per child, revoke, reconnect
 - Stats (7-day window), Hebrew RTL pass
 

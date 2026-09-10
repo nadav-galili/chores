@@ -12,3 +12,5 @@ export * from './chore.ts';
 export * from './join-code.ts';
 export * from './ops.ts';
 export * from './sync.ts';
+export * from './parent-invite.ts';
+export * from './parent-today.ts';

@@ -27,7 +27,7 @@ Kinds: `once` (due_date), `daily`, `weekdays` (bit mask Mon=0…Sun=6). Start/en
 - One child per device. Parent's phone has no kid mode in v1.
 - Join code: 6 chars, 15 min, single-use, bound to one child. Redeem → device token. Parent can revoke; revoked device wipes local data and shows "ask a parent to reconnect".
 - One binary. First launch asks parent / kid. Kid mode exits only with the parent PIN.
-- Parents: Clerk with Google, Apple, email code. Two parents free; second parent joins via invite link.
+- Parents: Clerk with Google, Apple, email code. Two parents free; the first parent adds their partner by email, and the partner becomes a parent of that household on their first sign-in with it.
 
 ## Tiers
 | | free | premium |

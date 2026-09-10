@@ -31,6 +31,8 @@ export const parentSchema = z.object({
   id: z.string().uuid(),
   household_id: z.string().uuid(),
   clerk_user_id: z.string().min(1),
+  /** The address they signed in with, which is how a partner is invited. */
+  email: z.string().nullable(),
   display_name: z.string().nullable(),
   created_at: z.string().datetime(),
 });

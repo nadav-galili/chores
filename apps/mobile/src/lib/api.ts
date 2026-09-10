@@ -9,6 +9,8 @@ import type {
   HouseholdSummary,
   DeviceSession,
   Parent,
+  ParentInvite,
+  ParentToday,
   RedeemJoinCodeInput,
   SyncRequest,
   SyncResponse,
@@ -61,6 +63,14 @@ export function createApi(getToken: GetToken) {
       call<Child>(getToken, `/households/${householdId}/children`, json('POST', input)),
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
+    today: (householdId: string) => call<ParentToday>(getToken, `/households/${householdId}/today`),
+    listParents: (householdId: string) =>
+      call<{ parents: Parent[]; invites: ParentInvite[] }>(
+        getToken,
+        `/households/${householdId}/parents`,
+      ),
+    inviteParent: (householdId: string, email: string) =>
+      call<ParentInvite>(getToken, `/households/${householdId}/parents`, json('POST', { email })),
     issueJoinCode: (householdId: string, childId: string) =>
       call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',

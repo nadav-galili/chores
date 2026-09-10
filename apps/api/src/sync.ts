@@ -1,16 +1,10 @@
-import {
-  choreDate,
-  instanceWindow,
-  materializeInstances,
-  syncRequestSchema,
-  type MaterializableChore,
-  type SyncResponse,
-} from '@chores/shared';
+import { choreDate, instanceWindow, syncRequestSchema, type SyncResponse } from '@chores/shared';
 import { and, asc, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { applyOps, reconcileChild, type OpContext } from './apply-ops.ts';
 import type { Db } from './db/client.ts';
-import { changeLog, choreAssignees, choreInstances, chores, households } from './db/schema.ts';
+import { changeLog, choreAssignees, chores, households } from './db/schema.ts';
+import { materializable, writeInstances } from './materialize.ts';
 import { requireKidDevice, type DeviceEnv } from './device-auth.ts';
 import { parseBody } from './parse-body.ts';
 
@@ -30,10 +24,7 @@ async function assignedChores(tx: Tx, childId: string) {
   return rows.map((r) => r.chores);
 }
 
-/**
- * Today's instances for one child, created if missing. Deterministic ids make a repeat, or a
- * race with the device or the cron, a no-op (ADR-0003).
- */
+/** Today's instances for one child, created if missing (ADR-0003). */
 async function materializeToday(
   tx: Tx,
   household: typeof households.$inferSelect,
@@ -42,33 +33,11 @@ async function materializeToday(
   now: Date,
 ) {
   const today = choreDate(now, household.tz, household.dayBoundaryHour);
-  const materializable: MaterializableChore[] = assigned.map((r) => ({
-    id: r.id,
-    household_id: r.householdId,
-    kind: r.kind,
-    weekday_mask: r.weekdayMask,
-    start_date: r.startDate,
-    end_date: r.endDate,
-    due_date: r.dueDate,
-    deleted_at: r.deletedAt ? r.deletedAt.toISOString() : null,
-    assignees: [childId],
-  }));
-  const instances = materializeInstances(materializable, today);
-  if (instances.length) {
-    await tx
-      .insert(choreInstances)
-      .values(
-        instances.map((i) => ({
-          id: i.id,
-          choreId: i.chore_id,
-          childId: i.child_id,
-          householdId: i.household_id,
-          choreDate: i.chore_date,
-          status: i.status,
-        })),
-      )
-      .onConflictDoNothing();
-  }
+  await writeInstances(
+    tx,
+    assigned.map((r) => materializable(r, [childId])),
+    today,
+  );
   return today;
 }
 

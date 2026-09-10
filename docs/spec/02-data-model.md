@@ -4,7 +4,8 @@ Postgres is the source of truth. Devices hold a scoped subset in expo-sqlite wit
 
 ## Household and people
 - **households**: id · name · tz (IANA) · day_boundary_hour (0–6, default 0) · digest_hour (default 20) · currency (ILS|USD) · coins_per_unit · entitlement (free|premium) · entitlement_source · created_at
-- **parents**: id · household_id · clerk_user_id (unique) · display_name · pin_hash · created_at
+- **parents**: id · household_id · clerk_user_id (unique) · email (lower-cased, from the Clerk token, nullable) · display_name · pin_hash · created_at
+- **parent_invites**: email (PK, lower-cased) · household_id · invited_by · created_at · accepted_at · accepted_parent_id. A partner is invited by address alone: there is no link and no mail. Their first Clerk sign-in with that email creates their parent row in the household and marks the invite accepted. A pending invite holds a seat, so it counts against the free tier's two parents.
 - **parent_devices**: id · parent_id · expo_push_token · platform · last_seen_at
 - **children**: id · household_id · first_name · ui_mode (little|big) · pet_name · reminder_time (local HH:MM, nullable) · read_only_after (nullable) · sort · created_at
 - **child_devices**: id · child_id · household_id · token_hash · analytics_anon_id · expo_push_token · platform · last_seen_at · revoked_at

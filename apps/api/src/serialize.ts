@@ -1,5 +1,6 @@
 import type {
   Child,
+  ParentInvite,
   Chore,
   ChoreFields,
   Household,
@@ -7,7 +8,7 @@ import type {
   HouseholdSummary,
   Parent,
 } from '@chores/shared';
-import type { children, chores, households, parents } from './db/schema.ts';
+import type { children, chores, households, parentInvites, parents } from './db/schema.ts';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
@@ -31,8 +32,19 @@ export function parentToApi(row: typeof parents.$inferSelect): Parent {
     id: row.id,
     household_id: row.householdId,
     clerk_user_id: row.clerkUserId,
+    email: row.email,
     display_name: row.displayName,
     created_at: row.createdAt.toISOString(),
+  };
+}
+
+export function parentInviteToApi(row: typeof parentInvites.$inferSelect): ParentInvite {
+  return {
+    email: row.email,
+    household_id: row.householdId,
+    invited_by: row.invitedBy,
+    created_at: row.createdAt.toISOString(),
+    accepted_at: iso(row.acceptedAt),
   };
 }
 

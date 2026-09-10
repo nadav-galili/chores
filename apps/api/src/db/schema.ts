@@ -43,15 +43,38 @@ export const households = pgTable('households', {
   createdAt: timestamptz('created_at').notNull().defaultNow(),
 });
 
-export const parents = pgTable('parents', {
-  id: uuid('id').primaryKey(),
+export const parents = pgTable(
+  'parents',
+  {
+    id: uuid('id').primaryKey(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    clerkUserId: text('clerk_user_id').notNull().unique(),
+    /** Lower-cased; from the Clerk token. Null when the token carried no email claim. */
+    email: text('email'),
+    displayName: text('display_name'),
+    pinHash: text('pin_hash'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('parents_email').on(t.email)],
+);
+
+/**
+ * A partner invited by email. There is no invite link and no mail: the address waits here and the
+ * partner's first Clerk sign-in with it turns into a parent row of this household.
+ */
+export const parentInvites = pgTable('parent_invites', {
+  email: text('email').primaryKey(),
   householdId: uuid('household_id')
     .notNull()
     .references(() => households.id),
-  clerkUserId: text('clerk_user_id').notNull().unique(),
-  displayName: text('display_name'),
-  pinHash: text('pin_hash'),
+  invitedBy: uuid('invited_by')
+    .notNull()
+    .references(() => parents.id),
   createdAt: timestamptz('created_at').notNull().defaultNow(),
+  acceptedAt: timestamptz('accepted_at'),
+  acceptedParentId: uuid('accepted_parent_id').references(() => parents.id),
 });
 
 export const parentDevices = pgTable('parent_devices', {

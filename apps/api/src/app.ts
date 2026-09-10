@@ -7,6 +7,7 @@ import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
 import type { RateLimit } from './rate-limit.ts';
 import { syncRoutes } from './sync.ts';
+import { todayRoutes } from './today.ts';
 
 export type AppOptions = {
   verifyToken: VerifyToken;
@@ -32,6 +33,7 @@ export function createApp(db: Db, { verifyToken, redeemLimit, syncPageSize }: Ap
   app.use('/households', requireClerkUser(verifyToken));
   app.route('/', householdRoutes(db));
   app.route('/', choreRoutes(db));
+  app.route('/', todayRoutes(db));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
 

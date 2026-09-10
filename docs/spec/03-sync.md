@@ -9,12 +9,12 @@ Local-first. Every write is one SQLite transaction: domain rows + outbox op. The
 4. Response: `acked[]` (each with `date_adjusted` when the server wrote a different chore_date), `rejected[]` (with reason), `changes[]` since cursor, new cursor. A rejected op leaves the outbox and is surfaced, never retried; anything else (network, 5xx) stays queued and is retried with backoff.
 5. Device upserts changes into SQLite; deterministic ids make server rows identical to optimistic rows.
 
-Parent "today" screen additionally polls every 60 s while open.
+Parent "today" screen additionally polls every 60 s while open, and re-reads on foreground. It reads `GET /households/:id/today`, which materializes the household's instances for the chore date first, so a day is visible before any kid device has opened it. A gate refused on the free tier answers `402 {error: 'gated', gate}`.
 
 ## Ops
 - **kid token:** `complete`, `uncomplete` (own, same day, before parent action), `request_redemption`, `cancel_redemption`, `register_push_token`
 - **parent token:** `upsert_chore`, `delete_chore`, `reject_completion`, `approve_photo`, `decide_redemption`, `upsert_reward`, `payout`, `adjust`, `upsert_child`, `revoke_device`
-- Plain REST (needs server): create household, join code issue/redeem, parent invite, entitlement, R2 presign.
+- Plain REST (needs server): create household, join code issue/redeem, parent invite, parent today (`GET /households/:id/today`), entitlement, R2 presign.
 
 ## Conflict rules
 | case | rule |
