@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
+import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { wipeDeviceDb } from '@/db/client';
@@ -82,6 +83,23 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
           </Text>
           {!little && <StreakBadge days={today.streak} />}
         </View>
+        {/* The way into the grove, and a tree standing at the child's own stage. Drawn only
+            while `grove_enabled` is on, so the flag hides the screen and its entry point
+            together. Big enough to hit in little mode; the label carries the count either way. */}
+        {today.status === 'ready' && today.grove.enabled && (
+          <Pressable
+            onPress={() => router.push('/(kid)/grove')}
+            accessibilityRole="button"
+            accessibilityLabel={t('grove.buttonLabel', { count: today.grove.ownTree.stage })}
+          >
+            <TreeFigure
+              tree={today.grove.ownTree}
+              ownName={today.firstName}
+              size={little ? 72 : 56}
+              showLabel={false}
+            />
+          </Pressable>
+        )}
       </View>
       {today.offline && <Text style={styles.offline}>{t('kid.offline')}</Text>}
       {today.refused > 0 && (
@@ -123,6 +141,11 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
             name: today.pet.name,
             level: today.pet.progress.level,
             mood: 'happy',
+          }}
+          grove={{
+            enabled: today.grove.enabled,
+            ownName: today.firstName,
+            tree: today.grove.ownTree,
           }}
           streak={today.streak}
           onDone={today.clearReaction}

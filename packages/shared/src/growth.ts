@@ -47,6 +47,9 @@ export function growthEntriesFor(
  * (ADR-0011). The child is a parameter rather than the caller's filter because the grove is one
  * household's rows and each child is a separate tree in it.
  */
-export function groveStage(entries: readonly GrowthEntry[], childId: string): number {
+export function groveStage(
+  entries: readonly Pick<GrowthEntry, 'child_id'>[],
+  childId: string,
+): number {
   return entries.filter((e) => e.child_id === childId).length;
 }

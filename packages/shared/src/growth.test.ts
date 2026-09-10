@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   growthEntriesFor,
   growthEntrySchema,
-  growthId,
   groveStage,
+  growthId,
   type GrowthEntry,
 } from './growth.ts';
 import { reconcileLedger, type LedgerCompletion, type LedgerInstance } from './ledger.ts';

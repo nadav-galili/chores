@@ -60,6 +60,24 @@ export const he: Catalog = {
     xpMax: '%{xp} XP · בוגר לגמרי',
     xpToNext: '%{into} / %{needed} XP לרמה %{level}',
   },
+  grove: {
+    back: 'היום',
+    title: 'החורשה שלכם',
+    buttonLabel: {
+      one: 'החורשה שלכם, עץ אחד',
+      two: 'החורשה שלכם, שני עצים',
+      other: 'החורשה שלכם, %{count} עצים',
+    },
+    mine: 'אני',
+    trees: { one: 'עץ אחד', two: 'שני עצים', other: '%{count} עצים' },
+    empty: 'סיימו הכול היום והזרע הזה יתחיל לצמוח.',
+    grew: 'העץ שלכם צמח! 🌱',
+    treeLabel: {
+      one: '%{name}, עץ אחד',
+      two: '%{name}, שני עצים',
+      other: '%{name}, %{count} עצים',
+    },
+  },
   join: {
     title: 'הקלידו את הקוד',
     titleRevoked: 'בקשו מהורה לחבר מחדש',

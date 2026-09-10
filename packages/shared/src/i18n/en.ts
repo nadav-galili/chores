@@ -65,6 +65,16 @@ export const en = {
     xpMax: '%{xp} XP · fully grown',
     xpToNext: '%{into} / %{needed} XP to level %{level}',
   },
+  grove: {
+    back: 'Today',
+    title: 'Your grove',
+    buttonLabel: plural({ one: 'Your grove, one tree', other: 'Your grove, %{count} trees' }),
+    mine: 'You',
+    trees: plural({ one: '%{count} tree', other: '%{count} trees' }),
+    empty: 'Finish everything today and this seed starts growing.',
+    grew: 'Your tree grew! 🌱',
+    treeLabel: plural({ one: '%{name}, one tree', other: '%{name}, %{count} trees' }),
+  },
   join: {
     title: 'Type your code',
     titleRevoked: 'Ask a parent to reconnect',

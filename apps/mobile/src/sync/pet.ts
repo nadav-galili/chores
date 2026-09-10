@@ -7,49 +7,15 @@ import {
   type PetProgress,
 } from '@chores/shared';
 import { and, eq, sql } from 'drizzle-orm';
-import { children, daySummaries, flags, petState, xpEvents } from '@/db/schema';
+import { children, daySummaries, petState, xpEvents } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
+import { PET_ENABLED, readFlag } from './flags';
 
 /**
  * The pet as the child's device knows it (docs/spec/01-product.md): level and mood from the shared
  * rules, over rows this device already holds. Nothing here calls the network — the pet reacts the
  * same offline as on.
  */
-
-export const PET_ENABLED = 'pet_enabled';
-
-/** The flags kid mode reads. Others exist upstream; only what a kid screen reads is cached here. */
-export type FlagKey = typeof PET_ENABLED;
-
-/**
- * What a flag means before a parent has cached anything. Kid mode never fetches flags, so an
- * uncached flag has to have an answer, and the answer is the shipped experience.
- */
-export const FLAG_DEFAULTS: Readonly<Record<FlagKey, boolean>> = { [PET_ENABLED]: true };
-
-export async function readFlag(db: DeviceDb, key: FlagKey): Promise<boolean> {
-  const [row] = await db.select().from(flags).where(eq(flags.key, key));
-  return row?.enabled ?? FLAG_DEFAULTS[key];
-}
-
-/**
- * Stores what parent mode last saw, so kid mode can read it offline. Parent mode does the
- * fetching in a later ticket; this is the cache it writes through.
- */
-export async function cacheFlag(
-  db: DeviceDb,
-  key: FlagKey,
-  enabled: boolean,
-  now: Date,
-): Promise<void> {
-  await db
-    .insert(flags)
-    .values({ key, enabled, updated_at: now.toISOString() })
-    .onConflictDoUpdate({
-      target: flags.key,
-      set: { enabled: sql`excluded.enabled`, updated_at: sql`excluded.updated_at` },
-    });
-}
 
 /** Total XP, `SUM(xp)`; never a stored column, exactly like the coin balance. */
 export async function xpTotalOf(db: DeviceDb, childId: string): Promise<number> {

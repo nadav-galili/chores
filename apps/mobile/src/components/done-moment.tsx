@@ -1,26 +1,32 @@
 import type { PetMood } from '@chores/shared';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { formatNumber, t } from '@/lib/i18n';
+import type { Tree } from '@/sync/grove';
 import type { DoneReaction } from '@/lib/use-today';
 
 /**
- * The done moment: the coins the tap paid, the streak, and the pet reacting.
+ * The done moment: the coins the tap paid, the streak, the pet reacting, and — on the tap that
+ * finished the day — the tree that tap just grew.
  *
  * The animation is driven off `reaction.key`, which the tap handler sets in the same tick as the
  * press, so the first frame of this is the first frame after the tap — nothing here waits on
- * SQLite or the network. With the pet switched off the coins and the streak still play.
+ * SQLite or the network. The tree is drawn from rows the tap itself wrote, so it grows offline.
+ * With the pet or the grove switched off, the coins and the streak still play.
  */
 export function DoneMoment({
   reaction,
   pet,
+  grove,
   streak,
   onDone,
 }: {
   reaction: DoneReaction;
   pet: { enabled: boolean; name: string; level: number; mood: PetMood };
+  grove: { enabled: boolean; ownName: string; tree: Tree };
   streak: number;
   onDone: () => void;
 }) {
@@ -73,6 +79,13 @@ export function DoneMoment({
             showStage={false}
           />
         )}
+        {/* Only the tap that completed the day planted one, so only that tap shows a tree. */}
+        {reaction.grew && grove.enabled && (
+          <View style={styles.grew}>
+            <TreeFigure tree={grove.tree} ownName={grove.ownName} size={72} showLabel={false} />
+            <Text style={styles.grewText}>{t('grove.grew')}</Text>
+          </View>
+        )}
         <StreakBadge days={streak} />
       </Animated.View>
     </View>
@@ -103,4 +116,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   coins: { fontSize: 40, fontWeight: '800' },
+  grew: { alignItems: 'center', gap: 4 },
+  grewText: { fontSize: 16, fontWeight: '600', color: '#2E7D32' },
 });
