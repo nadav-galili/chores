@@ -46,3 +46,9 @@ Exit: two kids, two devices, real chores, offline works, per-day opens visible i
 - tooling: turbo, vitest, tsx, drizzle-kit, eslint, prettier, typescript
 
 Anything not on this list is asked for separately.
+
+`react-dom` is pinned in `apps/mobile` and in `pnpm.overrides` at the same version as `react`. Nothing
+imports it — pnpm auto-installs it as a peer of expo-router's runtime and hoists it, and a hoisted copy
+newer than `react` red-boxes the app on launch with "Incompatible React versions". It is a version pin
+on a package that was already in the tree, not a new dependency; keep the two versions equal when
+either moves.

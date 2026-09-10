@@ -8,3 +8,5 @@ apps/mobile/drizzle/meta
 docs/
 *.md
 apps/mobile/src/db/migrations.ts
+.agents/skills
+skills-lock.json
