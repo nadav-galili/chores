@@ -69,6 +69,7 @@ export function syncRoutes(db: Db, pageSize: number) {
         householdId,
         household: household!,
         now,
+        createdBy: childId,
       };
       // Materialize first: what is due today decides whether a tap completes the day, so the
       // ops must land against the full list, not whatever happened to exist already.

@@ -11,7 +11,6 @@ import {
   uuid7,
   weekdayOf,
   type DeviceSession,
-  type SyncResponse,
 } from '@chores/shared';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
@@ -26,6 +25,7 @@ import {
 } from './db/schema.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
+import { completeOp, setupHousehold, syncAs, testToday, TEST_TZ } from './test/household.ts';
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -35,90 +35,11 @@ beforeAll(async () => {
   app = createApp(db, { verifyToken: fakeVerifyToken, redeemLimit: { max: 1000, windowMs: 1000 } });
 });
 
-const TZ = 'Asia/Jerusalem';
-const today = () => choreDate(new Date(), TZ, 0);
+const today = testToday;
 
-/** A household with two children on kid devices, plus a helper to write chores as the parent. */
-async function setup(clerkUserId: string) {
-  const res = await app.request(
-    '/households',
-    asParent(clerkUserId, {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Galili', tz: TZ, currency: 'ILS' }),
-    }),
-  );
-  const { household } = (await res.json()) as { household: { id: string } };
-  const joined: { id: string; session: DeviceSession }[] = [];
-  for (const first_name of ['Noa', 'Ori']) {
-    const c = await app.request(
-      `/households/${household.id}/children`,
-      asParent(clerkUserId, {
-        method: 'POST',
-        body: JSON.stringify({ first_name, ui_mode: 'little', pet_name: 'Pip' }),
-      }),
-    );
-    const child = (await c.json()) as { id: string };
-    const issued = (await (
-      await app.request(
-        `/households/${household.id}/children/${child.id}/join-code`,
-        asParent(clerkUserId, { method: 'POST' }),
-      )
-    ).json()) as { code: string };
-    const redeemed = await app.request('/join-codes/redeem', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: issued.code, platform: 'android' }),
-    });
-    joined.push({ id: child.id, session: (await redeemed.json()) as DeviceSession });
-  }
-  const addChore = async (title: string, assignees: string[]) => {
-    const choreId = uuid7();
-    await app.request(
-      `/households/${household.id}/chores/${choreId}`,
-      asParent(clerkUserId, {
-        method: 'PUT',
-        body: JSON.stringify({
-          fields: { title, kind: 'daily', assignees },
-          updated_at: new Date().toISOString(),
-        }),
-      }),
-    );
-    return choreId;
-  };
-  const deleteChore = (choreId: string) =>
-    app.request(
-      `/households/${household.id}/chores/${choreId}`,
-      asParent(clerkUserId, {
-        method: 'DELETE',
-        body: JSON.stringify({ updated_at: new Date().toISOString() }),
-      }),
-    );
-  return { householdId: household.id, noa: joined[0]!, ori: joined[1]!, addChore, deleteChore };
-}
-
-async function sync(session: DeviceSession, ops: unknown[] = [], cursor = 0) {
-  const res = await app.request('/sync', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${session.device_token}`,
-    },
-    body: JSON.stringify({ device_id: session.device_id, cursor, ops }),
-  });
-  return { status: res.status, body: (await res.json()) as SyncResponse };
-}
-
-const completeOp = (choreId: string, over: Record<string, unknown> = {}) => ({
-  op_id: uuid7(),
-  type: 'complete',
-  payload: {
-    completion_id: uuid7(),
-    chore_id: choreId,
-    chore_date: today(),
-    completed_at: new Date().toISOString(),
-    ...over,
-  },
-});
+const setup = (clerkUserId: string) => setupHousehold(app, clerkUserId);
+const sync = (session: DeviceSession, ops: unknown[] = [], cursor = 0) =>
+  syncAs(app, session, ops, cursor);
 
 const balance = async (childId: string) => {
   const rows = await db
@@ -252,7 +173,7 @@ describe('POST /sync complete', () => {
   it('trusts a chore date a day out', async () => {
     const { noa, addChore } = await setup('user_clock_ok');
     const choreId = await addChore('Dishes', [noa.id]);
-    const yesterday = choreDate(new Date(Date.now() - 86_400_000), TZ, 0);
+    const yesterday = choreDate(new Date(Date.now() - 86_400_000), TEST_TZ, 0);
     const op = completeOp(choreId, { chore_date: yesterday });
 
     const { body } = await sync(noa.session, [op]);
@@ -378,7 +299,7 @@ describe('POST /sync uncomplete', () => {
   it('refuses an undo of a day that has passed', async () => {
     const { noa, addChore } = await setup('user_undo_late');
     const choreId = await addChore('Dishes', [noa.id]);
-    const yesterday = choreDate(new Date(Date.now() - 86_400_000), TZ, 0);
+    const yesterday = choreDate(new Date(Date.now() - 86_400_000), TEST_TZ, 0);
     const done = completeOp(choreId, {
       chore_date: yesterday,
       completed_at: new Date(Date.now() - 86_400_000).toISOString(),
@@ -449,7 +370,7 @@ describe('POST /sync chore dates the recurrence does not allow', () => {
         }),
       }),
     );
-    const yesterday = choreDate(new Date(Date.now() - 86_400_000), TZ, 0);
+    const yesterday = choreDate(new Date(Date.now() - 86_400_000), TEST_TZ, 0);
     const op = completeOp(choreId, { chore_date: yesterday });
 
     const { body } = await sync(noa.session, [op]);

@@ -82,3 +82,10 @@ export const rejectReasonSchema = z.enum([
   'too_late',
 ]);
 export type RejectReason = z.infer<typeof rejectReasonSchema>;
+
+/**
+ * The answer to `reject_completion`, the parent op behind a rejection (docs/spec/03-sync.md).
+ * Two parents rejecting the same completion both get `rejected` and there is one clawback; a
+ * completion the child already undid is `already_undone` and nothing moves.
+ */
+export type RejectCompletionResult = 'rejected' | 'already_undone';
