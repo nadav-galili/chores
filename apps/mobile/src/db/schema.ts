@@ -18,7 +18,11 @@ import type { ChoreClocks, RejectReason } from '@chores/shared';
 const json = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 const bool = (name: string) => integer(name, { mode: 'boolean' });
 
-/** This device's one child; never anyone else's row. */
+/**
+ * The household's children: this device's own child, and its siblings for the grove's sake — one
+ * of the two tables that reach a kid device household-wide (docs/spec/03-sync.md). Every query
+ * about *this* child still filters by id; only the grove reads them all.
+ */
 export const children = sqliteTable('children', {
   id: text('id').primaryKey(),
   household_id: text('household_id').notNull(),

@@ -62,7 +62,7 @@ describe('showGrove', () => {
     expect((await showGrove(db, noa)).ownTree.stage).toBe(1);
   });
 
-  it('renders one tree per child the device knows, own tree first and marked as its own', async () => {
+  it('renders one tree per child in the household, own tree first and marked as its own', async () => {
     await seedChild(ori, 'Ori', 1);
     await plant(noa, '2026-09-08');
     await plant(ori, '2026-09-07');

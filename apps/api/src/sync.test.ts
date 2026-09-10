@@ -112,7 +112,7 @@ describe('POST /sync pull', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns the child row, assigned chores with assignees and today’s instance, scoped to the token’s child', async () => {
+  it('returns the household’s children, assigned chores with assignees and today’s instance, scoped to the token’s child', async () => {
     const { noa, ori, putChore } = await setup('user_pull');
     const shared = uuid7();
     const orisOnly = uuid7();
@@ -126,11 +126,13 @@ describe('POST /sync pull', () => {
 
     const { changes } = await pullAll(noa.session);
 
+    // The household's children all ride along, because the grove is one household's trees
+    // (ADR-0011). Nothing else about a sibling does, and no secrets do.
     const children = ofTable(changes, 'children');
-    expect(children.map((c) => c.row_id)).toEqual([noa.id]);
-    expect(children[0]!.row).toMatchObject({ id: noa.id, first_name: 'Noa', ui_mode: 'little' });
-    // Nothing about the household's other people or secrets rides along.
-    expect(children[0]!.row).not.toHaveProperty('token_hash');
+    expect(new Set(children.map((c) => c.row_id))).toEqual(new Set([noa.id, ori.id]));
+    const own = children.find((c) => c.row_id === noa.id)!;
+    expect(own.row).toMatchObject({ id: noa.id, first_name: 'Noa', ui_mode: 'little' });
+    expect(own.row).not.toHaveProperty('token_hash');
 
     const chores = ofTable(changes, 'chores');
     expect(new Set(chores.map((c) => c.row_id))).toEqual(new Set([shared]));
@@ -148,6 +150,89 @@ describe('POST /sync pull', () => {
       chore_date: today(),
       status: 'due',
     });
+  });
+
+  it('sends every child in the household, so the grove has one tree per child', async () => {
+    const { noa, ori } = await setup('user_grove_children');
+    const { changes } = await pullAll(noa.session);
+
+    const children = ofTable(changes, 'children');
+    expect(new Set(children.map((c) => c.row_id))).toEqual(new Set([noa.id, ori.id]));
+    const sibling = children.find((c) => c.row_id === ori.id)!;
+    expect(sibling.row).toMatchObject({ id: ori.id, first_name: 'Ori' });
+  });
+
+  it('sends a sibling’s growth entries, because the grove is the household’s', async () => {
+    const { noa, ori, putChore } = await setup('user_grove_entries');
+    const chore = uuid7();
+    await putChore(chore, { title: 'Dishes', kind: 'daily', assignees: [noa.id, ori.id] });
+
+    // Ori finishes their day; Noa has not touched theirs.
+    await pullAll(ori.session);
+    const done = await sync(ori.session, 0, [
+      {
+        op_id: uuid7(),
+        type: 'complete',
+        payload: {
+          completion_id: uuid7(),
+          chore_id: chore,
+          chore_date: today(),
+          completed_at: new Date().toISOString(),
+        },
+      },
+    ]);
+    expect(done.body.rejected).toEqual([]);
+
+    const { changes } = await pullAll(noa.session);
+    const grown = ofTable(changes, 'growth_entries');
+    expect(grown.map((g) => g.row)).toMatchObject([{ child_id: ori.id, chore_date: today() }]);
+  });
+
+  it('still keeps a sibling’s chores, coins, completions and days to themselves', async () => {
+    const { noa, ori, putChore } = await setup('user_grove_isolation');
+    const orisOnly = uuid7();
+    await putChore(orisOnly, { title: 'Trash', kind: 'daily', assignees: [ori.id] });
+
+    await pullAll(ori.session);
+    await sync(ori.session, 0, [
+      {
+        op_id: uuid7(),
+        type: 'complete',
+        payload: {
+          completion_id: uuid7(),
+          chore_id: orisOnly,
+          chore_date: today(),
+          completed_at: new Date().toISOString(),
+        },
+      },
+    ]);
+
+    const { changes } = await pullAll(noa.session);
+    // Widening the grove widened exactly two tables and no others.
+    for (const table of [
+      'completions',
+      'ledger_entries',
+      'xp_events',
+      'day_summaries',
+      'chore_instances',
+      'chores',
+      'redemptions',
+    ]) {
+      expect(ofTable(changes, table).filter((c) => c.row.child_id === ori.id)).toEqual([]);
+    }
+    expect(ofTable(changes, 'chores').map((c) => c.row_id)).not.toContain(orisOnly);
+  });
+
+  it('never crosses households, the only predicate still bounding the widened tables', async () => {
+    const mine = await setup('user_grove_household_a');
+    const theirs = await setup('user_grove_household_b');
+
+    const { changes } = await pullAll(mine.noa.session);
+    const ids = new Set(changes.map((c) => c.row_id));
+    for (const stranger of [theirs.noa.id, theirs.ori.id]) expect(ids.has(stranger)).toBe(false);
+    expect(new Set(ofTable(changes, 'children').map((c) => c.row_id))).toEqual(
+      new Set([mine.noa.id, mine.ori.id]),
+    );
   });
 
   it('materializes today lazily on read and does it once', async () => {
@@ -196,7 +281,8 @@ describe('POST /sync pull', () => {
     for (const title of ['A', 'B', 'C', 'D']) {
       await putChore(uuid7(), { title, kind: 'daily', assignees: [noa.id] });
     }
-    // child row + 4 chores + 4 assignees + 4 instances = 13 changes at a page size of 3.
+    // 2 child rows + 4 chores + 4 assignees + 4 instances = 14 changes at a page size of 3.
+    // Both children ride along because the grove is the household's (ADR-0011).
     const page1 = await sync(noa.session, 0);
     expect(page1.body.changes).toHaveLength(3);
     expect(page1.body.has_more).toBe(true);
@@ -207,7 +293,7 @@ describe('POST /sync pull', () => {
 
     const all = await pullAll(noa.session);
     expect(all.pages).toBe(5);
-    expect(all.changes).toHaveLength(13);
+    expect(all.changes).toHaveLength(14);
     const seqs = all.changes.map((c) => c.seq);
     expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
     expect(new Set(seqs).size).toBe(seqs.length);

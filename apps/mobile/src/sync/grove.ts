@@ -15,10 +15,13 @@ import { GROVE_ENABLED, readFlag } from './flags';
  * the streak; the count it would have to shrink has no clawback to shrink it with.
  */
 
-/** One child's tree in the household's grove. */
+/**
+ * One child's tree in the household's grove. Siblings' rows reach this device because `children`
+ * and `growth_entries` come household-wide on a kid token (docs/spec/03-sync.md).
+ */
 export type Tree = {
   childId: string;
-  /** Null until that child's row has been pulled. Only ever null for the device's own child. */
+  /** Null until the row has been pulled — only possible for the device's own child. */
   firstName: string | null;
   /** Grove Stage: `COUNT(*)` of that child's growth entries. */
   stage: number;
