@@ -17,6 +17,7 @@
     "@clerk/backend": "^3.17.1",
     "@hono/node-server": "^1.19.0",
     "drizzle-orm": "^0.45.0",
+    "expo-server-sdk": "^7.2.0",
     "hono": "^4.9.0",
     "postgres": "^3.4.7",
     "zod": "^3.25.0"

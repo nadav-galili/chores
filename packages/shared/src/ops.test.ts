@@ -35,6 +35,24 @@ describe('kidOpSchema', () => {
     expect(kidOpSchema.safeParse(complete({ completed_at: '2026-09-09' })).success).toBe(false);
   });
 
+  it('accepts a register_push_token op', () => {
+    const op = {
+      op_id: uuid7(),
+      type: 'register_push_token',
+      payload: { expo_push_token: 'ExponentPushToken[abc123]' },
+    };
+    expect(kidOpSchema.safeParse(op).success).toBe(true);
+  });
+
+  it('refuses a push token that is not an Expo one', () => {
+    const op = {
+      op_id: uuid7(),
+      type: 'register_push_token',
+      payload: { expo_push_token: 'fcm:abc123' },
+    };
+    expect(kidOpSchema.safeParse(op).success).toBe(false);
+  });
+
   it('refuses an op type it does not know', () => {
     const op = { op_id: uuid7(), type: 'reject_completion', payload: {} };
     expect(kidOpSchema.safeParse(op).success).toBe(false);

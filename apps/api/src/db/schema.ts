@@ -14,7 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import type { ChoreClocks } from '@chores/shared';
+import { notificationKindSchema, notificationTargetSchema, type ChoreClocks } from '@chores/shared';
 
 export const currencyEnum = pgEnum('currency', ['ILS', 'USD']);
 export const entitlementEnum = pgEnum('entitlement', ['free', 'premium']);
@@ -336,6 +336,36 @@ export const growthEntries = pgTable(
     createdAt: timestamptz('created_at').notNull().defaultNow(),
   },
   (t) => [index('growth_entries_child').on(t.childId)],
+);
+
+/** The four kinds and the two targets come from the shared schema; there is one list of each. */
+export const notificationKindEnum = pgEnum('notification_kind', notificationKindSchema.options);
+export const notificationTargetEnum = pgEnum(
+  'notification_target',
+  notificationTargetSchema.options,
+);
+
+/**
+ * One notification being due, and what Expo said about it. The id is deterministic — kind, whom
+ * it is about, and the day — so the minute cron inserting it is what decides the notification has
+ * not been sent yet, and a restart cannot send it twice. A row with no `ticket` was never pushed:
+ * the child's device had no token and its own local notification is the delivery.
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey(),
+    target: notificationTargetEnum('target').notNull(),
+    /** The device the push went to, if one was known when the notification came due. */
+    targetId: uuid('target_id'),
+    kind: notificationKindEnum('kind').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+    scheduledFor: timestamptz('scheduled_for').notNull(),
+    sentAt: timestamptz('sent_at'),
+    /** Expo's ticket id, which a later tick trades for a receipt. */
+    ticket: text('ticket'),
+  },
+  (t) => [index('notifications_ticket').on(t.ticket)],
 );
 
 /** Every op the server has already applied, with what it answered; a replay reads this and stops. */

@@ -16,6 +16,7 @@ import {
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
 import {
+  childDevices,
   choreInstances,
   completions,
   daySummaries,
@@ -466,5 +467,50 @@ describe('POST /sync chore dates the recurrence does not allow', () => {
     expect(stray).toEqual([]);
     // Today is complete, so the bonus and the tree still land.
     expect(await balance(noa.id)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+  });
+});
+
+describe('POST /sync register_push_token', () => {
+  const registerOp = (token: unknown) => ({
+    op_id: uuid7(),
+    type: 'register_push_token',
+    payload: { expo_push_token: token },
+  });
+
+  const deviceToken = async (deviceId: string) => {
+    const [row] = await db.select().from(childDevices).where(eq(childDevices.id, deviceId));
+    return row!.expoPushToken;
+  };
+
+  it('stores the token on the device the request came from, and replaces it on re-registration', async () => {
+    const { noa, ori } = await setup('user_push_token');
+
+    const first = await sync(noa.session, [registerOp('ExponentPushToken[first]')]);
+    expect(first.body.acked).toHaveLength(1);
+    expect(first.body.rejected).toEqual([]);
+    expect(await deviceToken(noa.session.device_id)).toBe('ExponentPushToken[first]');
+    // Nothing about a sibling's device moved.
+    expect(await deviceToken(ori.session.device_id)).toBeNull();
+
+    await sync(noa.session, [registerOp('ExponentPushToken[second]')]);
+    expect(await deviceToken(noa.session.device_id)).toBe('ExponentPushToken[second]');
+  });
+
+  it('refuses a token that is not an Expo one and leaves the stored one alone', async () => {
+    const { noa } = await setup('user_push_token_bad');
+    await sync(noa.session, [registerOp('ExponentPushToken[good]')]);
+
+    const { body } = await sync(noa.session, [registerOp('fcm:abc')]);
+    expect(body.rejected).toEqual([{ op_id: expect.any(String), reason: 'invalid_payload' }]);
+    expect(await deviceToken(noa.session.device_id)).toBe('ExponentPushToken[good]');
+  });
+
+  it('pays nothing: a push token is not a completion', async () => {
+    const { noa, addChore } = await setup('user_push_token_free');
+    await addChore('Dishes', [noa.id]);
+
+    await sync(noa.session, [registerOp('ExponentPushToken[free]')]);
+    expect(await balance(noa.id)).toBe(0);
+    expect(await xpTotal(noa.id)).toBe(0);
   });
 });

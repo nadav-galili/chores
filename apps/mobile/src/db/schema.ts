@@ -166,7 +166,7 @@ export const redemptions = sqliteTable('redemptions', {
  */
 export const outbox = sqliteTable('outbox', {
   op_id: text('op_id').primaryKey(),
-  type: text('type', { enum: ['complete', 'uncomplete'] }).notNull(),
+  type: text('type', { enum: ['complete', 'uncomplete', 'register_push_token'] }).notNull(),
   payload: json<Record<string, unknown>>('payload').notNull(),
   created_at: text('created_at').notNull(),
   attempts: integer('attempts').notNull().default(0),
@@ -197,6 +197,21 @@ export const flags = sqliteTable('flags', {
 export const petState = sqliteTable('pet_state', {
   child_id: text('child_id').primaryKey(),
   shown_level: integer('shown_level').notNull().default(1),
+});
+
+/**
+ * One row: what this device has already arranged about notifications — the push token it told the
+ * server about, and the reminder time it asked the OS to fire at. Both are compared before doing
+ * anything, so a token that has not rotted costs no op and a reminder that has not moved is not
+ * rescheduled (docs/spec/01-product.md, notifications).
+ */
+export const notificationState = sqliteTable('notification_state', {
+  id: integer('id').primaryKey(),
+  /** The Expo push token the server has been told about; null until one is registered. */
+  push_token: text('push_token'),
+  /** The household-local `HH:MM` the local notification is scheduled for; null for none. */
+  reminder_time: text('reminder_time'),
+  updated_at: text('updated_at').notNull(),
 });
 
 /** One row: how far this device has pulled the change log. */

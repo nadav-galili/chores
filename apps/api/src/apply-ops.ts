@@ -3,6 +3,7 @@ import {
   growthEntriesFor,
   instanceId,
   isDueOn,
+  KID_OP_TYPES,
   kidOpSchema,
   reconcileLedger,
   resolveChoreDate,
@@ -16,6 +17,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
 import {
   appliedOps,
+  childDevices,
   choreAssignees,
   choreInstances,
   chores,
@@ -62,11 +64,19 @@ const ack = (date_adjusted = false): StoredResult =>
 async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResult> {
   const parsed = kidOpSchema.safeParse(raw);
   if (!parsed.success) {
-    return reject(
-      raw.type === 'complete' || raw.type === 'uncomplete' ? 'invalid_payload' : 'unknown_op',
-    );
+    const known = (KID_OP_TYPES as readonly string[]).includes(raw.type);
+    return reject(known ? 'invalid_payload' : 'unknown_op');
   }
   const op = parsed.data;
+
+  if (op.type === 'register_push_token') {
+    // A token rots, so the device re-sends it on every open; the device is the one on the token.
+    await tx
+      .update(childDevices)
+      .set({ expoPushToken: op.payload.expo_push_token })
+      .where(eq(childDevices.id, ctx.deviceId));
+    return ack();
+  }
 
   if (op.type === 'complete') {
     const { chore_id, completion_id, completed_at, chore_date: claimed } = op.payload;
@@ -321,7 +331,8 @@ export async function applyOps(tx: Tx, ctx: OpContext, ops: SyncOp[]): Promise<A
         .insert(appliedOps)
         .values({ opId: raw.op_id, deviceId: ctx.deviceId, result, at: ctx.now })
         .onConflictDoNothing();
-      if (result.status === 'acked') changed = true;
+      // Only a completion changes what a child has earned; a push token does not.
+      if (result.status === 'acked' && raw.type !== 'register_push_token') changed = true;
     }
     if (result.status === 'acked') {
       acked.push(

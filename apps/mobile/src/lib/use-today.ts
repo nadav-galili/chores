@@ -14,10 +14,12 @@ import { children, daySummaries } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
 import { materializeToday, todayList, type TodayItem } from '@/sync/engine';
 import { balanceOf, tapContext, tapToggle, type ChildContext } from '@/sync/local';
+import { serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
 import { ApiError, createDeviceApi } from '@/lib/api';
+import { arrangeKidReminder } from '@/lib/notifications';
 
 export type TodayState = {
   status: 'loading' | 'ready';
@@ -34,6 +36,10 @@ export type TodayState = {
   refused: number;
   /** Level, mood and XP bar, from the shared rules over local rows. */
   pet: PetView;
+  /** The reminder time the parent set, from the child row; drives the local notification. */
+  reminderTime: string | null;
+  /** The server holds this device's push token, so the reminder is a push and not a local one. */
+  pushRegistered: boolean;
 };
 
 /**
@@ -84,6 +90,8 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     offline: false,
     refused: 0,
     pet: { ...PET_PLACEHOLDER, name: session.child.pet_name },
+    reminderTime: null,
+    pushRegistered: false,
   });
   const [reaction, setReaction] = useState<DoneReaction | null>(null);
   const taps = useRef(0);
@@ -108,13 +116,14 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     async (db: DeviceDb, offline: boolean) => {
       const date = choreDate(new Date(), tz, boundary);
       await materializeToday(db, childId, date);
-      const [items, rows, summaries, coins, refused, pet] = await Promise.all([
+      const [items, rows, summaries, coins, refused, pet, pushRegistered] = await Promise.all([
         todayList(db, childId, date),
         db.select().from(children).where(eq(children.id, childId)),
         db.select().from(daySummaries).where(eq(daySummaries.child_id, childId)),
         balanceOf(db, childId),
         rejectedOps(db),
         showPet(db, childId, date),
+        serverHoldsToken(db),
       ]);
       setState({
         status: 'ready',
@@ -126,6 +135,8 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         offline,
         refused: refused.length,
         pet,
+        reminderTime: rows[0]?.reminder_time ?? null,
+        pushRegistered,
       });
     },
     [childId, tz, boundary, joinedUiMode, joinedName],
@@ -188,6 +199,15 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     });
     return () => sub.remove();
   }, [refresh]);
+
+  // The reminder is arranged once the child row says what it should be, again whenever a parent
+  // moves it, and again when the server takes this device's token — which is what turns the local
+  // notification off. Not on every refresh: reading the push token is a call to Expo.
+  useEffect(() => {
+    void (async () => {
+      await arrangeKidReminder(await openDeviceDb(), { tz, reminderTime: state.reminderTime });
+    })();
+  }, [tz, state.reminderTime, state.pushRegistered]);
 
   return { ...state, toggle, dismissRefused, reaction, clearReaction };
 }

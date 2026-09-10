@@ -3,7 +3,6 @@ import {
   currentStreak,
   type DaySummary,
   type IsoDate,
-  type MaterializableChore,
   type ParentToday,
   type ParentTodayItem,
 } from '@chores/shared';
@@ -12,7 +11,6 @@ import { Hono } from 'hono';
 import type { Db } from './db/client.ts';
 import {
   children,
-  choreAssignees,
   choreInstances,
   chores,
   completions,
@@ -20,29 +18,8 @@ import {
   households,
   ledgerEntries,
 } from './db/schema.ts';
-import { materializable, writeInstances } from './materialize.ts';
+import { writeHouseholdInstances } from './materialize.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
-
-/**
- * The instances the whole household is due on `date`, created if missing. The parent's screen is
- * the one place a day can be seen before any kid device has opened it, so it materializes the way
- * a kid pull does (ADR-0003).
- */
-async function materializeHousehold(db: Db, householdId: string, date: IsoDate) {
-  const rows = await db
-    .select()
-    .from(chores)
-    .innerJoin(choreAssignees, eq(choreAssignees.choreId, chores.id))
-    .where(eq(chores.householdId, householdId));
-
-  const byChore = new Map<string, MaterializableChore>();
-  for (const { chores: chore, chore_assignees: link } of rows) {
-    const held = byChore.get(chore.id);
-    if (held) held.assignees.push(link.childId);
-    else byChore.set(chore.id, materializable(chore, [link.childId]));
-  }
-  await writeInstances(db, [...byChore.values()], date);
-}
 
 /**
  * The day summaries `currentStreak` reads: today's, and the latest one before it per child. A
@@ -98,7 +75,7 @@ export function todayRoutes(db: Db) {
     });
     if (!household) return c.json({ error: 'not_found' }, 404);
     const today = choreDate(new Date(), household.tz, household.dayBoundaryHour);
-    await materializeHousehold(db, householdId, today);
+    await writeHouseholdInstances(db, householdId, today);
 
     const childRows = await db.query.children.findMany({
       where: eq(children.householdId, householdId),

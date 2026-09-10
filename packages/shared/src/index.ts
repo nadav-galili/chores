@@ -15,3 +15,5 @@ export * from './ops.ts';
 export * from './sync.ts';
 export * from './parent-invite.ts';
 export * from './parent-today.ts';
+export * from './schedule.ts';
+export * from './notification.ts';
