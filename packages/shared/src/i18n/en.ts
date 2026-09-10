@@ -60,8 +60,8 @@ export const en = {
     stage: {
       egg: 'Egg',
       hatchling: 'Hatchling',
-      chick: 'Chick',
       fledgling: 'Fledgling',
+      full: 'Full-grown',
       splendid: 'Splendid',
     },
     artLabel: '%{name}, level %{level}, %{mood}',

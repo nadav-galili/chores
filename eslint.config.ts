@@ -7,4 +7,11 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
+  {
+    // Metro bundles an asset only from a literal `require`, so image maps cannot be `import`ed.
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-require-imports': ['error', { allow: ['\\.(webp|png)$'] }],
+    },
+  },
 );

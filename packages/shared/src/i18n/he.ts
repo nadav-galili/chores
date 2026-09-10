@@ -53,8 +53,8 @@ export const he: Catalog = {
     stage: {
       egg: 'ביצה',
       hatchling: 'בוקע',
-      chick: 'אפרוח',
       fledgling: 'גוזל',
+      full: 'בוגר',
       splendid: 'מפואר',
     },
     artLabel: '%{name}, רמה %{level}, %{mood}',

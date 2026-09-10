@@ -62,7 +62,7 @@ The pet's fifteen level-and-mood combinations are eight assets, not fifteen: fiv
 
 Five bodies, one creature. A small round garden bird — a robin or a wren, not a peacock, not a parrot, not a bird of paradise. A showy silhouette does not survive being painted eight times in one style, and the moods are carried by overlays rather than by plumage.
 
-The stage names are ADR-0012's: egg, hatchling, fledgling, full, splendid. (`pet-art.ts` currently labels level 3 "Chick" against a placeholder emoji; the swap ticket reconciles that label with these names.)
+The stage names are ADR-0012's: egg, hatchling, fledgling, full, splendid. (`pet-art.ts` labelled level 3 "Chick" against a placeholder emoji; the seam ticket that took the pet onto images reconciled the labels with these names, and the placeholders it ships already carry the filenames in the manifest, so the swap replaces eight files and touches no code.)
 
 The bird faces three-quarters to the viewer's left in stages 1 to 4. **Stage 5 is the exception: it turns to face the viewer, chest out, tail cocked upright.** That is deliberate and it is the thing that makes splendid readable — see the pass 1 re-render below. Do not "correct" it back into profile.
 
