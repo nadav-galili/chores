@@ -196,6 +196,16 @@ clerk_cli() {
   if command -v clerk >/dev/null 2>&1; then clerk "$@"; else npx -y clerk@latest "$@"; fi
 }
 
+# cfg_flag FILE EXPR — evaluate a python expression against the pulled instance
+# config (bound as `c`) and echo yes/no, or "unknown" when the config couldn't
+# be read. Keys are specific on purpose: a loose grep for a provider name
+# matches the config's list of every *available* provider, not the enabled one.
+cfg_flag() {
+  python3 -c 'import json,sys
+c = json.load(open(sys.argv[1]))
+print("yes" if ('"$2"') else "no")' "$1" 2>/dev/null || echo unknown
+}
+
 banner "Mibo — Clerk setup"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
@@ -337,8 +347,8 @@ say "The parent sign-in screen calls signIn.emailCode, so the instance must offe
 say "email address as an identifier with email-code verification."
 CFG="$(mktemp)"
 clerk_cli config pull --instance dev > "$CFG" 2>/dev/null || true
-if grep -q 'email_code' "$CFG" 2>/dev/null; then
-  note "the instance config mentions email_code — looks enabled"
+if [[ "$(cfg_flag "$CFG" '"email_code" in (c.get("auth_email") or {}).get("sign_in_strategies") or []')" == yes ]]; then
+  note "auth_email.sign_in_strategies includes email_code — enabled"
 else
   warn "couldn't confirm email-code sign-in from the config — set it by hand."
   clerk_cli open dashboard >/dev/null 2>&1 || open_url "https://dashboard.clerk.com"
@@ -355,8 +365,8 @@ say "The same screen offers 'Continue with Google' via startSSOFlow({ strategy:"
 say "'oauth_google' }). That needs the Google social connection switched on."
 CFG="$(mktemp)"
 clerk_cli config pull --instance dev > "$CFG" 2>/dev/null || true
-if grep -q '"google"' "$CFG" 2>/dev/null; then
-  note "the instance config mentions google — looks enabled"
+if [[ "$(cfg_flag "$CFG" '(c.get("connection_oauth_google") or {}).get("enabled") is True')" == yes ]]; then
+  note "connection_oauth_google.enabled is true — enabled"
 else
   warn "couldn't confirm the Google connection from the config — set it by hand."
   clerk_cli open dashboard >/dev/null 2>&1 || open_url "https://dashboard.clerk.com"
@@ -373,12 +383,26 @@ stage "Redirect URL for the native app"
 say "After Google sign-in the browser hands control back to the app through the"
 say "'mibo' scheme (app.json). Clerk only redirects to URLs on its allowlist, so"
 say "an unregistered scheme leaves the parent stuck in the browser tab."
-clerk_cli open dashboard >/dev/null 2>&1 || open_url "https://dashboard.clerk.com"
-step "Find the Redirect URLs / allowlist for this instance in the dashboard."
-step "Add:  mibo://parent"
-step "Add:  mibo://          (the bare scheme, for anything else that redirects)"
+for url in "mibo://parent" "mibo://"; do
+  if clerk_cli api /redirect_urls 2>/dev/null | grep -qF "\"$url\""; then
+    note "already registered: $url"
+  elif clerk_cli api -X POST /redirect_urls -d "{\"url\":\"$url\"}" --yes >/dev/null 2>&1; then
+    printf '  %s✓ registered%s %s\n' "$GREEN" "$RESET" "$url"
+  else
+    warn "couldn't register $url through the API — add it by hand."
+    clerk_cli open dashboard >/dev/null 2>&1 || open_url "https://dashboard.clerk.com"
+    step "Find the Redirect URLs / allowlist for this instance and add: $url"
+    pause "Press Enter once it's registered"
+  fi
+done
+if [[ "$(clerk_cli api /redirect_urls 2>/dev/null | grep -cF 'mibo://')" -ge 2 ]]; then
+  note "both mibo:// redirect URLs are on the allowlist"
+else
+  warn "the allowlist still doesn't hold both mibo:// URLs — Google sign-in will hang."
+  SKIPPED+=("register mibo://parent and mibo:// as Clerk redirect URLs")
+fi
 warn "Google sign-in cannot work in Expo Go — it needs the dev client build."
-pause "Press Enter once both URLs are registered"
+pause "Press Enter to continue"
 
 # ── 9 ───────────────────────────────────────────────────────────────────
 stage "Hook Clerk up to the agents"
