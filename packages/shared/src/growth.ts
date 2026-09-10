@@ -50,3 +50,25 @@ export function growthEntriesFor(
 export function groveStage(entries: readonly GrowthEntry[], childId: string): number {
   return entries.filter((e) => e.child_id === childId).length;
 }
+
+/**
+ * The grove stage each of the eight tree forms starts at. Fast at the near end and slow at the
+ * far end, and deliberately not exhausted before week three — the retention question this art
+ * exists to serve is day 15-21, and a shorter ladder goes flat exactly when it is being measured.
+ */
+export const TREE_FORM_THRESHOLDS: readonly number[] = [1, 2, 4, 7, 12, 20, 35, 60];
+export const TREE_MAX_FORM = TREE_FORM_THRESHOLDS.length;
+
+/**
+ * The art form a tree is drawn in, one of eight, derived from its grove stage. Grove stage is an
+ * unbounded count — on day 400 it is 400 — so this is the ladder between that count and something
+ * drawable. Total over every non-negative stage and clamped at both ends: an empty grove is the
+ * first form, anything past the last threshold stays the eighth. Never decreases.
+ */
+export function treeForm(stage: number): number {
+  let form = 1;
+  for (let i = 1; i < TREE_FORM_THRESHOLDS.length; i++) {
+    if (stage >= TREE_FORM_THRESHOLDS[i]!) form = i + 1;
+  }
+  return form;
+}
