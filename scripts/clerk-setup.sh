@@ -439,7 +439,20 @@ for _ in $(seq 1 30); do
   if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then HEALTHY=yes; break; fi
   sleep 1
 done
+# Kill the children first: $API_PID is the subshell, and the node process it
+# spawned outlives it — orphaned, still holding :3000, so the next `pnpm dev`
+# dies with EADDRINUSE.
+pkill -P "$API_PID" >/dev/null 2>&1 || true
 kill "$API_PID" >/dev/null 2>&1 || true
+sleep 1
+if lsof -t -nP -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1; then
+  lsof -t -nP -iTCP:3000 -sTCP:LISTEN 2>/dev/null | xargs kill >/dev/null 2>&1 || true
+  sleep 1
+fi
+if lsof -t -nP -iTCP:3000 -sTCP:LISTEN >/dev/null 2>&1; then
+  warn "something is still listening on :3000 — 'pnpm dev' will fail with EADDRINUSE"
+  SKIPPED+=("free port 3000: lsof -t -iTCP:3000 -sTCP:LISTEN | xargs kill")
+fi
 if [[ -n "$HEALTHY" ]]; then
   note "GET /health answered — DATABASE_URL, CLERK_SECRET_KEY and the migrations are all good"
 else
