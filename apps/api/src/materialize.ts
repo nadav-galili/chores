@@ -1,6 +1,7 @@
 import { materializeInstances, type IsoDate, type MaterializableChore } from '@chores/shared';
+import { eq } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
-import { choreInstances, chores } from './db/schema.ts';
+import { choreAssignees, choreInstances, chores } from './db/schema.ts';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 /** Either a transaction or the pool: both write instances the same way. */
@@ -46,4 +47,24 @@ export async function writeInstances(
       })),
     )
     .onConflictDoNothing();
+}
+
+/**
+ * The instances a whole household is due on `date`, created if missing. Both the parent's today
+ * screen and the boundary cron write a day nobody's device has opened yet (ADR-0003).
+ */
+export async function writeHouseholdInstances(db: Db, householdId: string, date: IsoDate) {
+  const rows = await db
+    .select()
+    .from(chores)
+    .innerJoin(choreAssignees, eq(choreAssignees.choreId, chores.id))
+    .where(eq(chores.householdId, householdId));
+
+  const byChore = new Map<string, MaterializableChore>();
+  for (const { chores: chore, chore_assignees: link } of rows) {
+    const held = byChore.get(chore.id);
+    if (held) held.assignees.push(link.childId);
+    else byChore.set(chore.id, materializable(chore, [link.childId]));
+  }
+  await writeInstances(db, [...byChore.values()], date);
 }

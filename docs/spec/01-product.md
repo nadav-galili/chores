@@ -58,13 +58,14 @@ i18n with English default, Hebrew as the tested locale, RTL from day one. Store 
 
 ## Analytics (PostHog EU)
 - Parent mode: `identify(clerk_user_id)`, group `household:<id>`.
-- Kid mode: `distinct_id = analytics_anon_id` (random, secure store, rotated on revoke). Properties: `ui_mode`, `age_band` (5-7 / 8-10 / 11+), `household_hash`. Never child id, name, pet name.
+- Kid mode: `distinct_id = analytics_anon_id` (random, secure store, rotated on revoke). Properties: `ui_mode`, `age_band`, `household_hash`. Never child id, name, pet name.
+- `age_band` is derived from `ui_mode` — `little` → `5-7`, `big` → `8+`. No birthdate is stored anywhere and none will be (child first name only), so `8-10` and `11+` cannot be told apart without asking for an age, and are one band.
 - Autocapture and session replay off. Server events via `posthog-node` with the originating distinct id.
-- Flags `pet_enabled`, `streak_bonus_enabled` fetched in parent mode, cached to SQLite for kid mode.
+- Flags `pet_enabled`, `grove_enabled` fetched in parent mode, cached to SQLite for kid mode. They are independent so the pet's and the grove's contributions to week-three retention can be separated (ADR-0011).
 
 | question | events |
 |---|---|
-| week-2/3 kid retention | `kid_app_open` (daily dedupe), `kid_day_complete` |
+| week-2/3 kid retention | `kid_app_open` (daily dedupe), `kid_day_complete`, `grove_grew {stage}` |
 | done → reward latency | `chore_completed {offline}`, `pet_reacted {ms}` |
 | digest open rate | `push_sent` (server), `push_opened {kind}` |
 | paywall → purchase | `paywall_shown {gate}`, `purchase_completed` (webhook) |

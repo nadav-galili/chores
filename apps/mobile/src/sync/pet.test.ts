@@ -3,7 +3,8 @@ import { PET_MAX_LEVEL, uuid7 } from '@chores/shared';
 import { openTestDb } from '@/db/test-db';
 import type { DeviceDb } from '@/db/types';
 import { children, daySummaries, petState, xpEvents } from '@/db/schema';
-import { PET_ENABLED, cacheFlag, readFlag, showPet } from './pet';
+import { PET_ENABLED, cacheFlag, readFlag } from './flags';
+import { showPet } from './pet';
 
 let db: DeviceDb;
 const childId = uuid7();

@@ -31,7 +31,7 @@ Parent "today" screen additionally polls every 60 s while open, and re-reads on 
 | revoked device | `/sync` → 401 `device_revoked`; app wipes local DB |
 
 ## Device scope
-- **Kid device:** its child row, assigned chores, its instances (today ±14 days), its completions, ledger, xp, day_summaries, growth entries, active rewards, its redemptions. `change_log` is filtered by the token's `child_id` server-side; sibling isolation is structural.
+- **Kid device:** its child row, assigned chores, its instances (today ±14 days), its completions, ledger, xp, day_summaries, growth entries, active rewards, its redemptions. `change_log` is filtered by the token's `child_id` server-side; sibling isolation is structural. **Two exceptions, `children` and `growth_entries`, come household-wide**: the grove is one household's trees, not one child's (ADR-0011), so a kid device needs each sibling's name and the chore dates they were Day Complete to draw one tree per child. The change log carries whole rows, so a sibling's `children` row crosses entire (name, pet name, ui mode, sort, reminder time) — household-internal, and no secret: device tokens live on `child_devices`, which is not logged. Nothing else about a sibling crosses — no chores, coins, completions, xp, day summaries or instances.
 - **Parent device:** whole household minus tokens/secrets. History depth gated by entitlement on pull.
 
 ## Photos

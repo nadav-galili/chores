@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/expo';
 import { Redirect, Stack, usePathname } from 'expo-router';
 import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
+import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
 
 /** Signed in → needs a household → create-household; has one → the children list. */
@@ -11,9 +12,9 @@ function HouseholdGate() {
   if (state.status === 'error') {
     return (
       <Screen>
-        <Title>Could not reach Mibo</Title>
+        <Title>{t('parent.unreachable')}</Title>
         <ErrorText>{state.message}</ErrorText>
-        <Button title="Try again" onPress={() => void state.refresh()} />
+        <Button title={t('common.tryAgain')} onPress={() => void state.refresh()} />
       </Screen>
     );
   }

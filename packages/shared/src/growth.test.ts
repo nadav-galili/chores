@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   growthEntriesFor,
   growthEntrySchema,
-  growthId,
   groveStage,
+  growthId,
   treeForm,
   TREE_FORM_THRESHOLDS,
   TREE_MAX_FORM,

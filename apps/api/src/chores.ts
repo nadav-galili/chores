@@ -1,5 +1,6 @@
 import {
   applyChoreOp,
+  choreCreated,
   upsertChoreOpSchema,
   writerClockSchema,
   type ChoreClocks,
@@ -8,6 +9,7 @@ import {
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import type { Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import { children, choreAssignees, chores } from './db/schema.ts';
 import { parseBody } from './parse-body.ts';
@@ -46,7 +48,7 @@ async function lockChore(tx: Tx, choreId: string) {
 }
 
 /** Routes for a signed-in parent to manage the household's chores. */
-export function choreRoutes(db: Db) {
+export function choreRoutes(db: Db, analytics: Analytics) {
   const app = new Hono<ScopedEnv>();
   app.use('/households/:householdId/*', householdScope(db));
 
@@ -157,6 +159,17 @@ export function choreRoutes(db: Db) {
     if (result.status === 404) return c.json({ error: 'not_found' }, 404);
     if (result.status === 400) {
       return c.json({ error: result.error, issues: result.issues ?? [] }, 400);
+    }
+    // Activation is the chore existing at all: a later edit to it is not another one.
+    if (result.status === 201) {
+      analytics.capture({
+        distinctId: c.get('clerkUserId'),
+        event: choreCreated({
+          kind: result.chore.kind,
+          assignee_count: result.chore.assignees.length,
+        }),
+        groups: { household: householdId },
+      });
     }
     return c.json(result.chore, result.status);
   });

@@ -8,6 +8,24 @@ import { materializable, writeInstances } from './materialize.ts';
 import { requireKidDevice, type DeviceEnv } from './device-auth.ts';
 import { parseBody } from './parse-body.ts';
 
+/**
+ * The only tables a kid device sees the whole household of. Everything else is filtered to the
+ * token's own child, so sibling isolation stays structural for the rows that matter — this is the
+ * one deliberate hole in it, and it exists because a grove with one tree in it is not a grove
+ * (ADR-0011, docs/spec/03-sync.md).
+ *
+ * The change log carries whole rows, so a sibling's `children` row crosses entire — first name,
+ * pet name, ui mode, sort, reminder time, and `read_only_after`, which the device drops as a
+ * column it does not have. All of it is household-internal and none of it is a secret: device
+ * tokens live on `child_devices`, which has no change-log trigger at all. What still never
+ * crosses is a sibling's chores, coins, completions, xp, day summaries and instances — those stay
+ * filtered by `child_id`, and `sync.test.ts` holds that line.
+ *
+ * The household predicate below is now the only thing bounding these two tables. It was
+ * belt-and-braces while every row was pinned to one child id; it is load-bearing now.
+ */
+const HOUSEHOLD_WIDE = ['children', 'growth_entries'] as const;
+
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type ChoreRow = typeof chores.$inferSelect;
 
@@ -69,6 +87,7 @@ export function syncRoutes(db: Db, pageSize: number) {
         householdId,
         household: household!,
         now,
+        createdBy: childId,
       };
       // Materialize first: what is due today decides whether a tap completes the day, so the
       // ops must land against the full list, not whatever happened to exist already.
@@ -90,6 +109,7 @@ export function syncRoutes(db: Db, pageSize: number) {
             gt(changeLog.seq, cursor),
             or(
               eq(changeLog.childId, childId),
+              inArray(changeLog.table, [...HOUSEHOLD_WIDE]),
               visibleChores.length
                 ? and(eq(changeLog.table, 'chores'), inArray(changeLog.rowId, visibleChores))
                 : sql`false`,

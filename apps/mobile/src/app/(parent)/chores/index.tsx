@@ -5,15 +5,18 @@ import { WEEKDAYS } from '@/components/chore-form';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { useChores } from '@/lib/use-chores';
+import { CHEVRON, formatChoreDate, t } from '@/lib/i18n';
 
 function recurrenceLabel(chore: Chore): string {
   switch (chore.kind) {
     case 'daily':
-      return 'Every day';
+      return t('chores.everyDay');
     case 'once':
-      return `Once · ${chore.due_date}`;
+      return t('chores.once', { date: chore.due_date ? formatChoreDate(chore.due_date) : '' });
     case 'weekdays':
-      return WEEKDAYS.filter((_, i) => ((chore.weekday_mask ?? 0) & (1 << i)) !== 0).join(' ');
+      return WEEKDAYS()
+        .filter((_: string, i: number) => ((chore.weekday_mask ?? 0) & (1 << i)) !== 0)
+        .join(' ');
   }
 }
 
@@ -27,15 +30,13 @@ export default function ChoresList() {
 
   return (
     <Screen>
-      <Title>Chores</Title>
+      <Title>{t('chores.title')}</Title>
       {chores.status === 'error' && <ErrorText>{chores.message}</ErrorText>}
       <FlatList
         data={chores.chores}
         keyExtractor={(c) => c.id}
         ListEmptyComponent={
-          chores.status === 'ready' ? (
-            <Text style={styles.empty}>No chores yet. Add the first one.</Text>
-          ) : null
+          chores.status === 'ready' ? <Text style={styles.empty}>{t('chores.empty')}</Text> : null
         }
         renderItem={({ item }) => (
           <Link href={{ pathname: '/(parent)/chores/[id]', params: { id: item.id } }} asChild>
@@ -46,21 +47,24 @@ export default function ChoresList() {
                   {item.title}
                 </Text>
                 <Text style={styles.meta}>
-                  {recurrenceLabel(item)} · {item.assignees.map(nameOf).join(', ')}
+                  {t('chores.meta', {
+                    recurrence: recurrenceLabel(item),
+                    who: item.assignees.map(nameOf).join(', '),
+                  })}
                 </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Text style={styles.chevron}>{CHEVRON}</Text>
             </Pressable>
           </Link>
         )}
       />
       <Button
-        title="Add a chore"
+        title={t('chores.add')}
         onPress={() => router.push('/(parent)/chores/new')}
         disabled={children.length === 0}
       />
-      {children.length === 0 && <ErrorText>Add a child before adding chores.</ErrorText>}
-      <Button title="Back" onPress={() => router.back()} secondary />
+      {children.length === 0 && <ErrorText>{t('chores.needAChild')}</ErrorText>}
+      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

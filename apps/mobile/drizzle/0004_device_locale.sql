@@ -1,0 +1,1 @@
+ALTER TABLE `notification_state` ADD `locale` text;

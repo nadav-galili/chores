@@ -4,13 +4,14 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
+import { t } from '@/lib/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
 
 type Step = { kind: 'email' } | { kind: 'code'; flow: 'sign-in' | 'sign-up' };
 
 export function ParentSignIn({
-  title = 'Sign in as a parent',
+  title = t('signIn.title'),
   footer,
 }: {
   title?: string;
@@ -56,7 +57,8 @@ export function ParentSignIn({
     if (step.flow === 'sign-in') {
       const { error: verifyError } = await signIn.emailCode.verifyCode({ code: code.trim() });
       if (verifyError) return setError(verifyError.message);
-      if (signIn.status !== 'complete') return setError(`Sign-in is ${signIn.status}`);
+      if (signIn.status !== 'complete')
+        return setError(t('signIn.unfinished', { status: signIn.status }));
       const { error: finalizeError } = await signIn.finalize();
       if (finalizeError) setError(finalizeError.message);
       return;
@@ -65,7 +67,8 @@ export function ParentSignIn({
       code: code.trim(),
     });
     if (verifyError) return setError(verifyError.message);
-    if (signUp.status !== 'complete') return setError(`Sign-up is ${signUp.status}`);
+    if (signUp.status !== 'complete')
+      return setError(t('signIn.unfinished', { status: signUp.status }));
     const { error: finalizeError } = await signUp.finalize();
     if (finalizeError) setError(finalizeError.message);
   };
@@ -78,16 +81,16 @@ export function ParentSignIn({
         redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo', path: 'parent' }),
       });
       if (createdSessionId && setActive) await setActive({ session: createdSessionId });
-      else setError('Google sign-in did not finish');
+      else setError(t('signIn.googleUnfinished'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Google sign-in failed');
+      setError(e instanceof Error ? e.message : t('signIn.googleFailed'));
     }
   };
 
   if (step.kind === 'code') {
     return (
       <Screen>
-        <Title>Enter the code we emailed you</Title>
+        <Title>{t('signIn.codeTitle')}</Title>
         <Field
           label={email}
           value={code}
@@ -96,9 +99,13 @@ export function ParentSignIn({
           autoFocus
         />
         <ErrorText>{error}</ErrorText>
-        <Button title="Continue" onPress={verifyCode} disabled={busy || code.length < 4} />
         <Button
-          title="Use a different email"
+          title={t('common.continue')}
+          onPress={verifyCode}
+          disabled={busy || code.length < 4}
+        />
+        <Button
+          title={t('signIn.differentEmail')}
           onPress={() => setStep({ kind: 'email' })}
           secondary
         />
@@ -110,9 +117,9 @@ export function ParentSignIn({
   return (
     <Screen>
       <Title>{title}</Title>
-      <Button title="Continue with Google" onPress={google} disabled={busy} />
+      <Button title={t('signIn.google')} onPress={google} disabled={busy} />
       <Field
-        label="Or use your email"
+        label={t('signIn.emailLabel')}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -120,7 +127,11 @@ export function ParentSignIn({
         autoComplete="email"
       />
       <ErrorText>{error}</ErrorText>
-      <Button title="Email me a code" onPress={sendCode} disabled={busy || !email.includes('@')} />
+      <Button
+        title={t('signIn.emailCode')}
+        onPress={sendCode}
+        disabled={busy || !email.includes('@')}
+      />
       {footer}
     </Screen>
   );

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './chore-date.ts';
+import { localeSchema } from './locale.ts';
+import { expoPushTokenSchema } from './notification.ts';
 
 /**
  * The ops a kid device may send (docs/spec/03-sync.md, Ops). Each is an intent recorded locally
@@ -25,6 +27,17 @@ export const uncompletePayloadSchema = z.object({
 });
 export type UncompletePayload = z.infer<typeof uncompletePayloadSchema>;
 
+/**
+ * The push token this device now holds, re-sent on every app open because a token rots, and the
+ * locale it reads in, so a push arrives in the language the child's phone is set to. The device is
+ * read from the token on the request, so nothing here says which one it belongs to.
+ */
+export const registerPushTokenPayloadSchema = z.object({
+  expo_push_token: expoPushTokenSchema,
+  locale: localeSchema.optional(),
+});
+export type RegisterPushTokenPayload = z.infer<typeof registerPushTokenPayloadSchema>;
+
 export const kidOpSchema = z.discriminatedUnion('type', [
   z.object({
     op_id: z.string().uuid(),
@@ -36,9 +49,22 @@ export const kidOpSchema = z.discriminatedUnion('type', [
     type: z.literal('uncomplete'),
     payload: uncompletePayloadSchema,
   }),
+  z.object({
+    op_id: z.string().uuid(),
+    type: z.literal('register_push_token'),
+    payload: registerPushTokenPayloadSchema,
+  }),
 ]);
 export type KidOp = z.infer<typeof kidOpSchema>;
 export type KidOpType = KidOp['type'];
+
+/**
+ * The op types this version knows, read off the schema. An op of any other type is a device and a
+ * server that disagree about what exists, which is `unknown_op` rather than a bad payload.
+ */
+export const KID_OP_TYPES: readonly KidOpType[] = kidOpSchema.options.map(
+  (o) => o.shape.type.value,
+);
 
 /**
  * Why an op will never be accepted. A rejected op is dropped from the outbox and surfaced;
@@ -59,3 +85,10 @@ export const rejectReasonSchema = z.enum([
   'too_late',
 ]);
 export type RejectReason = z.infer<typeof rejectReasonSchema>;
+
+/**
+ * The answer to `reject_completion`, the parent op behind a rejection (docs/spec/03-sync.md).
+ * Two parents rejecting the same completion both get `rejected` and there is one clawback; a
+ * completion the child already undid is `already_undone` and nothing moves.
+ */
+export type RejectCompletionResult = 'rejected' | 'already_undone';

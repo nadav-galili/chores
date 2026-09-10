@@ -6,6 +6,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import type { Locale } from '@chores/shared';
 import type { ChoreClocks, RejectReason } from '@chores/shared';
 
 /**
@@ -17,7 +18,11 @@ import type { ChoreClocks, RejectReason } from '@chores/shared';
 const json = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 const bool = (name: string) => integer(name, { mode: 'boolean' });
 
-/** This device's one child; never anyone else's row. */
+/**
+ * The household's children: this device's own child, and its siblings for the grove's sake — one
+ * of the two tables that reach a kid device household-wide (docs/spec/03-sync.md). Every query
+ * about *this* child still filters by id; only the grove reads them all.
+ */
 export const children = sqliteTable('children', {
   id: text('id').primaryKey(),
   household_id: text('household_id').notNull(),
@@ -166,7 +171,7 @@ export const redemptions = sqliteTable('redemptions', {
  */
 export const outbox = sqliteTable('outbox', {
   op_id: text('op_id').primaryKey(),
-  type: text('type', { enum: ['complete', 'uncomplete'] }).notNull(),
+  type: text('type', { enum: ['complete', 'uncomplete', 'register_push_token'] }).notNull(),
   payload: json<Record<string, unknown>>('payload').notNull(),
   created_at: text('created_at').notNull(),
   attempts: integer('attempts').notNull().default(0),
@@ -197,6 +202,41 @@ export const flags = sqliteTable('flags', {
 export const petState = sqliteTable('pet_state', {
   child_id: text('child_id').primaryKey(),
   shown_level: integer('shown_level').notNull().default(1),
+});
+
+/**
+ * One row: what this device has already arranged about notifications — the push token it told the
+ * server about, and the reminder time it asked the OS to fire at. Both are compared before doing
+ * anything, so a token that has not rotted costs no op and a reminder that has not moved is not
+ * rescheduled (docs/spec/01-product.md, notifications).
+ */
+export const notificationState = sqliteTable('notification_state', {
+  id: integer('id').primaryKey(),
+  /** The Expo push token the server has been told about; null until one is registered. */
+  push_token: text('push_token'),
+  /** The locale registered alongside that token, so the server pushes in the child's language. */
+  locale: text('locale').$type<Locale>(),
+  /** The household-local `HH:MM` the local notification is scheduled for; null for none. */
+  reminder_time: text('reminder_time'),
+  updated_at: text('updated_at').notNull(),
+});
+
+/**
+ * One row: what this device has already reported to analytics, so a daily event is daily and a
+ * growth is a growth (ADR-0009). Kept here rather than in memory because the questions are about
+ * days and the app is relaunched many times a day; a restart must not look like another open.
+ */
+export const analyticsState = sqliteTable('analytics_state', {
+  id: integer('id').primaryKey(),
+  /** The last chore date this device reported an open for. */
+  opened_on: text('opened_on'),
+  /** The last chore date this device reported a Day Complete for. */
+  completed_on: text('completed_on'),
+  /**
+   * The child's Grove Stage as last reported; null until this device has read one. A stage only
+   * ever rises (ADR-0011), and the first stage a device reads is what it already had, not growth.
+   */
+  grove_stage: integer('grove_stage'),
 });
 
 /** One row: how far this device has pulled the change log. */

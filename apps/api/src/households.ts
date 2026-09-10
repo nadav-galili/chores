@@ -2,11 +2,13 @@ import {
   canDo,
   childInputSchema,
   createHouseholdInputSchema,
+  householdCreated,
   parentInviteInputSchema,
   uuid7,
 } from '@chores/shared';
 import { and, asc, count, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Analytics } from './analytics.ts';
 import type { AuthVariables } from './auth.ts';
 import type { Db } from './db/client.ts';
 import { children, households, parentInvites, parents } from './db/schema.ts';
@@ -17,7 +19,7 @@ import { householdScope, type ScopedEnv } from './scope.ts';
 type Env = { Variables: AuthVariables };
 
 /** Routes for a signed-in parent: their household and its children. */
-export function householdRoutes(db: Db) {
+export function householdRoutes(db: Db, analytics: Analytics) {
   const app = new Hono<Env>();
 
   const parentOf = (clerkUserId: string) =>
@@ -102,6 +104,11 @@ export function householdRoutes(db: Db) {
         })
         .returning();
       return { household: household!, parent: parent! };
+    });
+    analytics.capture({
+      distinctId: clerkUserId,
+      event: householdCreated({ currency: result.household.currency, tz: result.household.tz }),
+      groups: { household: result.household.id },
     });
     return c.json(
       { household: householdToApi(result.household), parent: parentToApi(result.parent) },

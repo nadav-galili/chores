@@ -62,7 +62,7 @@ No UI tests, no mocking of Postgres or SQLite, no handler-level unit tests.
 - Ledger, XP and completion rows are never updated or deleted; corrections are clawback entries.
 - Growth entries are append-only and have **no** clawback: a rejection costs coins and the streak, never a tree. Grove stage is always `COUNT(*)`, never a stored column. (ADR-0011)
 - Every date-keyed row stores a household-local `chore_date`; never do date arithmetic on instants.
-- A kid device token scopes every query to one child; sibling isolation is enforced server-side, not in UI.
+- A kid device token scopes every query to one child; sibling isolation is enforced server-side, not in UI. The one exception is the grove: `children` and `growth_entries` reach a kid device household-wide, because the grove is the household's (ADR-0011, docs/spec/03-sync.md).
 - Child data is first name only; nothing about a child goes to analytics or third parties.
 - The child's side is never gated by entitlement.
 

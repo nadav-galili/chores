@@ -4,6 +4,7 @@ import { choreInstances, completions } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
 import { applyPull, inTransaction, readCursor } from './engine';
 import { reconcileLocal, tapContext, type ChildContext, type TapContext } from './local';
+import { forgetRegisteredToken } from './notifications';
 import { deferOps, dropOp, markRejected, pendingOps } from './outbox';
 
 export type SyncCall = (body: SyncRequest) => Promise<SyncResponse>;
@@ -15,7 +16,12 @@ let inFlight: Promise<void> | null = null;
  * different chore date. The server's own rows arrive as changes and are already applied, so this
  * only has to clear what the device invented.
  */
-async function repair(db: DeviceDb, op: KidOp, kind: 'rejected' | 'date_adjusted') {
+async function repair(
+  db: DeviceDb,
+  ctx: TapContext,
+  op: KidOp,
+  kind: 'rejected' | 'date_adjusted',
+) {
   if (op.type === 'complete') {
     if (kind === 'rejected') {
       // Completions are never deleted, on the device no more than on the server: the row stays
@@ -36,6 +42,12 @@ async function repair(db: DeviceDb, op: KidOp, kind: 'rejected' | 'date_adjusted
           eq(choreInstances.chore_date, op.payload.chore_date),
         ),
       );
+    return;
+  }
+  if (op.type === 'register_push_token') {
+    // Nothing local was invented, but the device believes the server holds this token: a refusal
+    // means it does not, so forget it and let the next open register again.
+    if (kind === 'rejected') await forgetRegisteredToken(db, ctx.now);
     return;
   }
   if (kind !== 'rejected') return;
@@ -77,7 +89,7 @@ async function settle(
     for (const verdict of verdicts) {
       const op = byId.get(verdict.op_id);
       if (!op) continue;
-      await repair(db, op, verdict.kind);
+      await repair(db, ctx, op, verdict.kind);
       repaired = true;
     }
     if (repaired) await reconcileLocal(db, ctx);

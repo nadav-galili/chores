@@ -3,10 +3,13 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
+import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { wipeDeviceDb } from '@/db/client';
+import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
+import { formatNumber, t } from '@/lib/i18n';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
 import { clearRole } from '@/lib/role';
 import { useToday } from '@/lib/use-today';
@@ -32,9 +35,11 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
     // Once per token; a save above rewrites `session` and must not loop.
   }, [session.device_token]);
 
-  // A revoked device wipes its local copy and goes back to the code screen.
+  // A revoked device wipes its local copy and goes back to the code screen. Its analytics anon id
+  // is rotated on revoke (ADR-0009), so the client that holds the old one goes too.
   const onRevoked = useCallback(async () => {
     router.replace({ pathname: '/(kid)/join', params: { reason: 'revoked' } });
+    await shutdownAnalytics();
     await wipeDeviceDb();
     await device.clear();
     await clearRole();
@@ -58,7 +63,10 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
           <Pressable
             onPress={() => router.push('/(kid)/pet')}
             accessibilityRole="button"
-            accessibilityLabel={`${today.pet.name}, level ${today.pet.progress.level}`}
+            accessibilityLabel={t('kid.petButton', {
+              name: today.pet.name,
+              level: today.pet.progress.level,
+            })}
           >
             <PetFigure
               name={today.pet.name}
@@ -69,19 +77,37 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
             />
           </Pressable>
         )}
-        <Text style={little ? styles.greetingLittle : styles.greeting}>Hi {today.firstName}!</Text>
+        <Text style={little ? styles.greetingLittle : styles.greeting}>
+          {t('kid.greeting', { name: today.firstName })}
+        </Text>
         <View style={styles.tallies}>
-          <Text style={styles.coinTally}>{today.coins} 🪙</Text>
+          <Text style={styles.coinTally}>
+            {t('kid.coinTally', { coins: formatNumber(today.coins) })}
+          </Text>
           {!little && <StreakBadge days={today.streak} />}
         </View>
+        {/* The way into the grove, and a tree standing at the child's own stage. Drawn only
+            while `grove_enabled` is on, so the flag hides the screen and its entry point
+            together. Big enough to hit in little mode; the label carries the count either way. */}
+        {today.status === 'ready' && today.grove.enabled && (
+          <Pressable
+            onPress={() => router.push('/(kid)/grove')}
+            accessibilityRole="button"
+            accessibilityLabel={t('grove.buttonLabel', { count: today.grove.ownTree.stage })}
+          >
+            <TreeFigure
+              tree={today.grove.ownTree}
+              ownName={today.firstName}
+              size={little ? 72 : 56}
+              showLabel={false}
+            />
+          </Pressable>
+        )}
       </View>
-      {today.offline && <Text style={styles.offline}>Showing what’s saved on this device.</Text>}
+      {today.offline && <Text style={styles.offline}>{t('kid.offline')}</Text>}
       {today.refused > 0 && (
         <Pressable style={styles.refused} onPress={today.dismissRefused}>
-          <Text style={styles.refusedText}>
-            {today.refused === 1 ? 'One tap didn’t save.' : `${today.refused} taps didn’t save.`}{' '}
-            Tap to hide.
-          </Text>
+          <Text style={styles.refusedText}>{t('kid.refused', { count: today.refused })}</Text>
         </Pressable>
       )}
       <FlatList
@@ -102,7 +128,7 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
         ListEmptyComponent={
           today.status === 'ready' ? (
             <Text style={little ? styles.emptyLittle : styles.empty}>
-              {little ? '🎈 Nothing to do today!' : 'Nothing to do today.'}
+              {t(little ? 'kid.emptyLittle' : 'kid.empty')}
             </Text>
           ) : null
         }
@@ -118,6 +144,11 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
             name: today.pet.name,
             level: today.pet.progress.level,
             mood: 'happy',
+          }}
+          grove={{
+            enabled: today.grove.enabled,
+            ownName: today.firstName,
+            tree: today.grove.ownTree,
           }}
           streak={today.streak}
           onDone={today.clearReaction}
@@ -161,14 +192,16 @@ function Row({ item, onPress }: { item: TodayItem; onPress: () => void }) {
       <Text style={[styles.rowTitle, done && styles.rowTitleDone]} numberOfLines={1}>
         {item.title}
       </Text>
-      <Text style={styles.coins}>+{COINS_PER_CHORE} 🪙</Text>
+      <Text style={styles.coins}>
+        {t('kid.chorePays', { coins: formatNumber(COINS_PER_CHORE) })}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingTop: 56, paddingHorizontal: 16 },
-  secretCorner: { position: 'absolute', top: 0, right: 0, width: 72, height: 72, zIndex: 1 },
+  secretCorner: { position: 'absolute', top: 0, end: 0, width: 72, height: 72, zIndex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   greeting: { fontSize: 28, fontWeight: '700' },
   greetingLittle: { fontSize: 36, fontWeight: '700' },

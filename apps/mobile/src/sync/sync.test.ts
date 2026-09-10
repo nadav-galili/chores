@@ -4,8 +4,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  bonusId,
+  clawbackId,
   COINS_PER_CHORE,
+  DAY_COMPLETE_BONUS,
+  earnId,
   instanceId,
+  xpId,
   uuid7,
   type SyncRequest,
   type SyncResponse,
@@ -20,8 +25,9 @@ import {
   outbox,
   syncState,
 } from '@/db/schema';
-import { materializeToday } from './engine';
+import { materializeToday, todayList } from './engine';
 import { balanceOf, tapContext, tapDone, type ChildContext } from './local';
+import { xpTotalOf } from './pet';
 import { backoffMs, pendingOps } from './outbox';
 import { syncNow } from './sync';
 
@@ -178,6 +184,93 @@ describe('syncNow', () => {
     // The chore was still done, so it still earns; today is no longer complete, so the day bonus
     // goes back.
     expect(await balanceOf(db, childId)).toBe(COINS_PER_CHORE);
+  });
+
+  it('applies a parent’s rejection pulled from the server: the coins drop and the chore is a redo', async () => {
+    const instance = await seedChore(db);
+    await tapDone(db, tapContext(child, new Date(T)), instance);
+    const [done] = await db.select().from(completions);
+    expect(await balanceOf(db, childId)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+
+    // The server acked the tap, then a parent rejected it: the completion stops counting, the
+    // instance comes back as a redo, and the clawbacks reverse the earn and the day bonus. XP
+    // mirrors every clawback 1:1, so the pet loses exactly what the tap gave it.
+    const clawback = (id: string, coins: number) => ({
+      id: clawbackId(id),
+      household_id: householdId,
+      child_id: childId,
+      kind: 'clawback',
+      coins,
+      money_amount: null,
+      ref_type: 'ledger_entry',
+      ref_id: id,
+      created_at: T,
+      created_by: parentId,
+    });
+    const rows = [
+      { table: 'completions', row_id: done!.id, row: { ...done!, status: 'rejected' } },
+      {
+        table: 'chore_instances',
+        row_id: instance.id,
+        row: {
+          ...(await db.select().from(choreInstances).where(eq(choreInstances.id, instance.id)))[0]!,
+          status: 'redo',
+        },
+      },
+      {
+        table: 'ledger_entries',
+        row_id: clawbackId(earnId(done!.id)),
+        row: clawback(earnId(done!.id), -COINS_PER_CHORE),
+      },
+      {
+        table: 'ledger_entries',
+        row_id: clawbackId(bonusId(childId, TODAY)),
+        row: clawback(bonusId(childId, TODAY), -DAY_COMPLETE_BONUS),
+      },
+      ...[
+        [earnId(done!.id), -COINS_PER_CHORE] as const,
+        [bonusId(childId, TODAY), -DAY_COMPLETE_BONUS] as const,
+      ].map(([id, coins]) => ({
+        table: 'xp_events',
+        row_id: xpId(clawbackId(id)),
+        row: {
+          id: xpId(clawbackId(id)),
+          child_id: childId,
+          xp: coins,
+          ref_entry_id: clawbackId(id),
+          created_at: T,
+        },
+      })),
+      {
+        table: 'day_summaries',
+        // day_summaries has no id column, so the server logs the change under the child (see the
+        // 0004 migration); the device matches on the row's own primary key either way.
+        row_id: childId,
+        row: {
+          child_id: childId,
+          chore_date: TODAY,
+          due_count: 1,
+          done_count: 0,
+          complete: false,
+          streak_after: 0,
+        },
+      },
+    ];
+    const server = fakeServer((req) =>
+      empty({
+        acked: req.ops.map((o) => ({ op_id: o.op_id })),
+        changes: rows.map((r, i) => ({ seq: i + 1, op: 'update' as const, ...r })),
+        cursor: rows.length,
+      }),
+    );
+    await syncNow(db, child, server.call);
+
+    expect(await balanceOf(db, childId)).toBe(0);
+    const [stored] = await db.select().from(completions);
+    expect(stored!.status).toBe('rejected');
+    const [item] = await todayList(db, childId, TODAY);
+    expect(item!.status).toBe('redo');
+    expect(await xpTotalOf(db, childId)).toBe(0);
   });
 
   it('leaves ops queued and backs off when the request never lands', async () => {

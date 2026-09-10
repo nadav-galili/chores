@@ -2,6 +2,7 @@ import { choreFieldsOf } from '@chores/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChoreForm, diffChore } from '@/components/chore-form';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 import { useChores } from '@/lib/use-chores';
 
 export default function EditChore() {
@@ -18,7 +19,7 @@ export default function EditChore() {
 
   return (
     <ChoreForm
-      title={`Edit ${chore.title}`}
+      title={t('choreForm.edit', { title: chore.title })}
       children={state.me.children}
       initial={initial}
       onSubmit={async (fields) => {

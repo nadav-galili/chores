@@ -1,8 +1,14 @@
 import {
   COINS_PER_CHORE,
+  choreCompleted,
   choreDate,
   currentStreak,
+  groveGrew,
+  kidAppOpen,
+  kidDayComplete,
+  petReacted,
   type DeviceSession,
+  type IsoDate,
   type UiMode,
 } from '@chores/shared';
 import { eq } from 'drizzle-orm';
@@ -14,10 +20,15 @@ import { children, daySummaries } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
 import { materializeToday, todayList, type TodayItem } from '@/sync/engine';
 import { balanceOf, tapContext, tapToggle, type ChildContext } from '@/sync/local';
+import { serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
+import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
+import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
+import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
+import { arrangeKidReminder } from '@/lib/notifications';
 
 export type TodayState = {
   status: 'loading' | 'ready';
@@ -33,7 +44,13 @@ export type TodayState = {
   /** Taps the server refused. They are never retried, so the child has to be told. */
   refused: number;
   /** Level, mood and XP bar, from the shared rules over local rows. */
-  pet: PetView;
+  pet: PetView & { name: string };
+  /** One tree per child, from the growth entries on this device. */
+  grove: GroveView;
+  /** The reminder time the parent set, from the child row; drives the local notification. */
+  reminderTime: string | null;
+  /** The server holds this device's push token, so the reminder is a push and not a local one. */
+  pushRegistered: boolean;
 };
 
 /**
@@ -48,6 +65,8 @@ export type DoneReaction = {
   coins: number;
   /** `Date.now()` at the tap itself. */
   at: number;
+  /** The tap completed the day, so it planted a tree; the grove reacts too. */
+  grew: boolean;
 };
 
 export type Today = TodayState & {
@@ -61,13 +80,41 @@ export type Today = TodayState & {
   clearReaction: () => void;
 };
 
-/** What the header draws before the first read lands. */
-const PET_PLACEHOLDER: PetView = {
+/** What the header draws before the first read lands; the name comes from the join. */
+const PET_PLACEHOLDER: Omit<PetView, 'name'> = {
   enabled: true,
-  name: 'Pet',
   mood: 'sleepy',
   progress: { level: 1, xp: 0, into: 0, needed: 100, fraction: 0, atMax: false },
 };
+
+/** What the header draws before the first read lands: the child's own tree, not yet counted. */
+const grovePlaceholder = (childId: string): GroveView => {
+  const ownTree = { childId, firstName: null, stage: 0, isSelf: true };
+  return { enabled: true, trees: [ownTree], ownTree };
+};
+
+/**
+ * What the local rows have just said, reported once each (ADR-0009). Every one of these is a
+ * question about a day or a threshold, and this runs on every open, every focus and after every
+ * tap, so what makes them events rather than readings is the device's own record of what it has
+ * already said — see `sync/analytics`.
+ *
+ * Nothing is marked as said before there is anywhere to say it: this runs on the first read,
+ * which can beat the client coming up, and a day marked open without an event would be a day
+ * silently lost.
+ */
+async function reportDay(
+  db: DeviceDb,
+  today: IsoDate,
+  day: { complete: boolean; streak: number; stage: number },
+): Promise<void> {
+  if (!analyticsReady()) return;
+  if (await markOpen(db, today)) capture(kidAppOpen());
+  if (day.complete && (await markDayComplete(db, today))) {
+    capture(kidDayComplete({ streak: day.streak }));
+  }
+  if (await markGroveStage(db, day.stage)) capture(groveGrew({ stage: day.stage }));
+}
 
 /**
  * Today's list, read from SQLite only: materialize today, show it, then sync and show it again.
@@ -84,9 +131,16 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     offline: false,
     refused: 0,
     pet: { ...PET_PLACEHOLDER, name: session.child.pet_name },
+    grove: grovePlaceholder(session.child.id),
+    reminderTime: null,
+    pushRegistered: false,
   });
   const [reaction, setReaction] = useState<DoneReaction | null>(null);
   const taps = useRef(0);
+  // The child's own Grove Stage as of the last read. A tap that raises it planted a tree, which
+  // is the only honest signal for the done moment: coins and trees are separate quantities from
+  // one event (ADR-0004, ADR-0011), so a coin total cannot stand in for a Day Complete.
+  const stage = useRef(0);
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
 
@@ -108,24 +162,37 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     async (db: DeviceDb, offline: boolean) => {
       const date = choreDate(new Date(), tz, boundary);
       await materializeToday(db, childId, date);
-      const [items, rows, summaries, coins, refused, pet] = await Promise.all([
-        todayList(db, childId, date),
-        db.select().from(children).where(eq(children.id, childId)),
-        db.select().from(daySummaries).where(eq(daySummaries.child_id, childId)),
-        balanceOf(db, childId),
-        rejectedOps(db),
-        showPet(db, childId, date),
-      ]);
+      const [items, rows, summaries, coins, refused, pet, grove, pushRegistered] =
+        await Promise.all([
+          todayList(db, childId, date),
+          db.select().from(children).where(eq(children.id, childId)),
+          db.select().from(daySummaries).where(eq(daySummaries.child_id, childId)),
+          balanceOf(db, childId),
+          rejectedOps(db),
+          showPet(db, childId, date),
+          showGrove(db, childId),
+          serverHoldsToken(db),
+        ]);
+      stage.current = grove.ownTree.stage;
+      const streak = currentStreak(summaries, date);
       setState({
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
         uiMode: rows[0]?.ui_mode ?? joinedUiMode,
         items,
-        streak: currentStreak(summaries, date),
+        streak,
         coins,
         offline,
         refused: refused.length,
-        pet,
+        pet: { ...pet, name: pet.name ?? session.child.pet_name },
+        grove,
+        reminderTime: rows[0]?.reminder_time ?? null,
+        pushRegistered,
+      });
+      await reportDay(db, date, {
+        complete: summaries.some((s) => s.chore_date === date && s.complete),
+        streak,
+        stage: grove.ownTree.stage,
       });
     },
     [childId, tz, boundary, joinedUiMode, joinedName],
@@ -148,23 +215,39 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       // Start the done moment in this very tick: the pet must react to the tap, not to SQLite.
       // Undoing is not a celebration, so only a chore going done gets one.
       if (item.status !== 'done') {
-        setReaction({ key: (taps.current += 1), coins: COINS_PER_CHORE, at: Date.now() });
+        setReaction({
+          key: (taps.current += 1),
+          coins: COINS_PER_CHORE,
+          at: Date.now(),
+          grew: false,
+        });
       }
       void (async () => {
         const db = await openDeviceDb();
+        const grown = stage.current;
         const paid = await tapToggle(db, tapContext(child), item);
-        // The child sees the new coins and streak before anything reaches the network.
+        // The tap has counted, in SQLite, whether or not there is a network — which is the whole
+        // offline promise, and why the event carries whether there was one.
+        if (item.status !== 'done') capture(choreCompleted({ offline: state.offline }));
+        // The child sees the new coins, streak and tree before anything reaches the network.
         await readLocal(db, state.offline);
-        // A tap that completed the day paid a bonus too. The animation is already running; this
-        // only corrects the number on it, from what the tap itself wrote.
-        if (paid > COINS_PER_CHORE) {
-          setReaction((r) => (r === null ? r : { ...r, coins: paid }));
-        }
+        // The animation is already running; this only corrects it, from what the tap itself
+        // wrote. A tap that completed the day paid a bonus and planted a tree — the two are
+        // asked separately because they are separate quantities.
+        if (paid > COINS_PER_CHORE) setReaction((r) => (r === null ? r : { ...r, coins: paid }));
+        if (stage.current > grown) setReaction((r) => (r === null ? r : { ...r, grew: true }));
         await refresh();
       })();
     },
     [child, readLocal, refresh, state.offline],
   );
+
+  // How long the child waited for the pet: the reaction is created in the tap's own tick, so the
+  // first render carrying it is the frame the pet appears in. Once per tap, by its key.
+  useEffect(() => {
+    if (reaction) capture(petReacted({ tapped_at: reaction.at, shown_at: Date.now() }));
+    // The key changes on every tap; nothing else about the reaction re-fires this.
+  }, [reaction?.key]);
 
   const clearReaction = useCallback(() => setReaction(null), []);
 
@@ -175,6 +258,12 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       await readLocal(db, state.offline);
     })();
   }, [readLocal, state.offline]);
+
+  // This device's analytics identity: the anon id from its join, and nothing about the child
+  // (ADR-0009). Kid mode never asks PostHog for anything, so there is nothing to await.
+  useEffect(() => {
+    void startKidAnalytics(session);
+  }, [session.analytics_anon_id, session.child.ui_mode, session.household.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -188,6 +277,15 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     });
     return () => sub.remove();
   }, [refresh]);
+
+  // The reminder is arranged once the child row says what it should be, again whenever a parent
+  // moves it, and again when the server takes this device's token — which is what turns the local
+  // notification off. Not on every refresh: reading the push token is a call to Expo.
+  useEffect(() => {
+    void (async () => {
+      await arrangeKidReminder(await openDeviceDb(), { tz, reminderTime: state.reminderTime });
+    })();
+  }, [tz, state.reminderTime, state.pushRegistered]);
 
   return { ...state, toggle, dismissRefused, reaction, clearReaction };
 }

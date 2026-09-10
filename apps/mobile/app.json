@@ -35,6 +35,7 @@
       "@clerk/expo",
       "expo-web-browser",
       "expo-localization",
+      "expo-notifications",
       "expo-sqlite"
     ],
     "experiments": {

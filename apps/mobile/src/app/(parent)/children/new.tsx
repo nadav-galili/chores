@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { ChildForm } from '@/components/child-form';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 
 export default function NewChild() {
   const state = useHousehold();
@@ -10,7 +11,7 @@ export default function NewChild() {
 
   return (
     <ChildForm
-      title="Add a child"
+      title={t('childForm.add')}
       onSubmit={async (input) => {
         await state.api.createChild(householdId, input);
         await state.refresh();

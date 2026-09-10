@@ -3,6 +3,7 @@ import {
   growthEntriesFor,
   instanceId,
   isDueOn,
+  KID_OP_TYPES,
   kidOpSchema,
   reconcileLedger,
   resolveChoreDate,
@@ -16,6 +17,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
 import {
   appliedOps,
+  childDevices,
   choreAssignees,
   choreInstances,
   chores,
@@ -30,12 +32,18 @@ import {
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Household = typeof households.$inferSelect;
 
-export type OpContext = {
-  deviceId: string;
+/** Whose rows a reconciliation recomputes, when, and whose name goes on what it writes. */
+export type ReconcileContext = {
   childId: string;
   householdId: string;
-  household: Household;
   now: Date;
+  /** `created_by` on every ledger row written: the child who tapped, or the parent who rejected. */
+  createdBy: string;
+};
+
+export type OpContext = ReconcileContext & {
+  deviceId: string;
+  household: Household;
 };
 
 type Ack = SyncResponse['acked'][number];
@@ -62,11 +70,24 @@ const ack = (date_adjusted = false): StoredResult =>
 async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResult> {
   const parsed = kidOpSchema.safeParse(raw);
   if (!parsed.success) {
-    return reject(
-      raw.type === 'complete' || raw.type === 'uncomplete' ? 'invalid_payload' : 'unknown_op',
-    );
+    const known = (KID_OP_TYPES as readonly string[]).includes(raw.type);
+    return reject(known ? 'invalid_payload' : 'unknown_op');
   }
   const op = parsed.data;
+
+  if (op.type === 'register_push_token') {
+    // A token rots, so the device re-sends it on every open; the device is the one on the token.
+    // The locale rides along, so the push the cron sends is in the language the child reads.
+    await tx
+      .update(childDevices)
+      .set({
+        expoPushToken: op.payload.expo_push_token,
+        // An op that carries no locale says nothing about the language: leave the one on file.
+        ...(op.payload.locale ? { locale: op.payload.locale } : {}),
+      })
+      .where(eq(childDevices.id, ctx.deviceId));
+    return ack();
+  }
 
   if (op.type === 'complete') {
     const { chore_id, completion_id, completed_at, chore_date: claimed } = op.payload;
@@ -136,10 +157,14 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         status: 'done',
       })
       .onConflictDoNothing();
+    // A redo is due again after a parent's rejection, so the child may complete it; a
+    // `pending_photo` instance is waiting on a parent and is not theirs to flip.
     await tx
       .update(choreInstances)
       .set({ status: 'done' })
-      .where(and(eq(choreInstances.id, instance_id), eq(choreInstances.status, 'due')));
+      .where(
+        and(eq(choreInstances.id, instance_id), inArray(choreInstances.status, ['due', 'redo'])),
+      );
     await tx
       .insert(completions)
       .values({
@@ -181,7 +206,7 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
  * holds. Reads the child's whole history rather than a window so streaks and their bonuses are
  * the same numbers whoever recomputes them; a child's history is a few rows a day.
  */
-export async function reconcileChild(tx: Tx, ctx: OpContext): Promise<void> {
+export async function reconcileChild(tx: Tx, ctx: ReconcileContext): Promise<void> {
   const [instanceRows, completionRows, entryRows, summaryRows] = await Promise.all([
     tx
       .select({ id: choreInstances.id, chore_date: choreInstances.choreDate })
@@ -216,7 +241,7 @@ export async function reconcileChild(tx: Tx, ctx: OpContext): Promise<void> {
     completions: completionRows,
     entries: entryRows,
     created_at: createdAt,
-    created_by: ctx.childId,
+    created_by: ctx.createdBy,
   });
 
   if (entries.length) {
@@ -321,7 +346,8 @@ export async function applyOps(tx: Tx, ctx: OpContext, ops: SyncOp[]): Promise<A
         .insert(appliedOps)
         .values({ opId: raw.op_id, deviceId: ctx.deviceId, result, at: ctx.now })
         .onConflictDoNothing();
-      if (result.status === 'acked') changed = true;
+      // Only a completion changes what a child has earned; a push token does not.
+      if (result.status === 'acked' && raw.type !== 'register_push_token') changed = true;
     }
     if (result.status === 'acked') {
       acked.push(

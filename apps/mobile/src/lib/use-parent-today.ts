@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 
 /** How often the screen re-reads today while it is open (docs/spec/03-sync.md). */
 export const POLL_MS = 60_000;
@@ -32,9 +33,9 @@ export function useParentToday(householdId: string | null): ParentTodayState {
       setToday(await api.today(householdId));
       setStatus('ready');
       setMessage(null);
-    } catch (e) {
+    } catch {
       setStatus('error');
-      setMessage(e instanceof Error ? e.message : 'failed');
+      setMessage(t('parent.loadFailed'));
     }
   }, [api, householdId]);
 

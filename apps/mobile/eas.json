@@ -8,7 +8,11 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-production-c5c7.up.railway.app",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y29tbXVuYWwtcHVwLTMxNzAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      }
     }
   }
 }

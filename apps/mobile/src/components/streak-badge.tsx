@@ -1,12 +1,12 @@
 import { StyleSheet, Text } from 'react-native';
+import { t } from '@/lib/i18n';
 
 /** The streak, said the same way everywhere it appears. Renders nothing at zero. */
 export function StreakBadge({ days, style }: { days: number; style?: 'badge' | 'line' }) {
   if (days <= 0) return null;
-  const label = `🔥 ${days} day${days === 1 ? '' : 's'}`;
   return (
     <Text style={style === 'line' ? styles.line : styles.badge}>
-      {style === 'line' ? `${label} in a row` : label}
+      {t(style === 'line' ? 'streak.line' : 'streak.badge', { count: days })}
     </Text>
   );
 }

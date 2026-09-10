@@ -2,6 +2,7 @@ import { uuid7 } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { ChoreForm, emptyChore } from '@/components/chore-form';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 
 export default function NewChore() {
   const state = useHousehold();
@@ -11,7 +12,7 @@ export default function NewChore() {
 
   return (
     <ChoreForm
-      title="Add a chore"
+      title={t('chores.add')}
       children={state.me.children}
       initial={emptyChore(state.me.children)}
       onSubmit={async (fields) => {

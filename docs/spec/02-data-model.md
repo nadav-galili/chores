@@ -43,7 +43,7 @@ Balance = `SUM(coins)` minus reserved open redemptions. Owed money = `SUM(money_
 ## Sync and ops plumbing
 - **change_log**: seq (bigserial) · household_id · child_id (nullable) · table · row_id · op · row (jsonb) · at. Written by trigger on every table above.
 - **applied_ops**: op_id (PK) · device_id · result · at
-- **notifications**: id · target (parent_device|child_device) · kind · payload · scheduled_for · sent_at · ticket
+- **notifications**: **id = uuid5('notif', kind, subject_id, key)** · target (parent_device|child_device) · target_id (the device pushed to, nullable) · kind · payload · scheduled_for · sent_at · ticket. The id is what makes the minute cron send exactly once — it inserts `ON CONFLICT DO NOTHING` and only a claimed row is pushed — with the subject being who the notification is about (a child, a parent) and the key what makes it one of a series (a chore date for the daily kinds). A row with `sent_at` null was never pushed: no token, so the device's own local notification is the delivery. `payload.receipt` holds what Expo answered for the ticket; a `DeviceNotRegistered` receipt nulls `child_devices.expo_push_token`.
 - **revenuecat_events**: raw webhook log, idempotent by event id
 
 ## Timezone rules
