@@ -17,6 +17,8 @@ export type ColorTokens = {
   surface: string;
   /** The one colour that means "act". Buttons, active chips, links. */
   action: string;
+  /** Text and icons drawn on top of `action`, and nothing else. */
+  onAction: string;
   /** The Grove's living green. Illustrations and growth affordances only. */
   growth: string;
   /** Reserved: Coin display and nothing else. No button, chip, badge or chrome. */
@@ -34,6 +36,7 @@ export const kidColors: ColorTokens = {
   ground: '#F2F6F1',
   surface: '#FFFFFF',
   action: '#2F6B4F',
+  onAction: '#FFFFFF',
   growth: '#8CBF9E',
   coin: '#E9B949',
   text: '#1B2A22',
@@ -46,6 +49,7 @@ export const parentColors: ColorTokens = {
   ground: '#F5F7F5',
   surface: '#FFFFFF',
   action: '#35594A',
+  onAction: '#FFFFFF',
   growth: '#A6BCAF',
   coin: '#C9A64E',
   text: '#23302A',
@@ -71,6 +75,13 @@ export const radius = Object.freeze({
   xl: 24,
   pill: 999,
 } as const);
+
+/**
+ * The smallest a thing you tap may be. `little` gets the larger one: target size is the second
+ * of the three differences between the modes (docs/spec/06-design.md), and it is a size rather
+ * than a multiplier because a target has a floor that type does not.
+ */
+export const touchTargets = Object.freeze({ big: 48, little: 56 } as const);
 
 /** Rubik 600 carries display and title; everything else stays on the system font. */
 export const displayFontFamily = 'Rubik-SemiBold';

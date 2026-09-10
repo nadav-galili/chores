@@ -7,6 +7,7 @@ import {
   parentColors,
   radius,
   space,
+  touchTargets,
   typeSizes,
   type ColorTokens,
   type TypeStep,
@@ -30,6 +31,8 @@ export type Theme = {
   space: typeof space;
   radius: typeof radius;
   type: TypeScale;
+  /** The minimum height and width of anything tappable, in points. */
+  touchTarget: number;
 };
 
 /** Rubik 600 is spent on the two largest steps only. */
@@ -54,18 +57,19 @@ function buildTypeScale(multiplier: number): TypeScale {
   ) as TypeScale;
 }
 
-function buildTheme(colors: ColorTokens, typeMultiplier: number): Theme {
+function buildTheme(colors: ColorTokens, typeMultiplier: number, touchTarget: number): Theme {
   return Object.freeze({
     colors: Object.freeze({ ...colors }),
     space,
     radius,
     type: buildTypeScale(typeMultiplier),
+    touchTarget,
   });
 }
 
-export const kidBigTheme = buildTheme(kidColors, 1);
-export const kidLittleTheme = buildTheme(kidColors, LITTLE_TYPE_MULTIPLIER);
-export const parentTheme = buildTheme(parentColors, 1);
+export const kidBigTheme = buildTheme(kidColors, 1, touchTargets.big);
+export const kidLittleTheme = buildTheme(kidColors, LITTLE_TYPE_MULTIPLIER, touchTargets.little);
+export const parentTheme = buildTheme(parentColors, 1, touchTargets.big);
 
 /**
  * Picks one of three frozen themes. It selects; it does not compute — every

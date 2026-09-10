@@ -13,6 +13,7 @@ Two themes, the same tokens: the child's at full strength, the parent's desatura
 | ground | `#F2F6F1` | `#F5F7F5` | the page behind everything |
 | surface | `#FFFFFF` | `#FFFFFF` | cards and rows standing on the ground |
 | action | `#2F6B4F` | `#35594A` | the one colour that means "act": buttons, active chips, links |
+| onAction | `#FFFFFF` | `#FFFFFF` | text and icons drawn on top of `action`, and nothing else |
 | growth | `#8CBF9E` | `#A6BCAF` | the grove's living green — illustrations and growth affordances only |
 | coin | `#E9B949` | `#C9A64E` | reserved: coin display and nothing else |
 | text | `#1B2A22` | `#23302A` | primary text |
@@ -22,9 +23,9 @@ Two themes, the same tokens: the child's at full strength, the parent's desatura
 Two rules the tokens cannot enforce on their own:
 
 - **One green.** `action` is the only green in UI chrome. The grove's greens stay inside illustrations; `growth` never becomes a button. A "Done" button must not look like a tree — see ADR-0012 and ADR-0011 for why the two must not share a hue.
-- **Coin gold is reserved.** No button, chip, badge or chrome element uses `coin`. Coins are the only thing on screen that colour means.
+- **Coin gold is reserved.** No button, chip, badge or chrome element uses `coin`. Coins are the only thing on screen that colour means. The `Coins` primitive in `src/components/ui.tsx` is the only code that reads the token, so everything showing coins goes through it and nothing else can.
 
-Spacing `4 / 8 / 12 / 16 / 24 / 32`; radius `8 / 12 / 16 / 24 / pill`. Both are frozen objects shared by every theme.
+Spacing `4 / 8 / 12 / 16 / 24 / 32`; radius `8 / 12 / 16 / 24 / pill`. Both are frozen objects shared by every theme. Touch target is `48` in `big` and the parent theme, `56` in `little`: a size rather than a multiplier, because a target has a floor that type does not.
 
 Light only. `userInterfaceStyle` is `"light"`; dark mode is deferred (ADR-0012).
 
@@ -51,7 +52,7 @@ RTL is not a later pass. Hebrew is a tested locale from day one; every layout is
 
 Three differences, and only three:
 
-1. **Type multiplier and touch-target size.** `little` is ×1.15 and larger targets.
+1. **Type multiplier and touch-target size.** `little` is ×1.15 type and a 56-point target against 48. Both arrive through the theme, so no component knows `ui_mode` exists.
 2. **Pet placement.** Above the list in `little`; collapsed into a header element in `big`.
 3. **Copy voice.** Celebratory in `little`, neutral in `big`.
 

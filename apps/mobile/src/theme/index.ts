@@ -1,5 +1,6 @@
 export { useDisplayFont } from './fonts';
 export { ThemeProvider, useTheme } from './provider';
+export { useThemedStyles } from './styles';
 export {
   kidBigTheme,
   kidLittleTheme,

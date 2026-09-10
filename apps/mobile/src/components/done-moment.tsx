@@ -4,7 +4,8 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
-import { formatNumber, t } from '@/lib/i18n';
+import { Coins } from '@/components/ui';
+import { t } from '@/lib/i18n';
 import type { Tree } from '@/sync/grove';
 import type { DoneReaction } from '@/lib/use-today';
 
@@ -67,9 +68,7 @@ export function DoneMoment({
         accessibilityLiveRegion="polite"
         accessibilityLabel={t('kid.doneMoment', { coins: reaction.coins })}
       >
-        <Text style={styles.coins}>
-          {t('kid.chorePays', { coins: formatNumber(reaction.coins) })}
-        </Text>
+        <Coins amount={reaction.coins} variant="pays" step="display" />
         {pet.enabled && (
           <PetFigure
             name={pet.name}
@@ -115,7 +114,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
-  coins: { fontSize: 40, fontWeight: '800' },
   grew: { alignItems: 'center', gap: 4 },
   grewText: { fontSize: 16, fontWeight: '600', color: '#2E7D32' },
 });

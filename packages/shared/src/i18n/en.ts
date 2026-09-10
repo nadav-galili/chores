@@ -35,10 +35,14 @@ export const en = {
     }),
     empty: 'Nothing to do today.',
     emptyLittle: '🎈 Nothing to do today!',
-    coinTally: '%{coins} 🪙',
-    chorePays: '+%{coins} 🪙',
     petButton: '%{name}, level %{level}',
     doneMoment: 'Nice! Plus %{coins} coins',
+  },
+  // The coin display's own strings: the glyph sits where the language wants it, which is why a
+  // number and an emoji need a catalog entry at all.
+  coins: {
+    tally: '%{coins} 🪙',
+    pays: '+%{coins} 🪙',
   },
   streak: {
     badge: plural({ one: '🔥 %{count} day', other: '🔥 %{count} days' }),
