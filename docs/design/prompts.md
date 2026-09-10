@@ -20,6 +20,8 @@ Every prompt below already contains this text inline. It is repeated here only s
 
 Palette the illustrations may use: ground `#F2F6F1`, sage `#8CBF9E`, forest `#2F6B4F`, warm gold `#E9B949` (fruit only), deep green-black `#1B2A22`, and the muted browns and creams the subjects need. Nothing saturated, nothing neon.
 
+**What the style block actually produces, and why that is left alone.** Pass 1 showed the models read this as fine naturalist botanical watercolour rather than as heavy opaque gouache: soft blended washes, almost no visible brush stroke, barely any paper grain. That is not what the words ask for, and it is better than what the words ask for — it is calm, it holds detail at 40 points, and it is dead consistent across all twenty-one. So the block stays exactly as written. Do not "fix" it toward heavier gouache: the wording is what produced the house style, whatever it says on its face.
+
 ## Manifest
 
 Twenty-one assets. Filenames are flat and stage-numbered — no dates, no hashes — because they are referenced from a static require map that Metro resolves at build time.
@@ -48,7 +50,9 @@ Twenty-one assets. Filenames are flat and stage-numbered — no dates, no hashes
 | 20 | `android-icon-background` | adaptive icon background | 1024×1024 | `#F2F6F1` |
 | 21 | `splash-icon` | splash mark | 1024×1024 | transparent |
 
-`android-icon-monochrome.png` is not on this list and is not generated: it is a flat silhouette derived from `android-icon-foreground` in an image editor, which is what Android's themed-icon slot wants and what a painterly render cannot be.
+The background column is what the **render** comes back with, not what ships. The pet bodies and tree forms are painted on `#F2F6F1` because the models hold the style far better with a ground under the brush than against transparency — but that ground is keyed out before the asset is bundled, so all seventeen in-app assets ship with alpha and sit on the theme's `ground` token. Step 2 of **Export and post-process** is where that happens, and pass 1 is why.
+
+`android-icon-monochrome.png` is not on this list and is not generated: it is a flat silhouette derived from `android-icon-foreground`, which is what Android's themed-icon slot wants and what a painterly render cannot be.
 
 The pet's fifteen level-and-mood combinations are eight assets, not fifteen: five bodies with three overlays composited on top, which is the shape `apps/mobile/src/lib/pet-art.ts` already has. Keeping the moods as overlays is also what keeps them consistent — one happy overlay is one painting to hold in style, five happy birds are five chances to drift.
 
@@ -106,7 +110,9 @@ The bird faces three-quarters to the viewer's left in every stage. The eye is a 
 
 **Model:** GPT-image (or Nano Banana), edit-in-place. **Edit of `pet-l4`.**
 
-> Edit this image. Keep the same bird — the same small round garden bird, the same face, the same soft gouache botanical style, the same brush handling and paper grain, the same lighting from the upper left, the same flat `#F2F6F1` background, the same framing and the same scale. This is the same creature at its best, not a different species. Its plumage is richer and deeper: the back warms toward a deep forest green-brown near `#2F6B4F`, the breast a warmer cream, the feather edges catching a little more light, the tail slightly longer and fuller. It stands proud on the pale sage-green `#8CBF9E` moss with a single small sprig of green leaves beside it. Still a plain garden bird — no crest, no long trailing plumes, no peacock tail, no iridescence, no gold. Keep the muted natural palette. No text, no letters, no numbers, no watermark, no signature, no border, no drop shadow, no outline stroke, no cartoon bevel, no glossy highlight, no sparkle, no 3D render, no vector look.
+> Edit this image. Keep the same bird — the same small round garden bird, the same face, the same soft gouache botanical style, the same brush handling and paper grain, the same lighting from the upper left, the same flat `#F2F6F1` background, the same framing and the same scale. This is the same creature at its best, not a different species. Change four things and make each one obvious in the silhouette alone: the back deepens to a rich forest green-brown near `#2F6B4F`, clearly darker and greener than before; the tail grows markedly longer and fuller and lifts to a jaunty upward angle; the breast is a warmer, creamier cream with soft fine barring; and the bird stands taller and more upright, chest out, rather than hunched. Beside it on the pale sage-green `#8CBF9E` moss stands a small leafy sprig with three or four leaves, tall enough to be visible in outline. Still a plain garden bird — no crest, no long trailing plumes, no peacock tail, no iridescence, no gold. Keep the muted natural palette. No text, no letters, no numbers, no watermark, no signature, no border, no drop shadow, no outline stroke, no cartoon bevel, no glossy highlight, no sparkle, no 3D render, no vector look.
+
+**Pass 1 correction.** The first `pet-l5` differed from `pet-l4` only by a slightly greener back and a small leaf sprig, and the two were not tellable apart at 40 points. This is the top of the ladder and has to read as an arrival, so the prompt now asks for four changes rather than one and requires each to show in the outline. Re-render `pet-l5` from `pet-l4` with this wording.
 
 | model | seed | date | notes |
 |---|---|---|---|
@@ -160,7 +166,9 @@ Each form must be a **distinct silhouette at a glance**, small on a phone, in a 
 
 Blossom arrives at form 6, fruit at form 7, heavy fruit at form 8. Nothing before form 6 carries either. The grove stage each form starts at lives in `packages/shared/src/growth.ts`; the art does not restate it.
 
-Every tree stands on the same shallow patch of pale sage-green ground, its base on the same horizontal line at the same height in every canvas, so eight trees of different heights line up on one ground line in the grove without per-asset nudging.
+Every tree stands on the same shallow patch of pale sage-green ground, its base on the same horizontal line at the same height in every canvas, so eight trees of different heights line up on one ground line in the grove.
+
+**Do not trust the prompt for this.** Pass 1 asked eight prompts to hold one ground line and got two: forms 1–4 landed with the ground patch bottom at 85% of the canvas height, forms 5–7 at 91% and form 8 at 93%. A 6–8% drift is invisible in a single render and obvious in a row of eight. Pixel alignment is not a thing a language prompt controls, so it is a post-process step instead — see **Export and post-process** below, which trims and re-pads every tree onto one line. Keep the wording anyway: it gets the renders close enough that the correction is a shift and never a crop.
 
 ### 9. `tree-s1` — form 1, seedling
 
@@ -264,7 +272,9 @@ The shared ground line the grove's trees stand on: a wide strip tiled horizontal
 
 The icon is the pet, and the brand on it is "Mibo" and nothing else — see `docs/spec/05-store-listing.md`. The bird on the icon is the same bird as `pet-l4`, painted once more at icon scale rather than cropped from it: a 512-pixel painting reduced to a launcher tile loses the brush.
 
-Both `icon` and `android-icon-foreground` must survive a circular, squircle, rounded-square and teardrop mask, so the bird sits inside the middle 66% of the canvas and no launcher shape clips it.
+`icon` is a square iOS/store tile and may sit close to its edges. `android-icon-foreground` is masked by the launcher and may not: Android's guaranteed-visible zone is a centred circle of only **61%** of the canvas, so the bird and every leaf tip have to fit inside the middle 60%.
+
+**Pass 1 correction.** The first `android-icon-foreground` was an edit of `icon` that kept its scale — content spanned 19% to 85% of the canvas — and a circular launcher mask cut off the tail and both leaf tips. The prompt below now asks for 60% rather than 66% and says so in pixels; the mask check is in **Export and post-process**, because this is the one identity asset a bad guess silently breaks on a real home screen.
 
 ### 18. `icon`
 
@@ -280,7 +290,7 @@ Both `icon` and `android-icon-foreground` must survive a circular, squircle, rou
 
 **Model:** GPT-image (or Nano Banana), edit-in-place. **Edit of `icon`.**
 
-> Edit this image. Keep the same bird, the same soft gouache botanical style, the same brush handling and paper grain, the same lighting from the upper left, and the same pose. Remove the background entirely so it is fully transparent — no `#F2F6F1` fill, no paper, nothing behind the bird. Scale the bird down slightly so that it and its leaf sprig sit comfortably inside the central 66% of the square canvas with wide empty transparent margins on all four sides, safe for a circular or squircle launcher mask. Keep the muted natural palette. No text, no letters, no numbers, no watermark, no signature, no border, no frame, no drop shadow, no outline stroke, no glossy highlight, no sparkle, no 3D render, no vector look.
+> Edit this image. Keep the same bird, the same soft gouache botanical style, the same brush handling and paper grain, the same lighting from the upper left, and the same pose. Remove the background entirely so it is fully transparent — no `#F2F6F1` fill, no paper, nothing behind the bird. Scale the bird down substantially so that the whole subject — the bird, its beak, its tail and every leaf tip — fits inside the central 60% of the square canvas, leaving an empty transparent margin of at least 20% of the canvas width on all four sides. On a 1024×1024 canvas, nothing may be painted outside the box from 205,205 to 819,819. Everything must survive a circular launcher mask. Keep the muted natural palette. No text, no letters, no numbers, no watermark, no signature, no border, no frame, no drop shadow, no outline stroke, no glossy highlight, no sparkle, no 3D render, no vector look.
 
 | model | seed | date | notes |
 |---|---|---|---|
@@ -310,9 +320,21 @@ The splash is the egg, not the bird: the app opens on the thing that has not hap
 
 ---
 
+## Export and post-process
+
+The models return large square PNGs — Nano Banana returned 1254×1254 for every square asset in pass 1 — and neither the canvas size, the file format, the filename nor the pixel alignment is what the app wants. None of that is worth another prompt attempt. Five deterministic steps turn a folder of renders into the bundle, and pass 1 proved that two of them are not optional.
+
+1. **Rename to the manifest.** The generation tool's filename is not the target filename. `mimbo-icon.png` is `icon`; leading spaces and copy suffixes go.
+2. **Drop the painted background on the seventeen in-app assets.** The pet bodies and tree forms come back with `#F2F6F1` painted in, and pass 1 measured it landing anywhere from `rgb(240,244,240)` to `rgb(243,246,242)` — within three of the token and not equal to each other. Against the app's exact `ground` token each one is a faint visible tile, and every asset a slightly different one. Key the flat background out to transparent and let the token show through. This also frees the same art to sit on the parent theme's `#F5F7F5`.
+3. **Put the eight trees on one ground line.** Trim each tree to its content, then pad it back to a square canvas with the bottom of the ground patch at exactly 90% of the canvas height and the trunk centred horizontally. Verify by trimming all eight again and confirming one identical bottom edge. The pet bodies already align — pass 1 measured all five within one pixel — but run the same check on them.
+4. **Resize to the manifest canvas and convert.** Down to 512, 768, 1536×512 or 1024 as the manifest says, then WebP lossy at quality 82–88 for the seventeen in-app assets, alpha preserved. Downscaling from 1254 is fine; never upscale.
+5. **Check the two masked assets before believing them.** Composite `android-icon-foreground` over `android-icon-background`, mask it to a centred circle of 61% of the canvas, and look at the result. If a beak, a tail or a leaf tip is cut, scale the foreground down and repeat. Do the same with a squircle. This is the check that pass 1 failed.
+
+`android-icon-monochrome.png` is produced here too, not generated: take the finished foreground, flatten it to a single flat silhouette, and keep it inside the same 60% box.
+
 ## Format and budget
 
-**Single 3× WebP per in-app asset.** One file, no `@1x`/`@2x` set — no shipping device is 1×, and a three-file set triples the thing that has to stay in style. The canvases in the manifest are already the 3× pixel sizes; export lossy at quality 82–88, with the alpha channel preserved on the overlays, the ground and the two transparent identity marks. Do not trace to SVG: it destroys a painterly illustration. Do not host remotely: bundled art is what keeps the offline guarantee honest.
+**Single 3× WebP per in-app asset.** One file, no `@1x`/`@2x` set — no shipping device is 1×, and a three-file set triples the thing that has to stay in style. The canvases in the manifest are already the 3× pixel sizes; export lossy at quality 82–88, with the alpha channel preserved on all seventeen. Do not trace to SVG: it destroys a painterly illustration. Do not host remotely: bundled art is what keeps the offline guarantee honest.
 
 **The four identity assets are the exception and stay PNG.** Expo's icon, adaptive-icon and splash slots take PNG, so `icon`, `android-icon-foreground`, `android-icon-background` and `splash-icon` ship as 1024×1024 PNGs, and they are the reason the budget below is not smaller.
 
@@ -353,21 +375,41 @@ They span the two subjects and both ends of both ladders. `pet-l1` and `tree-s1`
 
 **Record the pass here.** One row per rendered asset, then the corrections made to the prompts above and the reason for each. If a correction changes a prompt that has already been used, the affected asset is re-rendered, not kept.
 
-### Pass 1
+### Pass 1 — 2026-09-10
+
+Run wider than planned: all twenty-one were generated in one sitting on Nano Banana before the pass was read, so the pass judged the full set rather than four. That is more expensive than the ticket intended and it did not change the verdict — the three faults below would each have shown in the four.
 
 | asset | model | seed | date | verdict |
 |---|---|---|---|---|
-| `pet-l1` |  |  |  |  |
-| `pet-l4` |  |  |  |  |
-| `tree-s1` |  |  |  |  |
-| `tree-s6` |  |  |  |  |
+| all 21 | Nano Banana | not recorded | 2026-09-10 | style accepted; three faults, listed below |
 
-**What it showed:**
+Source renders are 1254×1254 PNG (the ground 2172×724), which is above every manifest canvas, so all of it downscales.
 
-_Not yet run — the four renders are made by hand, outside this repo._
+**What it showed.**
 
-**Corrections made:**
+The style holds. All twenty-one read as one hand: the same soft washes, the same light from the upper left, the same muted palette, no saturated colour anywhere, gold only on fruit. Nothing forbidden crept in — no text, no frame, no vignette, no outline, no cartoon bevel. It survives 40 points. The one surprise is that the models render the style block as fine naturalist watercolour rather than opaque gouache; that is recorded above the style block and deliberately not corrected.
 
-_None yet._
+The pet is one creature across all five stages, and the five bodies are aligned to within a pixel — bottom edge at y=1037 in every one. The tree is one broadleaf across all eight, blossom lands at form 6 in soft cream and blush rather than pink, fruit at form 7 in a muted gold, heavy fruit at form 8. Both ladders read as growth. The three overlays are clean, transparent, clear of the bird's face, and sleepy reads as resting rather than sad. `ground` composites cleanly over `#F2F6F1` — the yellow edge visible over black is sub-2% alpha and disappears — and tiles with only a faint seam that will not read at grove scale.
 
-A second pass is only needed if pass 1 forces a change to the style block itself. A correction confined to one entry is verified by that entry's re-render.
+Three faults, all of them structural rather than stylistic:
+
+1. **The eight trees do not share a ground line.** Ground-patch bottoms measured at y=1069 for forms 1–4, y=1145 for forms 5–7 and y=1169 for form 8: a 6–8% drift. Invisible in one render, obvious in a row of eight standing on one line, which is exactly what the grove screen is.
+2. **`android-icon-foreground` overflows the launcher safe zone.** It was edited from `icon` and kept its scale, so content spans 19% to 85% of the canvas. Masked to Android's 61% circle, the tail and both leaf tips are cut.
+3. **`pet-l5` is not distinguishable from `pet-l4` at phone scale.** The splendid stage arrived as a slightly greener back plus a leaf sprig. Side by side at full size the difference is there; at 40 points the two are the same bird. That is the top of the ladder — a child reaching it must see that they arrived.
+
+Two smaller things, both handled in post rather than by re-rendering: the painted backgrounds land within three of `#F2F6F1` but not on it and not on each other, so each asset would show as a faint tile on the token ground; and every file is the wrong name, canvas and format for the bundle.
+
+**Corrections made.**
+
+| # | correction | where |
+|---|---|---|
+| 1 | Recorded that the style block renders as watercolour, not gouache, and that it must not be "fixed" toward gouache | above the style block |
+| 2 | Ground-line alignment moved out of the prompts and into a trim-and-repad post step, with a verification | tree preamble, **Export and post-process** step 3 |
+| 3 | `android-icon-foreground` safe zone tightened from 66% to 60%, stated in pixels, with a mandatory mask check | entry 19, identity preamble, **Export and post-process** step 5 |
+| 4 | `pet-l5` rewritten to ask for four silhouette-visible changes instead of one | entry 5 |
+| 5 | In-app assets now ship with the painted background keyed out to alpha, on the theme's `ground` token instead of a baked one | manifest note, **Export and post-process** step 2 |
+| 6 | Whole **Export and post-process** section added: rename, key out, align, resize and convert, mask-check | new section |
+
+**What has to be re-rendered:** `pet-l5` only, from `pet-l4`, with the corrected prompt. Faults 1 and 2 are fixed in post-process and need no new render, and the other nineteen assets stand.
+
+A second pass is only needed if a later pass forces a change to the style block itself. A correction confined to one entry is verified by that entry's re-render.
