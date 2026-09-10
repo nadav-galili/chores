@@ -4,6 +4,7 @@ export { uuid5, NAMESPACE_CHORES } from './uuid5.ts';
 export * from './materialize.ts';
 export * from './day-summary.ts';
 export * from './ledger.ts';
+export * from './growth.ts';
 export * from './pet.ts';
 export * from './entitlement.ts';
 export * from './child.ts';

@@ -193,35 +193,3 @@ export function reconcileLedger(input: ReconcileInput): ReconcileResult {
   }));
   return { entries, xp_events, summaries };
 }
-
-export type GrowthEntry = {
-  id: string;
-  household_id: string;
-  child_id: string;
-  chore_date: IsoDate;
-  created_at: string;
-};
-
-/** Growth entry id = uuid5('grow', child_id, chore_date) (ADR-0011). */
-export const growthId = (childId: string, choreDate: IsoDate) => uuid5('grow', childId, choreDate);
-
-/**
- * One growth entry per day-complete chore date. Append-only and never clawed back: a rejection
- * costs coins, XP and the streak, never a tree, so this reads only `complete` (ADR-0011).
- */
-export function growthEntriesFor(
-  householdId: string,
-  childId: string,
-  summaries: readonly DaySummary[],
-  createdAt: string,
-): GrowthEntry[] {
-  return summaries
-    .filter((s) => s.complete)
-    .map((s) => ({
-      id: growthId(childId, s.chore_date),
-      household_id: householdId,
-      child_id: childId,
-      chore_date: s.chore_date,
-      created_at: createdAt,
-    }));
-}
