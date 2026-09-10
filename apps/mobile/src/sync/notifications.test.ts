@@ -22,34 +22,53 @@ const state = async () => (await db.select().from(notificationState))[0];
 
 describe('registerPushToken', () => {
   it('queues one op and records the token the server now knows', async () => {
-    expect(await registerPushToken(db, 'ExponentPushToken[a]', now)).toBe(true);
+    expect(await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now)).toBe(
+      true,
+    );
 
     const queued = await ops();
     expect(queued).toHaveLength(1);
     expect(queued[0]).toMatchObject({
       type: 'register_push_token',
-      payload: { expo_push_token: 'ExponentPushToken[a]' },
+      payload: { expo_push_token: 'ExponentPushToken[a]', locale: 'en' },
       status: 'pending',
     });
     expect((await state())?.push_token).toBe('ExponentPushToken[a]');
   });
 
   it('says nothing twice about a token the server already has', async () => {
-    await registerPushToken(db, 'ExponentPushToken[a]', now);
-    expect(await registerPushToken(db, 'ExponentPushToken[a]', now)).toBe(false);
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
+    expect(await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now)).toBe(
+      false,
+    );
     expect(await ops()).toHaveLength(1);
   });
 
   it('registers a rotated token', async () => {
-    await registerPushToken(db, 'ExponentPushToken[a]', now);
-    expect(await registerPushToken(db, 'ExponentPushToken[b]', now)).toBe(true);
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
+    expect(await registerPushToken(db, { token: 'ExponentPushToken[b]', locale: 'en' }, now)).toBe(
+      true,
+    );
     expect(await ops()).toHaveLength(2);
     expect((await state())?.push_token).toBe('ExponentPushToken[b]');
   });
 
+  it('registers again when the phone changes language, so the push follows it', async () => {
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
+    expect(await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'he' }, now)).toBe(
+      true,
+    );
+    const queued = await ops();
+    expect(queued).toHaveLength(2);
+    expect(queued[1]).toMatchObject({
+      payload: { expo_push_token: 'ExponentPushToken[a]', locale: 'he' },
+    });
+    expect((await state())?.locale).toBe('he');
+  });
+
   it('leaves the reminder it has already scheduled alone', async () => {
     await scheduleReminder(db, '16:00', () => Promise.resolve(), now);
-    await registerPushToken(db, 'ExponentPushToken[a]', now);
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
     expect(await state()).toMatchObject({
       reminder_time: '16:00',
       push_token: 'ExponentPushToken[a]',
@@ -61,7 +80,7 @@ describe('serverHoldsToken', () => {
   it('is false until the op carrying the token has been acked', async () => {
     expect(await serverHoldsToken(db)).toBe(false);
 
-    await registerPushToken(db, 'ExponentPushToken[a]', now);
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
     // Queued, not acked: the cron has nothing to push to yet.
     expect(await serverHoldsToken(db)).toBe(false);
 
@@ -71,7 +90,7 @@ describe('serverHoldsToken', () => {
   });
 
   it('is false again once a refused token is forgotten', async () => {
-    await registerPushToken(db, 'ExponentPushToken[a]', now);
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
     const [queued] = await ops();
     await dropOp(db, queued!.op_id);
     await forgetRegisteredToken(db, now);
@@ -81,10 +100,12 @@ describe('serverHoldsToken', () => {
 
 describe('forgetRegisteredToken', () => {
   it('lets the same token be registered again after the server refused it', async () => {
-    await registerPushToken(db, 'ExponentPushToken[a]', now);
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
     await forgetRegisteredToken(db, now);
     expect((await state())?.push_token).toBeNull();
-    expect(await registerPushToken(db, 'ExponentPushToken[a]', now)).toBe(true);
+    expect(await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now)).toBe(
+      true,
+    );
   });
 });
 

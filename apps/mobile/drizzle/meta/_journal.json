@@ -29,6 +29,13 @@
       "when": 1789024243875,
       "tag": "0003_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789026445981,
+      "tag": "0004_device_locale",
+      "breakpoints": true
     }
   ]
 }

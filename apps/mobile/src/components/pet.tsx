@@ -1,5 +1,6 @@
 import type { PetMood, PetProgress } from '@chores/shared';
 import { StyleSheet, Text, View } from 'react-native';
+import { t } from '@/lib/i18n';
 import { petArt, petArtLabel } from '@/lib/pet-art';
 
 /** The pet itself, at whatever size the screen asks for. Pure display; it reads no data. */
@@ -45,7 +46,7 @@ export function XpBar({ progress }: { progress: PetProgress }) {
         accessibilityRole="progressbar"
         accessibilityValue={
           progress.atMax
-            ? { text: 'fully grown' }
+            ? { text: t('pet.fullyGrown') }
             : { min: 0, max: progress.needed, now: progress.into }
         }
       >
@@ -53,8 +54,12 @@ export function XpBar({ progress }: { progress: PetProgress }) {
       </View>
       <Text style={styles.barText}>
         {progress.atMax
-          ? `${progress.xp} XP · fully grown`
-          : `${progress.into} / ${progress.needed} XP to level ${progress.level + 1}`}
+          ? t('pet.xpMax', { xp: progress.xp })
+          : t('pet.xpToNext', {
+              into: progress.into,
+              needed: progress.needed,
+              level: progress.level + 1,
+            })}
       </Text>
     </View>
   );
@@ -63,7 +68,7 @@ export function XpBar({ progress }: { progress: PetProgress }) {
 const styles = StyleSheet.create({
   figure: { alignItems: 'center', gap: 8 },
   ground: { alignItems: 'center', justifyContent: 'center' },
-  face: { position: 'absolute', top: '12%', right: '12%' },
+  face: { position: 'absolute', top: '12%', end: '12%' },
   stage: { fontSize: 16, fontWeight: '600', color: '#555' },
   bar: { gap: 6, width: '100%' },
   track: { height: 16, borderRadius: 8, backgroundColor: '#E4E4EA', overflow: 'hidden' },

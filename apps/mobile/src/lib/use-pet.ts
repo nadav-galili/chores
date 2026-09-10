@@ -10,8 +10,10 @@ import { showPet, type PetView } from '@/sync/pet';
  * Deliberately not `useToday`: the pet screen has no list to materialize and no outbox to drain,
  * and running a second sync loop beside the today screen would race it. This only reads.
  */
-export function usePet(session: DeviceSession): PetView & { status: 'loading' | 'ready' } {
-  const [pet, setPet] = useState<PetView & { status: 'loading' | 'ready' }>({
+export function usePet(
+  session: DeviceSession,
+): PetView & { name: string; status: 'loading' | 'ready' } {
+  const [pet, setPet] = useState<PetView & { name: string; status: 'loading' | 'ready' }>({
     status: 'loading',
     enabled: true,
     name: session.child.pet_name,
@@ -27,9 +29,9 @@ export function usePet(session: DeviceSession): PetView & { status: 'loading' | 
       void (async () => {
         const db = await openDeviceDb();
         const view = await showPet(db, childId, choreDate(new Date(), tz, boundary));
-        setPet({ ...view, status: 'ready' });
+        setPet({ ...view, name: view.name ?? session.child.pet_name, status: 'ready' });
       })();
-    }, [childId, tz, boundary]),
+    }, [childId, tz, boundary, session.child.pet_name]),
   );
 
   return pet;

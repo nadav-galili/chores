@@ -5,16 +5,14 @@ import { useState } from 'react';
 import { Platform, StyleSheet, Text, TextInput } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
 import { ApiError, redeemJoinCode } from '@/lib/api';
+import { t } from '@/lib/i18n';
 import { useDeviceSession } from '@/lib/device-session';
 import { clearRole, setRole } from '@/lib/role';
 
-type RedeemError = 'invalid_code' | 'code_expired' | 'code_redeemed' | 'rate_limited';
-const MESSAGES: Record<RedeemError, string> = {
-  invalid_code: "That code isn't right. Check it with a parent.",
-  code_expired: 'That code has expired. Ask a parent for a new one.',
-  code_redeemed: 'That code was already used. Ask a parent for a new one.',
-  rate_limited: 'Too many tries. Wait a little and try again.',
-};
+const REDEEM_ERRORS = ['invalid_code', 'code_expired', 'code_redeemed', 'rate_limited'] as const;
+type RedeemError = (typeof REDEEM_ERRORS)[number];
+const isRedeemError = (code: string): code is RedeemError =>
+  (REDEEM_ERRORS as readonly string[]).includes(code);
 
 /** The one and only login a child ever sees: six characters, typed once. */
 export default function Join() {
@@ -30,8 +28,8 @@ export default function Join() {
   const parsed = joinCodeSchema.safeParse(code);
 
   const join = async () => {
-    if (!parsed.success) return setError(MESSAGES.invalid_code);
-    if (!platform.success) return setError('Mibo kid mode runs on a phone or tablet.');
+    if (!parsed.success) return setError(t('join.error.invalid_code'));
+    if (!platform.success) return setError(t('join.error.platform'));
     setBusy(true);
     setError(null);
     try {
@@ -45,24 +43,20 @@ export default function Join() {
       await setRole('kid');
       router.replace('/(kid)');
     } catch (e) {
-      const known = e instanceof ApiError && e.code in MESSAGES;
-      setError(known ? MESSAGES[e.code as RedeemError] : 'Could not join. Try again.');
+      const code = e instanceof ApiError ? e.code : null;
+      setError(code && isRedeemError(code) ? t(`join.error.${code}`) : t('join.error.failed'));
       setBusy(false);
     }
   };
 
   return (
     <Screen>
-      <Title>{reason === 'revoked' ? 'Ask a parent to reconnect' : 'Type your code'}</Title>
-      <Text style={styles.hint}>
-        {reason === 'revoked'
-          ? 'This device was disconnected. A parent can show you a new code.'
-          : 'A parent can show it to you.'}
-      </Text>
+      <Title>{t(reason === 'revoked' ? 'join.titleRevoked' : 'join.title')}</Title>
+      <Text style={styles.hint}>{t(reason === 'revoked' ? 'join.hintRevoked' : 'join.hint')}</Text>
       <TextInput
         style={styles.input}
         value={code}
-        onChangeText={(t) => setCode(t.toUpperCase())}
+        onChangeText={(typed) => setCode(typed.toUpperCase())}
         autoCapitalize="characters"
         autoCorrect={false}
         autoFocus
@@ -71,9 +65,13 @@ export default function Join() {
         placeholderTextColor="#bbb"
       />
       <ErrorText>{error}</ErrorText>
-      <Button title="Join" onPress={() => void join()} disabled={busy || !parsed.success} />
       <Button
-        title="I'm a parent"
+        title={t('join.action')}
+        onPress={() => void join()}
+        disabled={busy || !parsed.success}
+      />
+      <Button
+        title={t('join.imAParent')}
         secondary
         onPress={() => {
           void clearRole().then(() => router.replace('/'));

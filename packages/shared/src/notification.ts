@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Locale } from './locale.ts';
 import { uuid5 } from './uuid5.ts';
 
 /**
@@ -37,10 +38,14 @@ export const expoPushTokenSchema = z
 
 /**
  * The kid reminder's words, in one place: the server sends them as a push and the device schedules
- * the same ones locally, so they must not drift apart. English only for now; i18n arrives with the
- * rest of the locale work.
+ * the same ones locally, so they must not drift apart. The device knows its own locale; the server
+ * reads the one the device registered with its push token.
  */
-export const KID_REMINDER_COPY = {
-  title: 'Chore time!',
-  body: 'Tap to see what\u2019s left today.',
-} as const;
+const KID_REMINDER_COPY: Readonly<Record<Locale, { title: string; body: string }>> = {
+  en: { title: 'Chore time!', body: 'Tap to see what\u2019s left today.' },
+  he: { title: 'זמן מטלות!', body: 'הקישו כדי לראות מה נשאר להיום.' },
+};
+
+export function kidReminderCopy(locale: Locale): { title: string; body: string } {
+  return KID_REMINDER_COPY[locale];
+}

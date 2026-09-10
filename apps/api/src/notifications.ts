@@ -1,4 +1,4 @@
-import { KID_REMINDER_COPY, notificationId, type DueReminder } from '@chores/shared';
+import { kidReminderCopy, notificationId, type DueReminder } from '@chores/shared';
 import { and, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
 import { childDevices, notifications } from './db/schema.ts';
@@ -29,7 +29,11 @@ export async function forgetToken(db: Db, deviceId: string): Promise<void> {
 /** The device a child's reminder goes to: their newest live device that has a token. */
 async function pushableDevice(db: Db, childId: string) {
   const [device] = await db
-    .select({ id: childDevices.id, token: childDevices.expoPushToken })
+    .select({
+      id: childDevices.id,
+      token: childDevices.expoPushToken,
+      locale: childDevices.locale,
+    })
     .from(childDevices)
     .where(
       and(
@@ -95,7 +99,7 @@ export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Da
 
   const message: PushMessage = {
     to: device.token,
-    ...KID_REMINDER_COPY,
+    ...kidReminderCopy(device.locale),
     data: { child_id: due.child_id, chore_date: due.chore_date },
   };
   const id = reminderIdOf(due);

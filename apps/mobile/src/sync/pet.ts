@@ -63,7 +63,8 @@ export async function xpTotalOf(db: DeviceDb, childId: string): Promise<number> 
 export type PetView = {
   /** False only when a parent has cached `pet_enabled` off; the rest still reads true. */
   enabled: boolean;
-  name: string;
+  /** Null until the child row has been pulled; the screen falls back to the joined name. */
+  name: string | null;
   mood: PetMood;
   progress: PetProgress;
 };
@@ -101,7 +102,7 @@ export async function showPet(db: DeviceDb, childId: string, today: IsoDate): Pr
 
   return {
     enabled,
-    name: childRows[0]?.pet_name ?? 'Pet',
+    name: childRows[0]?.pet_name ?? null,
     mood: petMood(summaries[0]),
     progress: petProgress(xp, level),
   };

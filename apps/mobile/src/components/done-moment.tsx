@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
+import { formatNumber, t } from '@/lib/i18n';
 import type { DoneReaction } from '@/lib/use-today';
 
 /**
@@ -58,9 +59,11 @@ export function DoneMoment({
       <Animated.View
         style={[styles.card, { opacity: progress, transform: [{ scale }, { translateY: lift }] }]}
         accessibilityLiveRegion="polite"
-        accessibilityLabel={`Nice! Plus ${reaction.coins} coins`}
+        accessibilityLabel={t('kid.doneMoment', { coins: reaction.coins })}
       >
-        <Text style={styles.coins}>+{reaction.coins} 🪙</Text>
+        <Text style={styles.coins}>
+          {t('kid.chorePays', { coins: formatNumber(reaction.coins) })}
+        </Text>
         {pet.enabled && (
           <PetFigure
             name={pet.name}
@@ -80,9 +83,9 @@ const styles = StyleSheet.create({
   overlay: {
     position: 'absolute',
     top: 0,
-    right: 0,
     bottom: 0,
-    left: 0,
+    start: 0,
+    end: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },

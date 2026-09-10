@@ -3,6 +3,7 @@ import { getCalendars, getLocales } from 'expo-localization';
 import { useState } from 'react';
 import { Button, Choice, ErrorText, Field, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 
 type Currency = Household['currency'];
 
@@ -22,28 +23,33 @@ export default function CreateHousehold() {
     try {
       await api.createHousehold({ name: name.trim(), tz: phoneTz, currency });
       await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create the household');
+    } catch {
+      setError(t('household.failed'));
       setBusy(false);
     }
   };
 
   return (
     <Screen>
-      <Title>Set up your household</Title>
-      <Field label="Household name" value={name} onChangeText={setName} placeholder="The Galilis" />
+      <Title>{t('household.title')}</Title>
+      <Field
+        label={t('household.name')}
+        value={name}
+        onChangeText={setName}
+        placeholder={t('household.namePlaceholder')}
+      />
       <Choice
-        label="Currency"
+        label={t('household.currency')}
         value={currency}
         onChange={setCurrency}
         options={[
-          { value: 'ILS', title: '₪ ILS' },
-          { value: 'USD', title: '$ USD' },
+          { value: 'ILS', title: t('household.ils') },
+          { value: 'USD', title: t('household.usd') },
         ]}
       />
-      <Field label="Timezone (from this phone)" value={phoneTz} editable={false} />
+      <Field label={t('household.tz')} value={phoneTz} editable={false} />
       <ErrorText>{error}</ErrorText>
-      <Button title="Create household" onPress={submit} disabled={busy || !name.trim()} />
+      <Button title={t('household.create')} onPress={submit} disabled={busy || !name.trim()} />
     </Screen>
   );
 }

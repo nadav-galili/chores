@@ -7,6 +7,7 @@ import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { wipeDeviceDb } from '@/db/client';
 import { createDeviceApi } from '@/lib/api';
+import { formatNumber, t } from '@/lib/i18n';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
 import { clearRole } from '@/lib/role';
 import { useToday } from '@/lib/use-today';
@@ -58,7 +59,10 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
           <Pressable
             onPress={() => router.push('/(kid)/pet')}
             accessibilityRole="button"
-            accessibilityLabel={`${today.pet.name}, level ${today.pet.progress.level}`}
+            accessibilityLabel={t('kid.petButton', {
+              name: today.pet.name,
+              level: today.pet.progress.level,
+            })}
           >
             <PetFigure
               name={today.pet.name}
@@ -69,19 +73,20 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
             />
           </Pressable>
         )}
-        <Text style={little ? styles.greetingLittle : styles.greeting}>Hi {today.firstName}!</Text>
+        <Text style={little ? styles.greetingLittle : styles.greeting}>
+          {t('kid.greeting', { name: today.firstName })}
+        </Text>
         <View style={styles.tallies}>
-          <Text style={styles.coinTally}>{today.coins} 🪙</Text>
+          <Text style={styles.coinTally}>
+            {t('kid.coinTally', { coins: formatNumber(today.coins) })}
+          </Text>
           {!little && <StreakBadge days={today.streak} />}
         </View>
       </View>
-      {today.offline && <Text style={styles.offline}>Showing what’s saved on this device.</Text>}
+      {today.offline && <Text style={styles.offline}>{t('kid.offline')}</Text>}
       {today.refused > 0 && (
         <Pressable style={styles.refused} onPress={today.dismissRefused}>
-          <Text style={styles.refusedText}>
-            {today.refused === 1 ? 'One tap didn’t save.' : `${today.refused} taps didn’t save.`}{' '}
-            Tap to hide.
-          </Text>
+          <Text style={styles.refusedText}>{t('kid.refused', { count: today.refused })}</Text>
         </Pressable>
       )}
       <FlatList
@@ -102,7 +107,7 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
         ListEmptyComponent={
           today.status === 'ready' ? (
             <Text style={little ? styles.emptyLittle : styles.empty}>
-              {little ? '🎈 Nothing to do today!' : 'Nothing to do today.'}
+              {t(little ? 'kid.emptyLittle' : 'kid.empty')}
             </Text>
           ) : null
         }
@@ -161,14 +166,16 @@ function Row({ item, onPress }: { item: TodayItem; onPress: () => void }) {
       <Text style={[styles.rowTitle, done && styles.rowTitleDone]} numberOfLines={1}>
         {item.title}
       </Text>
-      <Text style={styles.coins}>+{COINS_PER_CHORE} 🪙</Text>
+      <Text style={styles.coins}>
+        {t('kid.chorePays', { coins: formatNumber(COINS_PER_CHORE) })}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingTop: 56, paddingHorizontal: 16 },
-  secretCorner: { position: 'absolute', top: 0, right: 0, width: 72, height: 72, zIndex: 1 },
+  secretCorner: { position: 'absolute', top: 0, end: 0, width: 72, height: 72, zIndex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   greeting: { fontSize: 28, fontWeight: '700' },
   greetingLittle: { fontSize: 36, fontWeight: '700' },

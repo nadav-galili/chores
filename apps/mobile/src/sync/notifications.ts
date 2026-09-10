@@ -1,4 +1,4 @@
-import { uuid7 } from '@chores/shared';
+import { uuid7, type Locale } from '@chores/shared';
 import { eq } from 'drizzle-orm';
 import { notificationState, outbox } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
@@ -25,7 +25,7 @@ async function held(db: DeviceDb) {
 
 async function record(
   db: DeviceDb,
-  fields: { push_token?: string | null; reminder_time?: string | null },
+  fields: { push_token?: string | null; locale?: Locale | null; reminder_time?: string | null },
   now: Date,
 ) {
   await db
@@ -38,19 +38,34 @@ async function record(
 }
 
 /**
+ * What the server has to know to push to this device: the token, and the language to push in.
+ */
+export type PushRegistration = { token: string; locale: Locale };
+
+/**
  * Tells the server about a push token it does not have yet, as one outbox op. The device re-reads
  * its token on every open because a token rots, so this is called far more often than it queues
- * anything. Returns whether an op was queued.
+ * anything. A phone that changed language registers again with the same token, so the reminder
+ * arrives in the language the child now reads. Returns whether an op was queued.
  */
-export async function registerPushToken(db: DeviceDb, token: string, now: Date): Promise<boolean> {
-  if ((await held(db))?.push_token === token) return false;
+export async function registerPushToken(
+  db: DeviceDb,
+  { token, locale }: PushRegistration,
+  now: Date,
+): Promise<boolean> {
+  const known = await held(db);
+  if (known?.push_token === token && known.locale === locale) return false;
   await inTransaction(db, async () => {
     await enqueueOp(
       db,
-      { op_id: uuid7(), type: 'register_push_token', payload: { expo_push_token: token } },
+      {
+        op_id: uuid7(),
+        type: 'register_push_token',
+        payload: { expo_push_token: token, locale },
+      },
       now,
     );
-    await record(db, { push_token: token }, now);
+    await record(db, { push_token: token, locale }, now);
   });
   return true;
 }

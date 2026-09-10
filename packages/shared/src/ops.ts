@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isoDateSchema } from './chore-date.ts';
+import { localeSchema } from './locale.ts';
 import { expoPushTokenSchema } from './notification.ts';
 
 /**
@@ -27,11 +28,13 @@ export const uncompletePayloadSchema = z.object({
 export type UncompletePayload = z.infer<typeof uncompletePayloadSchema>;
 
 /**
- * The push token this device now holds, re-sent on every app open because a token rots. The
- * device is read from the token on the request, so nothing here says which one it belongs to.
+ * The push token this device now holds, re-sent on every app open because a token rots, and the
+ * locale it reads in, so a push arrives in the language the child's phone is set to. The device is
+ * read from the token on the request, so nothing here says which one it belongs to.
  */
 export const registerPushTokenPayloadSchema = z.object({
   expo_push_token: expoPushTokenSchema,
+  locale: localeSchema.optional(),
 });
 export type RegisterPushTokenPayload = z.infer<typeof registerPushTokenPayloadSchema>;
 

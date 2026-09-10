@@ -14,12 +14,19 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { notificationKindSchema, notificationTargetSchema, type ChoreClocks } from '@chores/shared';
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  notificationKindSchema,
+  notificationTargetSchema,
+  type ChoreClocks,
+} from '@chores/shared';
 
 export const currencyEnum = pgEnum('currency', ['ILS', 'USD']);
 export const entitlementEnum = pgEnum('entitlement', ['free', 'premium']);
 export const uiModeEnum = pgEnum('ui_mode', ['little', 'big']);
 export const platformEnum = pgEnum('platform', ['ios', 'android']);
+export const localeEnum = pgEnum('locale', LOCALES);
 export const choreKindEnum = pgEnum('chore_kind', ['once', 'daily', 'weekdays']);
 export const instanceStatusEnum = pgEnum('instance_status', [
   'due',
@@ -113,6 +120,8 @@ export const childDevices = pgTable('child_devices', {
   tokenHash: text('token_hash').notNull().unique(),
   analyticsAnonId: text('analytics_anon_id').notNull(),
   expoPushToken: text('expo_push_token'),
+  /** The language this device reads, so a push arrives in it. Registered with the push token. */
+  locale: localeEnum('locale').notNull().default(DEFAULT_LOCALE),
   platform: platformEnum('platform').notNull(),
   lastSeenAt: timestamptz('last_seen_at').notNull().defaultNow(),
   revokedAt: timestamptz('revoked_at'),

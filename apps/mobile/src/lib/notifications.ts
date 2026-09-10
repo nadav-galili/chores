@@ -1,7 +1,8 @@
-import { KID_REMINDER_COPY, localTimeFor } from '@chores/shared';
+import { kidReminderCopy, localTimeFor } from '@chores/shared';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { locale, t } from '@/lib/i18n';
 import type { DeviceDb } from '@/db/types';
 import {
   registerPushToken,
@@ -35,7 +36,7 @@ async function permitted(): Promise<boolean> {
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-    name: 'Reminders',
+    name: t('notifications.channel'),
     importance: Notifications.AndroidImportance.DEFAULT,
   });
 }
@@ -53,7 +54,7 @@ const localReminder =
     const { hour, minute } = localTimeFor(time, tz);
     await Notifications.scheduleNotificationAsync({
       identifier: REMINDER_ID,
-      content: KID_REMINDER_COPY,
+      content: kidReminderCopy(locale),
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         channelId: CHANNEL_ID,
@@ -81,7 +82,7 @@ export async function arrangeKidReminder(
   if (projectId) {
     try {
       const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
-      await registerPushToken(db, data, now);
+      await registerPushToken(db, { token: data, locale }, now);
     } catch {
       // Offline, or no push credentials yet: the local reminder below stays the delivery until an
       // open that reaches Expo. Nothing about the child's day depends on this.

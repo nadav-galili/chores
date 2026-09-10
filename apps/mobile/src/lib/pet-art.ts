@@ -1,4 +1,5 @@
 import { PET_MAX_LEVEL, type PetMood } from '@chores/shared';
+import { t } from '@/lib/i18n';
 
 /**
  * Placeholder pet art, bundled in the app: one entry per level per mood, no files and no network,
@@ -20,7 +21,7 @@ export type PetArt = {
   stage: string;
 };
 
-const STAGES = ['Egg', 'Hatchling', 'Chick', 'Fledgling', 'Splendid'] as const;
+const STAGES = ['egg', 'hatchling', 'chick', 'fledgling', 'splendid'] as const;
 const GLYPHS = ['🥚', '🐣', '🐤', '🐦', '🦚'] as const;
 
 const MOOD: Readonly<Record<PetMood, { face: string; ground: string }>> = {
@@ -35,10 +36,10 @@ const MOOD: Readonly<Record<PetMood, { face: string; ground: string }>> = {
  */
 export function petArt(level: number, mood: PetMood): PetArt {
   const i = Math.min(Math.max(Math.floor(level), 1), PET_MAX_LEVEL) - 1;
-  return { glyph: GLYPHS[i]!, stage: STAGES[i]!, ...MOOD[mood] };
+  return { glyph: GLYPHS[i]!, stage: t(`pet.stage.${STAGES[i]!}`), ...MOOD[mood] };
 }
 
 /** What a screen reader says instead of the art. */
 export function petArtLabel(name: string, level: number, mood: PetMood): string {
-  return `${name}, level ${level}, ${mood}`;
+  return t('pet.artLabel', { name, level, mood: t(`pet.moodWord.${mood}`) });
 }

@@ -77,9 +77,14 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
 
   if (op.type === 'register_push_token') {
     // A token rots, so the device re-sends it on every open; the device is the one on the token.
+    // The locale rides along, so the push the cron sends is in the language the child reads.
     await tx
       .update(childDevices)
-      .set({ expoPushToken: op.payload.expo_push_token })
+      .set({
+        expoPushToken: op.payload.expo_push_token,
+        // An op that carries no locale says nothing about the language: leave the one on file.
+        ...(op.payload.locale ? { locale: op.payload.locale } : {}),
+      })
       .where(eq(childDevices.id, ctx.deviceId));
     return ack();
   }

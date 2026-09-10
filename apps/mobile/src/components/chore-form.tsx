@@ -10,9 +10,10 @@ import {
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, ErrorText, Field, Title, Choice } from '@/components/ui';
+import { fieldError, t, weekdayLabels } from '@/lib/i18n';
 
-/** Labels by mask bit, Mon=0 … Sun=6. */
-export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/** Labels by mask bit, Mon=0 … Sun=6, in the phone's language. */
+export const WEEKDAYS = weekdayLabels;
 
 /** The default for a new chore: daily, for every child. */
 export function emptyChore(children: Child[]): ChoreFields {
@@ -80,15 +81,14 @@ export function ChoreForm({
       assignees,
     });
     if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      return setError(`${issue?.path.join('.') ?? 'form'}: ${issue?.message ?? 'invalid'}`);
+      return setError(fieldError(parsed.error.issues[0]));
     }
     setBusy(true);
     setError(null);
     try {
       await onSubmit(parsed.data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save');
+    } catch {
+      setError(t('errors.save'));
       setBusy(false);
     }
   };
@@ -99,8 +99,8 @@ export function ChoreForm({
     setError(null);
     try {
       await onDelete();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete');
+    } catch {
+      setError(t('errors.delete'));
       setBusy(false);
     }
   };
@@ -108,22 +108,27 @@ export function ChoreForm({
   return (
     <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
       <Title>{title}</Title>
-      <Field label="Title" value={choreTitle} onChangeText={setChoreTitle} autoFocus />
+      <Field
+        label={t('choreForm.title')}
+        value={choreTitle}
+        onChangeText={setChoreTitle}
+        autoFocus
+      />
       <Choice
-        label="How often"
+        label={t('choreForm.howOften')}
         value={kind}
         onChange={setKind}
         options={[
-          { value: 'daily', title: 'Every day' },
-          { value: 'weekdays', title: 'Some days' },
-          { value: 'once', title: 'Once' },
+          { value: 'daily', title: t('choreForm.kind.daily') },
+          { value: 'weekdays', title: t('choreForm.kind.weekdays') },
+          { value: 'once', title: t('choreForm.kind.once') },
         ]}
       />
       {kind === 'weekdays' && (
         <View style={styles.field}>
-          <Text style={styles.label}>Which days</Text>
+          <Text style={styles.label}>{t('choreForm.whichDays')}</Text>
           <View style={styles.row}>
-            {WEEKDAYS.map((day, i) => (
+            {WEEKDAYS().map((day: string, i: number) => (
               <Chip
                 key={day}
                 title={day}
@@ -133,13 +138,15 @@ export function ChoreForm({
             ))}
           </View>
           <Pressable onPress={() => setMask(mask === ALL_WEEKDAYS ? 0 : ALL_WEEKDAYS)}>
-            <Text style={styles.link}>{mask === ALL_WEEKDAYS ? 'Clear all' : 'Every day'}</Text>
+            <Text style={styles.link}>
+              {t(mask === ALL_WEEKDAYS ? 'choreForm.clearAll' : 'choreForm.selectAll')}
+            </Text>
           </Pressable>
         </View>
       )}
       {kind === 'once' && (
         <Field
-          label="Due date (YYYY-MM-DD)"
+          label={t('choreForm.dueDate')}
           value={dueDate}
           onChangeText={setDueDate}
           placeholder="2026-09-12"
@@ -147,10 +154,10 @@ export function ChoreForm({
         />
       )}
       <View style={styles.field}>
-        <Text style={styles.label}>Who</Text>
+        <Text style={styles.label}>{t('choreForm.who')}</Text>
         <View style={styles.row}>
           <Chip
-            title="All"
+            title={t('common.all')}
             active={allAssigned}
             onPress={() => setAssignees(allAssigned ? [] : children.map((c) => c.id))}
           />
@@ -165,8 +172,10 @@ export function ChoreForm({
         </View>
       </View>
       <ErrorText>{error}</ErrorText>
-      <Button title="Save" onPress={submit} disabled={busy} />
-      {onDelete && <Button title="Delete chore" onPress={remove} disabled={busy} secondary />}
+      <Button title={t('common.save')} onPress={submit} disabled={busy} />
+      {onDelete && (
+        <Button title={t('choreForm.delete')} onPress={remove} disabled={busy} secondary />
+      )}
     </ScrollView>
   );
 }

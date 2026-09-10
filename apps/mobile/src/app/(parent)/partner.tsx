@@ -5,12 +5,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 
-const MESSAGES: Record<string, string> = {
-  gated: 'The free plan covers two parents.',
-  already_in_household: 'That email already belongs to a household.',
-  invalid_body: 'That does not look like an email address.',
-};
+const KNOWN_ERRORS = ['gated', 'already_in_household', 'invalid_body'] as const;
+const isKnownError = (code: string): code is (typeof KNOWN_ERRORS)[number] =>
+  (KNOWN_ERRORS as readonly string[]).includes(code);
 
 /** Add the partner by email: they become a parent of this household on their first sign-in. */
 export default function Partner() {
@@ -48,7 +47,7 @@ export default function Partner() {
         await load();
       } catch (e) {
         const code = e instanceof ApiError ? e.code : 'unknown';
-        setError(MESSAGES[code] ?? 'Could not add them. Try again.');
+        setError(isKnownError(code) ? t(`partner.error.${code}`) : t('partner.error.failed'));
       } finally {
         setBusy(false);
       }
@@ -59,22 +58,22 @@ export default function Partner() {
 
   return (
     <Screen>
-      <Title>Your partner</Title>
-      <Text style={styles.hint}>
-        They sign in with this email and land in this household. Two parents on the free plan.
-      </Text>
+      <Title>{t('partner.title')}</Title>
+      <Text style={styles.hint}>{t('partner.hint')}</Text>
       <View style={styles.people}>
         {people?.parents.map((p) => (
           <Text key={p.id} style={styles.person}>
-            {p.email ?? p.display_name ?? 'Signed in'}
+            {p.email ?? p.display_name ?? t('partner.signedIn')}
           </Text>
         ))}
         {pending.map((i) => (
-          <Text key={i.email} style={styles.pending}>{`${i.email} · waiting for sign-in`}</Text>
+          <Text key={i.email} style={styles.pending}>
+            {t('partner.pending', { email: i.email })}
+          </Text>
         ))}
       </View>
       <Field
-        label="Partner’s email"
+        label={t('partner.emailLabel')}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -83,8 +82,12 @@ export default function Partner() {
         placeholder="name@example.com"
       />
       <ErrorText>{error}</ErrorText>
-      <Button title="Add partner" onPress={submit} disabled={busy || email.trim().length === 0} />
-      <Button title="Back" onPress={() => router.back()} secondary />
+      <Button
+        title={t('partner.add')}
+        onPress={submit}
+        disabled={busy || email.trim().length === 0}
+      />
+      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

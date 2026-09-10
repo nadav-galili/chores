@@ -6,6 +6,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import type { Locale } from '@chores/shared';
 import type { ChoreClocks, RejectReason } from '@chores/shared';
 
 /**
@@ -209,6 +210,8 @@ export const notificationState = sqliteTable('notification_state', {
   id: integer('id').primaryKey(),
   /** The Expo push token the server has been told about; null until one is registered. */
   push_token: text('push_token'),
+  /** The locale registered alongside that token, so the server pushes in the child's language. */
+  locale: text('locale').$type<Locale>(),
   /** The household-local `HH:MM` the local notification is scheduled for; null for none. */
   reminder_time: text('reminder_time'),
   updated_at: text('updated_at').notNull(),

@@ -1,6 +1,7 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { t } from '@/lib/i18n';
 import { getRole, setRole, type Role } from '@/lib/role';
 
 const ROLE_HOME = { parent: '/(parent)', kid: '/(kid)' } as const;
@@ -24,12 +25,12 @@ export default function RolePicker() {
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>Who is using this device?</Text>
+      <Text style={styles.title}>{t('role.question')}</Text>
       <Pressable style={styles.button} onPress={() => choose('parent')}>
-        <Text style={styles.buttonText}>Parent</Text>
+        <Text style={styles.buttonText}>{t('role.parent')}</Text>
       </Pressable>
       <Pressable style={styles.button} onPress={() => choose('kid')}>
-        <Text style={styles.buttonText}>Kid</Text>
+        <Text style={styles.buttonText}>{t('role.kid')}</Text>
       </Pressable>
     </View>
   );

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { notificationId, uuid7, type DeviceSession } from '@chores/shared';
+import { kidReminderCopy, notificationId, uuid7, type DeviceSession } from '@chores/shared';
 import { createApp } from './app.ts';
 import { runTick } from './cron.ts';
 import type { Db } from './db/client.ts';
@@ -131,7 +131,7 @@ async function setup(
 }
 
 /** Registers a push token the way a kid device does: one `/sync` op. */
-async function registerToken(session: DeviceSession, token = TOKEN) {
+async function registerToken(session: DeviceSession, token = TOKEN, locale?: 'en' | 'he') {
   const res = await app.request('/sync', {
     method: 'POST',
     headers: {
@@ -141,7 +141,13 @@ async function registerToken(session: DeviceSession, token = TOKEN) {
     body: JSON.stringify({
       device_id: session.device_id,
       cursor: 0,
-      ops: [{ op_id: uuid7(), type: 'register_push_token', payload: { expo_push_token: token } }],
+      ops: [
+        {
+          op_id: uuid7(),
+          type: 'register_push_token',
+          payload: { expo_push_token: token, ...(locale ? { locale } : {}) },
+        },
+      ],
     }),
   });
   expect(res.status).toBe(200);
@@ -249,6 +255,36 @@ describe('kid reminder', () => {
     await runTick(db, push.push, at('2026-09-09T13:01:10Z'));
     await runTick(db, push.push, at('2026-09-09T13:02:10Z'));
     expect(push.sent).toHaveLength(1);
+  });
+
+  it('nudges the child in the language their device registered in', async () => {
+    const hebrew = await setup('user_remind_he', { tz: 'Asia/Jerusalem', reminder: '16:10' });
+    await registerToken(hebrew.session!, 'ExponentPushToken[he-device]', 'he');
+    const english = await setup('user_remind_en', { tz: 'Asia/Jerusalem', reminder: '16:10' });
+    await registerToken(english.session!, 'ExponentPushToken[en-device]');
+    const push = fakePush('locale');
+
+    await runTick(db, push.push, at('2026-09-09T13:10:10Z')); // 16:10 in Jerusalem
+    const copyFor = (token: string) => push.sent.find((m) => m.to === token);
+    expect(copyFor('ExponentPushToken[he-device]')).toMatchObject(kidReminderCopy('he'));
+    expect(copyFor('ExponentPushToken[en-device]')).toMatchObject(kidReminderCopy('en'));
+  });
+
+  it('keeps the language on file when an op carries none', async () => {
+    const { session } = await setup('user_remind_keep', {
+      tz: 'Asia/Jerusalem',
+      reminder: '16:20',
+    });
+    await registerToken(session!, 'ExponentPushToken[keep-device]', 'he');
+    // A token rotates; the op that carries it says nothing about the language.
+    await registerToken(session!, 'ExponentPushToken[keep-device-2]');
+    const push = fakePush('keep');
+
+    await runTick(db, push.push, at('2026-09-09T13:20:10Z')); // 16:20 in Jerusalem
+    expect(push.sent[0]).toMatchObject({
+      to: 'ExponentPushToken[keep-device-2]',
+      ...kidReminderCopy('he'),
+    });
   });
 
   it('records the reminder with no ticket when the device has no push token', async () => {

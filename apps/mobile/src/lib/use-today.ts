@@ -35,7 +35,7 @@ export type TodayState = {
   /** Taps the server refused. They are never retried, so the child has to be told. */
   refused: number;
   /** Level, mood and XP bar, from the shared rules over local rows. */
-  pet: PetView;
+  pet: PetView & { name: string };
   /** The reminder time the parent set, from the child row; drives the local notification. */
   reminderTime: string | null;
   /** The server holds this device's push token, so the reminder is a push and not a local one. */
@@ -67,10 +67,9 @@ export type Today = TodayState & {
   clearReaction: () => void;
 };
 
-/** What the header draws before the first read lands. */
-const PET_PLACEHOLDER: PetView = {
+/** What the header draws before the first read lands; the name comes from the join. */
+const PET_PLACEHOLDER: Omit<PetView, 'name'> = {
   enabled: true,
-  name: 'Pet',
   mood: 'sleepy',
   progress: { level: 1, xp: 0, into: 0, needed: 100, fraction: 0, atMax: false },
 };
@@ -134,7 +133,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         coins,
         offline,
         refused: refused.length,
-        pet,
+        pet: { ...pet, name: pet.name ?? session.child.pet_name },
         reminderTime: rows[0]?.reminder_time ?? null,
         pushRegistered,
       });

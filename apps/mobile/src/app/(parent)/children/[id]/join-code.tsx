@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
+import { t } from '@/lib/i18n';
 
 function useNow(intervalMs: number) {
   const [now, setNow] = useState(() => Date.now());
@@ -37,8 +38,8 @@ export default function JoinCode() {
     setError(null);
     try {
       setIssued(await api.issueJoinCode(householdId, id));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not get a code');
+    } catch {
+      setError(t('joinCode.failed'));
     }
   }, [api, householdId, id]);
 
@@ -52,10 +53,8 @@ export default function JoinCode() {
 
   return (
     <Screen>
-      <Title>{`${child.first_name}'s join code`}</Title>
-      <Text style={styles.hint}>
-        On {child.first_name}'s device, choose Kid and type this code.
-      </Text>
+      <Title>{t('joinCode.title', { name: child.first_name })}</Title>
+      <Text style={styles.hint}>{t('joinCode.hint', { name: child.first_name })}</Text>
       <View style={styles.codeBox}>
         <Text
           style={[styles.code, expired && styles.codeExpired]}
@@ -65,12 +64,16 @@ export default function JoinCode() {
           {issued ? issued.code : '······'}
         </Text>
         <Text style={styles.expiry}>
-          {issued ? (expired ? 'Expired' : `Expires in ${mmss(remaining)}`) : 'Getting a code…'}
+          {issued
+            ? expired
+              ? t('joinCode.expired')
+              : t('joinCode.expiresIn', { time: mmss(remaining) })
+            : t('joinCode.getting')}
         </Text>
       </View>
       <ErrorText>{error}</ErrorText>
-      <Button title="New code" onPress={() => void issue()} secondary />
-      <Button title="Done" onPress={() => router.back()} />
+      <Button title={t('joinCode.newCode')} onPress={() => void issue()} secondary />
+      <Button title={t('common.done')} onPress={() => router.back()} />
     </Screen>
   );
 }
