@@ -139,6 +139,12 @@ export const en = {
     loadFailed: 'Could not load today.',
     nothingDue: 'Nothing due today.',
     noChildren: 'No children yet. Add the first one.',
+    reject: 'Reject',
+    rejecting: 'Rejecting…',
+    // What came back from the rejection, said in the parent's terms rather than the protocol's.
+    rejected: 'Rejected. %{title} is back for a redo.',
+    rejectAlreadyUndone: '%{title} was already undone. Nothing changed.',
+    rejectFailed: 'Could not reject %{title}.',
     nav: {
       children: 'Children',
       chores: 'Chores',

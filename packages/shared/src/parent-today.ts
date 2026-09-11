@@ -11,6 +11,11 @@ export const parentTodayItemSchema = z.object({
   status: instanceStatusSchema,
   /** The accepted completion's instant, or null while the instance is still due. */
   completed_at: z.string().datetime().nullable(),
+  /**
+   * The accepted completion's id, or null while the instance is still due. It is the only thing
+   * on a parent surface that can name a completion, so it is what makes a rejection reachable.
+   */
+  completion_id: z.string().uuid().nullable(),
 });
 export type ParentTodayItem = z.infer<typeof parentTodayItemSchema>;
 

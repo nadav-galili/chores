@@ -137,6 +137,11 @@ export const he: Catalog = {
     loadFailed: 'לא הצלחנו לטעון את היום.',
     nothingDue: 'אין מטלות להיום.',
     noChildren: 'אין עדיין ילדים. הוסיפו את הראשון.',
+    reject: 'דחייה',
+    rejecting: 'דוחים…',
+    rejected: 'נדחה. %{title} חוזרת לביצוע חוזר.',
+    rejectAlreadyUndone: '%{title} כבר בוטלה. שום דבר לא השתנה.',
+    rejectFailed: 'לא הצלחנו לדחות את %{title}.',
     nav: {
       children: 'ילדים',
       chores: 'מטלות',
