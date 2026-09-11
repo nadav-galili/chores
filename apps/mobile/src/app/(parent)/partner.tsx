@@ -1,11 +1,12 @@
 import type { Parent, ParentInvite } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
+import { useThemedStyles, type Theme } from '@/theme';
 
 const KNOWN_ERRORS = ['gated', 'already_in_household', 'invalid_body'] as const;
 const isKnownError = (code: string): code is (typeof KNOWN_ERRORS)[number] =>
@@ -15,6 +16,7 @@ const isKnownError = (code: string): code is (typeof KNOWN_ERRORS)[number] =>
 export default function Partner() {
   const state = useHousehold();
   const router = useRouter();
+  const styles = useThemedStyles(partnerStyles);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -92,9 +94,10 @@ export default function Partner() {
   );
 }
 
-const styles = StyleSheet.create({
-  hint: { color: '#555', fontSize: 15 },
-  people: { gap: 4 },
-  person: { fontSize: 17 },
-  pending: { fontSize: 17, color: '#888' },
+/** A parent who has signed in reads as text; one who has only been invited reads as muted. */
+const partnerStyles = (theme: Theme) => ({
+  hint: { ...theme.type.label, color: theme.colors.muted },
+  people: { gap: theme.space.xs },
+  person: { ...theme.type.body, color: theme.colors.text },
+  pending: { ...theme.type.body, color: theme.colors.muted },
 });
