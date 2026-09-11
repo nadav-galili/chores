@@ -17,6 +17,8 @@ Issues live in GitHub Issues on `nadav-galili/chores` via `gh`; conventions in `
 
 Greenfield rule: all work lands directly on `main`. No feature branches, no PRs, until the first store release.
 
+Exception — `/implement-spec`: when the user explicitly runs that skill, the greenfield rule is suspended for that run. It is expected to create a feature branch and a draft PR, fan implementer subagents out into their own worktrees and branches, merge them back into the PR branch, and mark the PR ready for review. Only that skill gets this exception, and only when invoked by name.
+
 One ticket per session, in this order:
 
 1. **Pick from the frontier** — a `ready-for-agent` ticket with zero open blockers (`issue_dependencies_summary.blocked_by == 0`). If the user names a ticket, use that one; otherwise take the lowest-numbered frontier ticket and say which.
