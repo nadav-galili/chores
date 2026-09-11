@@ -35,7 +35,8 @@ The long-lived credential a kid device holds after redeeming a join code, scoped
 _Avoid_: Session, child JWT, login token
 
 **Parent PIN**:
-The short code a parent enters to leave kid mode on a device.
+The short code a parent enters to leave kid mode on a device. One per household, checked by the kid device itself against a hash it holds, so it works with no network. It guards that one door and nothing else. (ADR-0013)
+_Avoid_: Password, passcode, parent login
 
 ### Chores
 
@@ -68,6 +69,10 @@ _Avoid_: Decline, undo, veto
 
 **Redo**:
 The state of an instance whose completion was rejected and which the child may complete again.
+
+**Redo Window**:
+The two chore dates after an instance's own, during which its redo may still be completed. A redo completed inside it counts for the chore date it belongs to, not the day it was done.
+_Avoid_: Grace period, catch-up
 
 **Photo Proof**:
 A chore setting requiring a photo with the completion; the only case where earning waits for parent approval.
@@ -124,7 +129,7 @@ An append-only, signed record of coins (and optionally money) moving for a child
 _Avoid_: Transaction, balance update, points record
 
 **Clawback**:
-A ledger entry that exactly reverses an earlier entry after a rejection. History is never edited.
+A ledger entry that exactly reverses an earlier entry once the facts no longer justify it — a rejection, or a redemption that was declined or cancelled. History is never edited.
 _Avoid_: Deduction, penalty, refund
 
 **Reward**:
@@ -132,8 +137,8 @@ Something a child can request with coins. Built-in rewards ship with the app; cu
 _Avoid_: Prize, item, goal
 
 **Redemption**:
-A child's request to exchange coins for a reward, decided by a parent. Coins are reserved while requested and deducted on approval.
-_Avoid_: Purchase, order, claim
+A child's request to exchange coins for a reward, decided by a parent. The coins leave the ledger when the request is made, not when it is approved; a decline or a cancel returns them with a clawback. (ADR-0014)
+_Avoid_: Purchase, order, claim, reservation
 
 **Payout**:
 A parent converting a child's coins into real money owed, recorded in the ledger. No money moves through the app.
@@ -168,4 +173,4 @@ The device-local queue of ops not yet acknowledged by the server.
 The server's ordered record of row changes that devices pull from, scoped to what that device may see.
 
 **Digest**:
-The single evening notification summarising a household's day for a parent. The app never sends per-event notifications to parents.
+The single evening notification summarising a household's day so far for a parent, sent while that chore date is still open so the parent can act on it. The only recurring notification a parent gets: the app never sends per-event *progress* notifications. A redemption request is the one interrupt, because it is the only thing that leaves a child waiting on a parent.

@@ -15,6 +15,7 @@ Competitors lose the child in week two. The test: do a 7-year-old and a 10-year-
 | streak bonus | day 3: 30 · day 7: 70 · day 14: 150 (coins and XP) |
 | frozen day | zero instances due → streak neither breaks nor extends |
 | rejection | clawback of exactly what the completion earned, incl. bonus/streak it triggered; instance returns to due as "redo" |
+| redo window | a redo may be completed for two chore dates after its own; it counts for the date it belongs to, and restores that date's bonus and streak. The tree that date grew stands either way (ADR-0011) |
 | photo proof | the only chore type where coins wait for parent approval |
 | pet | one species, 5 levels from XP thresholds, mood from today's completions, never below "sleepy"; UI level is monotonic even if XP is clawed back |
 | tuning | coin amounts are not parent-tunable in v1 |
@@ -26,7 +27,7 @@ Kinds: `once` (due_date), `daily`, `weekdays` (bit mask Mon=0…Sun=6). Start/en
 - Child = first name, `ui_mode` (`little` | `big`, set by parent, not derived from age), pet name, optional reminder time.
 - One child per device. Parent's phone has no kid mode in v1.
 - Join code: 6 chars, 15 min, single-use, bound to one child. Redeem → device token. Parent can revoke; revoked device wipes local data and shows "ask a parent to reconnect".
-- One binary. First launch asks parent / kid. Kid mode exits only with the parent PIN.
+- One binary. First launch asks parent / kid. Kid mode exits only with the parent PIN: one per household, four digits, checked on the device itself so it works offline, and it guards that door and nothing else (ADR-0013). A parent must set one before their first join code is issued. Any signed-in parent can replace it without knowing the old one; an offline kid device keeps accepting the old one until it next syncs.
 - Parents: Clerk with Google, Apple, email code. Two parents free; the first parent adds their partner by email, and the partner becomes a parent of that household on their first sign-in with it.
 
 ## Tiers
@@ -43,11 +44,11 @@ Kinds: `once` (due_date), `daily`, `weekdays` (bit mask Mon=0…Sun=6). Start/en
 
 Pricing: $39.99/yr · $6.99/mo · $79.99 lifetime. No trial, no credit card for free. Paywall only when a gate is hit. RevenueCat entitlement `premium`, webhook → `households.entitlement`. Child side is never gated.
 
-Built-in reward catalog (seeded per locale): 50 pick a snack · 150 30 min screen time / stay up 15 min · 400 pick Friday dinner / small toy.
+Built-in reward catalog, copied into each household when it is created: 50 pick a snack · 150 30 min screen time / stay up 15 min · 400 pick Friday dinner / small toy. Each row carries a `builtin_key` and the title is rendered from i18n on the device, so the catalog is not seeded in a language. Coins leave a child's ledger when they ask, not when a parent approves (ADR-0014).
 
 ## Notifications (exactly four)
 1. Kid reminder at the child's reminder time (push; local fallback if no token).
-2. Parent evening digest at household `digest_hour` (default 20).
+2. Parent evening digest at household `digest_hour` (default 20). It summarises the chore date that is **still open** — today so far — because a parent can only act on a day that has not ended, and with a day boundary as late as 06:00 "yesterday" can mean thirty hours ago. So it reads "3/4 done" and never "did not complete", a child who finishes at 21:00 gets no credit in that evening's digest (their own screen celebrates it, which is the right place), and it carries the count of redemptions still waiting on a decision. A day with nothing due and nothing waiting sends no digest at all.
 3. Parent: redemption requested (immediate).
 4. Kid: reward approved (immediate).
 
@@ -70,6 +71,7 @@ i18n with English default, Hebrew as the tested locale, RTL from day one. Store 
 | digest open rate | `push_sent` (server), `push_opened {kind}` |
 | paywall → purchase | `paywall_shown {gate}`, `purchase_completed` (webhook) |
 | activation | `household_created`, `chore_created`, `join_code_redeemed` |
+| is the reward loop used | `reward_requested {builtin_key, cost_coins}` (kid device), `redemption_decided {decision}` (server) |
 
 ## Out of scope for v1
 Real money movement, ADHD positioning, web app, parent-tunable coin values, shared "first to finish" chores, kid mode on the parent phone.
