@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "prepare": "tsc -p tsconfig.build.json",
+    "prepare": "if [ -d src ]; then tsc -p tsconfig.build.json; fi",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
