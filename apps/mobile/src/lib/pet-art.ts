@@ -1,10 +1,12 @@
 import { PET_MAX_LEVEL, type PetMood } from '@chores/shared';
 import type { ImageSourcePropType } from 'react-native';
 import { t } from '@/lib/i18n';
+import { petMoodGrounds } from '@/theme/tokens';
 
 /**
  * The pet's art, bundled in the app: a body per level, a mood mark composited over it, and a
- * ground tint behind. Nothing is fetched, so the pet draws the same offline as on.
+ * ground tint behind. Nothing is fetched, so the pet draws the same offline as on. The tints are
+ * the only part not written down here: colour values live in the theme module and nowhere else.
  *
  * Eight images cover fifteen combinations — five bodies against three marks — which is what keeps
  * the whole set holdable in one style (docs/spec/04-milestones.md, risks: "placeholder art in M1
@@ -23,7 +25,7 @@ export type PetArt = {
   body: ImageSourcePropType;
   /** What its mood adds, drawn over the body. */
   mark: ImageSourcePropType;
-  /** Background behind the art. */
+  /** Background behind the art, from the theme's pet tints. */
   ground: string;
   /** The name of this stage, shown under the pet. */
   stage: string;
@@ -39,10 +41,10 @@ const BODIES = [
   require('../../assets/pet/pet-l5.webp'),
 ] as const satisfies readonly ImageSourcePropType[];
 
-const MOOD: Readonly<Record<PetMood, { mark: ImageSourcePropType; ground: string }>> = {
-  happy: { mark: require('../../assets/pet/pet-mood-happy.webp'), ground: '#FFF4CC' },
-  content: { mark: require('../../assets/pet/pet-mood-content.webp'), ground: '#E6F4FE' },
-  sleepy: { mark: require('../../assets/pet/pet-mood-sleepy.webp'), ground: '#ECECF2' },
+const MARKS: Readonly<Record<PetMood, ImageSourcePropType>> = {
+  happy: require('../../assets/pet/pet-mood-happy.webp'),
+  content: require('../../assets/pet/pet-mood-content.webp'),
+  sleepy: require('../../assets/pet/pet-mood-sleepy.webp'),
 };
 
 /**
@@ -51,7 +53,12 @@ const MOOD: Readonly<Record<PetMood, { mark: ImageSourcePropType; ground: string
  */
 export function petArt(level: number, mood: PetMood): PetArt {
   const i = Math.min(Math.max(Math.floor(level), 1), PET_MAX_LEVEL) - 1;
-  return { body: BODIES[i]!, stage: t(`pet.stage.${STAGES[i]!}`), ...MOOD[mood] };
+  return {
+    body: BODIES[i]!,
+    stage: t(`pet.stage.${STAGES[i]!}`),
+    mark: MARKS[mood],
+    ground: petMoodGrounds[mood],
+  };
 }
 
 /** What a screen reader says instead of the art. */

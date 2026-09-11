@@ -2,7 +2,7 @@
 
 The visual system for v1. Why it looks this way: ADR-0012. Vocabulary: `CONTEXT.md`. Tokens live in `apps/mobile/src/theme`, never in `packages/shared` — that workspace is zod schemas and correctness-critical pure logic, and a palette is neither.
 
-Semantic names only. `colors.action`, `colors.growth`, `colors.coin` — never `colors.green`. No screen holds a literal colour.
+Semantic names only. `colors.action`, `colors.growth`, `colors.coin` — never `colors.green`. No screen holds a literal colour, and lint enforces it: a `no-restricted-syntax` rule in `eslint.config.ts` fails the build on a hex value, an `rgb()`/`hsl()` notation, or a named colour in a `*Color` prop in any `.ts` or `.tsx` file under `apps/mobile` except `src/theme`. The one place outside its reach is `app.json`, whose splash and adaptive-icon backgrounds Expo reads at build time; both hold the kid `ground` value and are kept in step with it by hand.
 
 ## Palette
 
@@ -19,6 +19,8 @@ Two themes, the same tokens: the child's at full strength, the parent's desatura
 | text | `#1B2A22` | `#23302A` | primary text |
 | muted | `#5F7168` | `#6C7A73` | secondary text, borders, placeholders |
 | danger | `#B3261E` | `#9C3A33` | destructive actions and error copy |
+
+Three tints sit beside the table, behind the pet — `#FFF4CC` happy, `#E6F4FE` content, `#ECECF2` sleepy. They are the background of an illustration rather than chrome, nothing but `PetFigure` reads them, and they are the same in both themes because the parent side never draws a pet. They live in `src/theme/tokens.ts` as `petMoodGrounds` all the same: a colour value is written down in the theme module or nowhere.
 
 Two rules the tokens cannot enforce on their own:
 

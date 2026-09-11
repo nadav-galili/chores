@@ -10,6 +10,8 @@
  * See issue #19 for the visual direction these values come from.
  */
 
+import type { PetMood } from '@chores/shared';
+
 export type ColorTokens = {
   /** The page behind everything. */
   ground: string;
@@ -30,6 +32,19 @@ export type ColorTokens = {
   /** Destructive actions and error copy. */
   danger: string;
 };
+
+/**
+ * The three tints behind the pet, one per mood. Art rather than chrome — they are the
+ * background of an illustration and nothing else reads them — but they are colour values, so
+ * they live here with every other colour value rather than beside the `require`s in
+ * `src/lib/pet-art.ts`. Shared by both themes: the pet is the child's, and the parent side
+ * never draws one.
+ */
+export const petMoodGrounds: Readonly<Record<PetMood, string>> = Object.freeze({
+  happy: '#FFF4CC',
+  content: '#E6F4FE',
+  sleepy: '#ECECF2',
+});
 
 /** Calm & natural at full strength — the child's world. */
 export const kidColors: ColorTokens = {

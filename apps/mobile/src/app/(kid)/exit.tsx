@@ -1,8 +1,7 @@
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
-import { Text } from 'react-native';
 import { ParentSignIn } from '@/components/parent-sign-in';
-import { Button, Loading, Screen, Title } from '@/components/ui';
+import { Body, Button, Loading, Screen, Title } from '@/components/ui';
 import { useDeviceSession } from '@/lib/device-session';
 import { t } from '@/lib/i18n';
 import { setRole } from '@/lib/role';
@@ -32,11 +31,11 @@ export default function Exit() {
   return (
     <Screen>
       <Title>{t('exit.title')}</Title>
-      <Text style={{ fontSize: 16, color: '#555' }}>
+      <Body>
         {t('exit.body', {
           name: device.session?.child.first_name ?? t('exit.theChild'),
         })}
-      </Text>
+      </Body>
       <Button title={t('exit.leave')} onPress={() => void leave()} />
       <Button title={t('exit.stay')} secondary onPress={() => router.back()} />
     </Screen>
