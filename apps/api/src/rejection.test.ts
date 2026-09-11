@@ -10,6 +10,7 @@ import {
   instanceId,
   uuid7,
   type DeviceSession,
+  type ParentToday,
 } from '@chores/shared';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
@@ -227,6 +228,37 @@ describe('POST /households/:id/completions/:id/reject', () => {
       .from(daySummaries)
       .where(and(eq(daySummaries.childId, noa.id), eq(daySummaries.choreDate, today())));
     expect(summary).toMatchObject({ doneCount: 1, complete: true });
+  });
+
+  it('is reachable from the today payload: its completion id rejects, and the row comes back as a redo', async () => {
+    const { householdId, noa, choreId, completionId } = await completed('user_reject_from_today');
+    const instanceKey = instanceId(choreId, noa.id, today());
+
+    const before = (await (
+      await app.request(`/households/${householdId}/today`, asParent('user_reject_from_today'))
+    ).json()) as ParentToday;
+    const item = before.children
+      .find((c) => c.child_id === noa.id)!
+      .items.find((i) => i.instance_id === instanceKey)!;
+    expect(item).toMatchObject({ status: 'done', completion_id: completionId });
+
+    const res = await reject('user_reject_from_today', householdId, item.completion_id!);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: 'rejected' });
+
+    // The earn and the bonus it triggered are both clawed back, and the screen that named the
+    // completion now shows the instance as a redo with nothing left to name.
+    expect(await balance(noa.id)).toBe(0);
+    const after = (await (
+      await app.request(`/households/${householdId}/today`, asParent('user_reject_from_today'))
+    ).json()) as ParentToday;
+    const child = after.children.find((c) => c.child_id === noa.id)!;
+    expect(child.items.find((i) => i.instance_id === instanceKey)).toMatchObject({
+      status: 'redo',
+      completed_at: null,
+      completion_id: null,
+    });
+    expect(child).toMatchObject({ done_count: 0, balance: 0, streak: 0 });
   });
 
   it('sends the rejection to the kid device as changes it can apply', async () => {

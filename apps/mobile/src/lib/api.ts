@@ -12,6 +12,7 @@ import type {
   ParentInvite,
   ParentToday,
   RedeemJoinCodeInput,
+  RejectCompletionResult,
   SyncRequest,
   SyncResponse,
   UpsertChoreOp,
@@ -66,6 +67,13 @@ export function createApi(getToken: GetToken) {
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
     today: (householdId: string) => call<ParentToday>(getToken, `/households/${householdId}/today`),
+    // Rejecting names a completion, never an instance: the id comes from the today payload.
+    rejectCompletion: (householdId: string, completionId: string) =>
+      call<{ status: RejectCompletionResult }>(
+        getToken,
+        `/households/${householdId}/completions/${completionId}/reject`,
+        { method: 'POST' },
+      ),
     listParents: (householdId: string) =>
       call<{ parents: Parent[]; invites: ParentInvite[] }>(
         getToken,

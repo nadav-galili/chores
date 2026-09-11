@@ -105,7 +105,11 @@ export function todayRoutes(db: Db) {
         )
         .orderBy(asc(chores.title)),
       db
-        .select({ instanceId: completions.instanceId, completedAt: completions.completedAt })
+        .select({
+          id: completions.id,
+          instanceId: completions.instanceId,
+          completedAt: completions.completedAt,
+        })
         .from(completions)
         .where(
           and(
@@ -113,7 +117,12 @@ export function todayRoutes(db: Db) {
             eq(completions.choreDate, today),
             eq(completions.status, 'accepted'),
           ),
-        ),
+        )
+        // An instance can hold more than one accepted completion — a child with two devices,
+        // both offline, taps it twice — and the map below keeps the last row it reads. Oldest
+        // first makes that the newest completion: the one still holding the instance up, and so
+        // the one a parent rejecting from this screen means.
+        .orderBy(asc(completions.completedAt)),
       // Balance is always SUM(coins) over the whole ledger; never a stored column (ADR-0002).
       db
         .select({
@@ -126,7 +135,7 @@ export function todayRoutes(db: Db) {
       streakSummaries(db, childIds, today),
     ]);
 
-    const doneAt = new Map(completionRows.map((r) => [r.instanceId, r.completedAt.toISOString()]));
+    const doneBy = new Map(completionRows.map((r) => [r.instanceId, r]));
     const balanceByChild = new Map(balanceRows.map((r) => [r.childId, r.coins]));
 
     const body: ParentToday = {
@@ -140,7 +149,8 @@ export function todayRoutes(db: Db) {
             title: i.title,
             icon: i.icon,
             status: i.status,
-            completed_at: doneAt.get(i.id) ?? null,
+            completed_at: doneBy.get(i.id)?.completedAt.toISOString() ?? null,
+            completion_id: doneBy.get(i.id)?.id ?? null,
           }));
         return {
           child_id: child.id,
