@@ -42,6 +42,8 @@ async function call<T>(getToken: GetToken, path: string, init: RequestInit = {})
     },
   });
   if (!res.ok) {
+    // A body that is not JSON is the meaning: the status and 'unknown' are what the error then
+    // carries, and the parse failure itself says nothing the status does not.
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new ApiError(res.status, body.error ?? 'unknown');
   }

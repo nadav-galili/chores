@@ -47,6 +47,9 @@ export default function Join() {
       router.replace('/(kid)');
     } catch (e) {
       const code = e instanceof ApiError ? e.code : null;
+      // A wrong or expired code is the ordinary answer and reads as words. Anything else is a
+      // failure the child cannot act on, so the screen stays calm and the device says why.
+      if (code === null) console.error('join failed', e);
       setError(code && isRedeemError(code) ? t(`join.error.${code}`) : t('join.error.failed'));
       setBusy(false);
     }

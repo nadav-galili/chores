@@ -5,6 +5,8 @@ type Parsed<T> = { ok: true; data: T } | { ok: false; response: Response };
 
 /** JSON body → schema, or a ready-made 400 the handler returns as-is. */
 export async function parseBody<T>(c: Context, schema: z.ZodType<T>): Promise<Parsed<T>> {
+  // A body that is not JSON is a body that fails the schema, which is the 400 below. The parse
+  // error is the same fact as `invalid_body` and is not discarded so much as renamed.
   const result = schema.safeParse(await c.req.json().catch(() => null));
   return result.success
     ? { ok: true, data: result.data }

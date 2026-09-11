@@ -17,7 +17,8 @@ export function playDoneHaptic(tap: DoneTap): void {
     kind === 'success'
       ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  // Nothing waits on this, and a device with no taptic engine — or one with haptics switched off
-  // — is not a failure the child should ever hear about.
-  void played.catch(() => {});
+  void played.catch(() => {
+    // Nothing waits on this, and a device with no taptic engine — or one with haptics switched
+    // off — is not a failure the child should ever hear about. The one deliberate silence.
+  });
 }

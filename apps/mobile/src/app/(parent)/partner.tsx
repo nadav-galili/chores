@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
 import { ApiError } from '@/lib/api';
+import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 import { useThemedStyles, type Theme } from '@/theme';
@@ -28,8 +29,12 @@ export default function Partner() {
     if (!householdId) return;
     try {
       setPeople(await api.listParents(householdId));
-    } catch {
+      setError(null);
+    } catch (e) {
+      // An empty list and a list that failed to load look identical on screen, and the second one
+      // reads as "no partner yet" — so the parent is told which one this is, and why.
       setPeople(null);
+      setError(withCause(t('partner.error.loadFailed'), e));
     }
   }, [api, householdId]);
 
@@ -49,7 +54,10 @@ export default function Partner() {
         await load();
       } catch (e) {
         const code = e instanceof ApiError ? e.code : 'unknown';
-        setError(isKnownError(code) ? t(`partner.error.${code}`) : t('partner.error.failed'));
+        // A code the screen has words for reads as those words; anything else keeps the cause.
+        setError(
+          isKnownError(code) ? t(`partner.error.${code}`) : withCause(t('partner.error.failed'), e),
+        );
       } finally {
         setBusy(false);
       }

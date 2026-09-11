@@ -17,7 +17,12 @@ export function clerkVerifyToken(secretKey: string): VerifyToken {
       // in a household by email alone.
       const email = (claims as { email?: unknown }).email;
       return { clerkUserId: claims.sub, email: typeof email === 'string' ? email : null };
-    } catch {
+    } catch (e) {
+      // The caller gets 401 either way. A token that is expired or forged is the ordinary path
+      // and says so here; a secret key that is wrong rejects every request in the same shape,
+      // and without this line there is nothing to tell the two apart. Clerk's error describes the
+      // token, never the household behind it, so nothing about a child can reach this line.
+      console.error('clerk token verification failed', e);
       return null;
     }
   };

@@ -43,6 +43,8 @@ function isIanaTimeZone(tz: string): boolean {
     new Intl.DateTimeFormat('en-US', { timeZone: tz });
     return true;
   } catch {
+    // The throw is the answer, not a failure: `Intl` rejecting the string is how a zone is known
+    // not to be a zone. There is no cause here to discard.
     return false;
   }
 }

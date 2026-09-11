@@ -210,6 +210,10 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       await readLocal(db, false);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'device_revoked') return revoked.current();
+      // Everything that is not a revoke is shown to the child as the offline mark, which is the
+      // truth for the common case and calm for the rest. A sync that fails for a reason other
+      // than the network looks the same on screen, so the device says which it was.
+      console.error('sync failed', e);
       await readLocal(db, true);
     }
   }, [readLocal, child, session.device_token]);

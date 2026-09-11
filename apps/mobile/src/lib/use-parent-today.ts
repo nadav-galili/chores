@@ -2,6 +2,7 @@ import type { ParentToday } from '@chores/shared';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
@@ -35,9 +36,9 @@ export function useParentToday(householdId: string | null): ParentTodayState {
       setToday(await api.today(householdId));
       setStatus('ready');
       setMessage(null);
-    } catch {
+    } catch (e) {
       setStatus('error');
-      setMessage(t('parent.loadFailed'));
+      setMessage(withCause(t('parent.loadFailed'), e));
     }
   }, [api, householdId]);
 

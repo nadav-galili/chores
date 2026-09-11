@@ -23,8 +23,11 @@ async function reportParent(me: Me): Promise<void> {
   try {
     await startParentAnalytics(me.parent.clerk_user_id, me.household?.id ?? null);
     await refreshFlags(await openDeviceDb());
-  } catch {
-    // The cache keeps whatever it last knew; the shipped experience is the fallback.
+  } catch (e) {
+    // The cache keeps whatever it last knew; the shipped experience is the fallback — so the
+    // parent is told nothing. The device still says why, because a flag set that silently never
+    // arrives looks exactly like a flag set that arrived and said no.
+    console.error('parent analytics/flags failed', e);
   }
 }
 

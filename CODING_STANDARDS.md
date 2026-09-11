@@ -44,6 +44,8 @@ Swallowing the *failure* is often right; swallowing the *cause* never is. Where 
 
 Nothing logged may carry a child's first name, pet name, chore title or join code — the privacy rule above outranks this one (ADR-0009).
 
+The two banned shapes are the two a linter can see, so `no-empty` and `no-empty-function` reject them; both accept a body holding a comment, which is the third shape written down inside the braces. A `catch (e)` that binds the cause and then drops it is beyond either rule and stays a review call.
+
 This rule is evidence rather than an ADR: four bugs in one session — a discarded OAuth error, two discarded `uuid7()` failures and one with no `catch` at all — each cost a ten-minute instrumented device build to learn something the device already knew. (#36)
 
 ## Frozen identifiers

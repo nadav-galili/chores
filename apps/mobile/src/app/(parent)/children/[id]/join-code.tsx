@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
+import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 import { useThemedStyles, type Theme } from '@/theme';
@@ -40,8 +41,8 @@ export default function JoinCode() {
     setError(null);
     try {
       setIssued(await api.issueJoinCode(householdId, id));
-    } catch {
-      setError(t('joinCode.failed'));
+    } catch (e) {
+      setError(withCause(t('joinCode.failed'), e));
     }
   }, [api, householdId, id]);
 

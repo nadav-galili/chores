@@ -52,6 +52,42 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
+    /**
+     * A catch never discards its cause (CODING_STANDARDS.md). Two stock rules express the two
+     * banned shapes between them: `no-empty` — already on from `eslint.configs.recommended` —
+     * rejects `catch {}`, and `no-empty-function`, narrowed to arrow functions, rejects
+     * `.catch(() => {})`. Both accept a body holding a comment, which is the rule's third shape
+     * written down inside the braces.
+     *
+     * Narrowed on purpose: unnarrowed it fires on every empty method too — `noAnalytics.capture`
+     * is a no-op that is the whole implementation, not a swallowed cause — and #36 asked for no
+     * rule that fires on the legitimate cases. What is left over either way is a `catch (e)` that
+     * binds the cause and then drops it, which no rule can see and `/code-review` still must.
+     */
+    rules: {
+      '@typescript-eslint/no-empty-function': [
+        'error',
+        {
+          allow: [
+            'functions',
+            'generatorFunctions',
+            'asyncFunctions',
+            'methods',
+            'generatorMethods',
+            'asyncMethods',
+            'getters',
+            'setters',
+            'constructors',
+            'private-constructors',
+            'protected-constructors',
+            'decoratedFunctions',
+            'overrideMethods',
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Metro bundles an asset only from a literal `require`, so image maps cannot be `import`ed.
     files: ['apps/mobile/**/*.{ts,tsx}'],
     rules: {

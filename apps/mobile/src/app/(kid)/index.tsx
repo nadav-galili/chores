@@ -47,7 +47,9 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
     createDeviceApi(session.device_token)
       .me()
       .then((me) => device.save({ ...session, child: me.child, household: me.household }))
-      .catch(() => {});
+      // Stale tz or boundary is survivable — the local rows still draw the day — so the child
+      // sees nothing. The device says why, which is the only signal this refresh has.
+      .catch((e: unknown) => console.error('child /me refresh failed', e));
     // Once per token; a save above rewrites `session` and must not loop.
   }, [session.device_token]);
 

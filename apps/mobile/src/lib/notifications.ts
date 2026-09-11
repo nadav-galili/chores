@@ -83,9 +83,13 @@ export async function arrangeKidReminder(
     try {
       const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
       await registerPushToken(db, { token: data, locale }, now);
-    } catch {
+    } catch (e) {
       // Offline, or no push credentials yet: the local reminder below stays the delivery until an
-      // open that reaches Expo. Nothing about the child's day depends on this.
+      // open that reaches Expo. Nothing about the child's day depends on this, so nothing reaches
+      // the screen — but a build with the credentials wrong fails here every time and would
+      // otherwise look identical to a phone that is merely offline. Only the error goes to the
+      // console, never `data`; it stays on the device, which is what keeps it clear of ADR-0009.
+      console.error('push token registration failed', e);
     }
   }
 

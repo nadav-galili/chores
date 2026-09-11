@@ -2,6 +2,7 @@ import type { Household } from '@chores/shared';
 import { getCalendars, getLocales } from 'expo-localization';
 import { useState } from 'react';
 import { Button, Choice, ErrorText, Field, Screen, Title } from '@/components/ui';
+import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
@@ -23,8 +24,8 @@ export default function CreateHousehold() {
     try {
       await api.createHousehold({ name: name.trim(), tz: phoneTz, currency });
       await refresh();
-    } catch {
-      setError(t('household.failed'));
+    } catch (e) {
+      setError(withCause(t('household.failed'), e));
       setBusy(false);
     }
   };

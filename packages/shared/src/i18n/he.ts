@@ -167,6 +167,7 @@ export const he: Catalog = {
       already_in_household: 'האימייל הזה כבר שייך למשק בית.',
       invalid_body: 'זו לא נראית כתובת אימייל.',
       failed: 'לא הצלחנו להוסיף. נסו שוב.',
+      loadFailed: 'לא הצלחנו לטעון מי נמצא במשק הבית.',
     },
   },
   chores: {

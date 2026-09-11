@@ -169,6 +169,7 @@ export const en = {
       already_in_household: 'That email already belongs to a household.',
       invalid_body: 'That does not look like an email address.',
       failed: 'Could not add them. Try again.',
+      loadFailed: 'Could not load who is in this household.',
     },
   },
   chores: {
