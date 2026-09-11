@@ -1,6 +1,6 @@
 import type { IssuedJoinCode } from '@chores/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
@@ -45,9 +45,19 @@ export default function JoinCode() {
     }
   }, [api, householdId, id]);
 
+  // Issue once per child, and not once per `issue` identity. `api` is rebuilt whenever Clerk
+  // hands back a new token getter, which makes `issue` a new function, and this screen
+  // re-renders every second to move the countdown — so depending on the callback alone issued
+  // a fresh code continuously, replacing the digits on screen before a parent could finish
+  // reading them out. Old codes stay valid for their own fifteen minutes, so the cost was a
+  // parent who could not use any of them, plus an unthrottled write loop against the API.
+  const issuedFor = useRef<string | null>(null);
   useEffect(() => {
+    const key = householdId && id ? `${householdId}/${id}` : null;
+    if (key === null || issuedFor.current === key) return;
+    issuedFor.current = key;
     void issue();
-  }, [issue]);
+  }, [householdId, id, issue]);
 
   if (!child) return null;
   const remaining = issued ? new Date(issued.expires_at).getTime() - now : 0;
