@@ -3,11 +3,11 @@ import {
   choreCompleted,
   choreDate,
   currentStreak,
-  finishesTheDay,
   groveGrew,
   kidAppOpen,
   kidDayComplete,
   petReacted,
+  tapCompletesTheDay,
   type DeviceSession,
   type IsoDate,
 } from '@chores/shared';
@@ -223,7 +223,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       // — the same answer the ledger reaches a moment later, but available now, which is what the
       // phone needs to answer the stronger way at the instant of the tap rather than after a
       // write. The tree still waits for the row the write plants; the buzz does not.
-      playDoneHaptic({ completed, dayComplete: finishesTheDay(state.items, item.id) });
+      playDoneHaptic({ completed, dayComplete: tapCompletesTheDay(state.items, item.id) });
       if (completed) {
         setReaction({
           key: (taps.current += 1),

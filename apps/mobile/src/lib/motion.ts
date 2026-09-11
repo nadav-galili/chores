@@ -3,7 +3,9 @@ import { Animated, Easing } from 'react-native';
 
 /**
  * The done moment's clock, in one place (docs/spec/06-design.md). Nothing else in the app
- * animates, so nothing else imports this file.
+ * animates, so nothing else imports this file — and every duration the moment has is here, on
+ * this side of the workspace line: a beat is a design token, and tokens never live in
+ * `packages/shared`, which is zod schemas and correctness-critical logic.
  *
  * Every animation built here runs on the native driver: the tap's write to SQLite and the outbox
  * happens on the JS thread in the same tick, and the moment must not be able to delay it — nor be
@@ -19,6 +21,8 @@ export const MOTION = {
   holdGrew: 1300,
   /** A tree pushing up out of nothing. */
   grow: 520,
+  /** How long the balance takes to climb from the old number to the new one. */
+  countUp: 700,
 } as const;
 
 /**

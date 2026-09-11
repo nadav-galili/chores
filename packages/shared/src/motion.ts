@@ -16,7 +16,7 @@ import type { InstanceStatus } from './materialize.ts';
 export type DoneHaptic = 'medium' | 'success';
 
 /** One tap on a chore, as far as the child's senses are concerned. */
-export type Tap = {
+export type DoneTap = {
   /** The chore went done. An undo did not. */
   completed: boolean;
   /** That tap left every chore due today done. */
@@ -30,7 +30,7 @@ export type Tap = {
  *
  * An undo is not a celebration and is silent, however complete the day it leaves behind is.
  */
-export function doneHaptic(tap: Tap): DoneHaptic | null {
+export function doneHaptic(tap: DoneTap): DoneHaptic | null {
   if (!tap.completed) return null;
   return tap.dayComplete ? 'success' : 'medium';
 }
@@ -46,14 +46,11 @@ export type TappedItem = { id: string; status: InstanceStatus };
  * Read from the list rather than from the ledger on purpose: this answer is needed in the tap's
  * own tick, before any write, so the phone can answer the child immediately.
  */
-export function finishesTheDay(items: readonly TappedItem[], tappedId: string): boolean {
+export function tapCompletesTheDay(items: readonly TappedItem[], tappedId: string): boolean {
   const tapped = items.find((i) => i.id === tappedId);
   if (!tapped || tapped.status === 'done') return false;
   return items.every((i) => i.id === tappedId || i.status === 'done');
 }
-
-/** How long the coin balance takes to count from the old number to the new one. */
-export const COIN_COUNT_UP_MS = 700;
 
 /**
  * Where a counting balance stands `elapsedMs` into the count from `from` to `to`: whole coins,
@@ -67,7 +64,7 @@ export function countUpCoins(
   from: number,
   to: number,
   elapsedMs: number,
-  duration = COIN_COUNT_UP_MS,
+  duration: number,
 ): number {
   if (to <= from || duration <= 0) return to;
   if (elapsedMs <= 0) return from;

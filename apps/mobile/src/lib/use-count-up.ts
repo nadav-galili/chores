@@ -1,5 +1,6 @@
 import { countUpCoins } from '@chores/shared';
 import { useEffect, useRef, useState } from 'react';
+import { MOTION } from '@/lib/motion';
 
 /**
  * A number that counts up to `value` instead of being replaced by it — the coin balance's half
@@ -26,7 +27,7 @@ export function useCountUp(value: number, enabled: boolean): number {
     }
     const started = Date.now();
     let frame = requestAnimationFrame(function tick() {
-      const now = countUpCoins(from, value, Date.now() - started);
+      const now = countUpCoins(from, value, Date.now() - started, MOTION.countUp);
       at.current = now;
       setShown(now);
       if (now < value) frame = requestAnimationFrame(tick);

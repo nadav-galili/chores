@@ -7,8 +7,8 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
-import { usePop } from '@/components/motion';
 import { formatNumber, t } from '@/lib/i18n';
+import { usePop } from '@/lib/motion';
 import { useCountUp } from '@/lib/use-count-up';
 import { useTheme, useThemedStyles, type Theme } from '@/theme';
 
@@ -142,7 +142,13 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <StateShell title={title} body={body} actionTitle={actionTitle} onAction={onAction} error={false} />
+    <StateShell
+      title={title}
+      body={body}
+      actionTitle={actionTitle}
+      onAction={onAction}
+      error={false}
+    />
   );
 }
 

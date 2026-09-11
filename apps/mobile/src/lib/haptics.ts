@@ -1,4 +1,4 @@
-import { doneHaptic, type Tap } from '@chores/shared';
+import { doneHaptic, type DoneTap } from '@chores/shared';
 import * as Haptics from 'expo-haptics';
 
 /**
@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
  * Which of the two — or neither — is `doneHaptic`'s decision, tested in `@chores/shared`; all
  * this does is play it.
  */
-export function playDoneHaptic(tap: Tap): void {
+export function playDoneHaptic(tap: DoneTap): void {
   const kind = doneHaptic(tap);
   if (kind === null) return;
   const played =
