@@ -40,6 +40,9 @@ export const en = {
       greeting: 'Hi %{name}!',
       empty: '🎈 Nothing to do today!',
       dayComplete: 'Everything’s done! Amazing!',
+      // A rejected chore, back for a redo: the copy says what to do, never what went wrong.
+      redo: 'Do these again!',
+      redoEmpty: 'Nothing to do again. Great!',
       grove: 'Your grove is growing!',
       coins: 'Look how many coins you have!',
       doneMoment: 'Nice! Plus %{coins} coins',
@@ -49,6 +52,8 @@ export const en = {
       greeting: 'Hi %{name}',
       empty: 'Nothing to do today.',
       dayComplete: 'Everything’s done.',
+      redo: 'Do again',
+      redoEmpty: 'Nothing to do again.',
       grove: 'Your grove',
       coins: 'Your coins',
       doneMoment: 'Plus %{coins} coins',

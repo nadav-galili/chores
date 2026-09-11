@@ -4,6 +4,7 @@ import {
   reconcileLedger,
   summariesThatMoved,
   uuid7,
+  withinRedoWindow,
   type InstanceStatus,
   type IsoDate,
 } from '@chores/shared';
@@ -132,6 +133,34 @@ export async function tapDone(
   ctx: TapContext,
   instance: { id: string; chore_id: string },
 ): Promise<number> {
+  return completeInstance(db, ctx, instance, ctx.today);
+}
+
+/**
+ * The child does a rejected chore again. It counts for the Chore Date the instance belongs to,
+ * never for today: the day whose bonus and streak the rejection took back is the day the redo
+ * gives them back, and the server writes the completion on that same date (`apply-ops.ts`).
+ *
+ * Outside the Redo Window there is nothing to do — the day is the parent's by then, and the
+ * server would refuse the op `too_late`. The list does not offer one, so this is the backstop
+ * for a screen that has been open across a day boundary.
+ */
+export async function tapRedo(
+  db: DeviceDb,
+  ctx: TapContext,
+  instance: { id: string; chore_id: string; chore_date: IsoDate },
+): Promise<number> {
+  if (!withinRedoWindow(instance.chore_date, ctx.today)) return 0;
+  return completeInstance(db, ctx, instance, instance.chore_date);
+}
+
+/** One completion, on `chore_date`: the row, the instance, the ledger and the op, atomically. */
+async function completeInstance(
+  db: DeviceDb,
+  ctx: TapContext,
+  instance: { id: string; chore_id: string },
+  chore_date: IsoDate,
+): Promise<number> {
   return inTransaction(db, async () => {
     const completion_id = uuid7();
     const completed_at = ctx.now.toISOString();
@@ -143,7 +172,7 @@ export async function tapDone(
         chore_id: instance.chore_id,
         child_id: ctx.childId,
         household_id: ctx.householdId,
-        chore_date: ctx.today,
+        chore_date,
         completed_at,
         device_id: ctx.deviceId,
         status: 'accepted',
@@ -160,12 +189,7 @@ export async function tapDone(
       {
         op_id: uuid7(),
         type: 'complete',
-        payload: {
-          completion_id,
-          chore_id: instance.chore_id,
-          chore_date: ctx.today,
-          completed_at,
-        },
+        payload: { completion_id, chore_id: instance.chore_id, chore_date, completed_at },
       },
       ctx.now,
     );
