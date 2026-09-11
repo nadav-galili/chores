@@ -10,6 +10,8 @@ import {
   DAY_COMPLETE_BONUS,
   earnId,
   instanceId,
+  redeemEntryId,
+  redemptionRefundId,
   xpId,
   uuid7,
   type SyncRequest,
@@ -22,13 +24,17 @@ import {
   choreInstances,
   chores,
   completions,
+  ledgerEntries,
   outbox,
+  redemptions,
+  rewards,
   syncState,
 } from '@/db/schema';
 import { materializeToday, todayList } from './engine';
 import { balanceOf, tapContext, tapDone, type ChildContext } from './local';
 import { xpTotalOf } from './pet';
 import { backoffMs, pendingOps } from './outbox';
+import { askForReward, cancelRedemption } from './redeem';
 import { syncNow } from './sync';
 
 const childId = uuid7();
@@ -92,6 +98,33 @@ async function seedChore(target: DeviceDb, title = 'Dishes') {
   await target.insert(choreAssignees).values({ chore_id: id, child_id: childId });
   await materializeToday(target, childId, TODAY);
   return { chore_id: id, id: instanceId(id, childId, TODAY) };
+}
+
+/** One catalog row, as a pull would have written it. */
+async function seedReward(target: DeviceDb, cost_coins = COINS_PER_CHORE + DAY_COMPLETE_BONUS) {
+  const id = uuid7();
+  await target.insert(rewards).values({
+    id,
+    household_id: householdId,
+    builtin_key: 'snack',
+    title: null,
+    icon: '🍿',
+    cost_coins,
+    is_builtin: true,
+    active: true,
+    sort: 0,
+    updated_at: T,
+    deleted_at: null,
+  });
+  return { id, cost_coins };
+}
+
+/** The coins a Day Complete pays, with the op that earned them already acked and gone. */
+async function seedEarnedCoins(target: DeviceDb) {
+  const instance = await seedChore(target);
+  await tapDone(target, tapContext(child, new Date(T)), instance);
+  const acks = fakeServer((req) => empty({ acked: req.ops.map((o) => ({ op_id: o.op_id })) }));
+  await syncNow(target, child, acks.call);
 }
 
 beforeEach(async () => {
@@ -337,5 +370,136 @@ describe('syncNow', () => {
     expect(queued[0]!.type).toBe('complete');
     expect(await balanceOf(second.db, childId)).toBe(COINS_PER_CHORE + 20);
     second.close();
+  });
+
+  it('undoes a refused request for a reward: no redemption, no redeem entry, the coins come back', async () => {
+    await seedEarnedCoins(db);
+    const reward = await seedReward(db);
+    const spent = await balanceOf(db, childId);
+    expect(spent).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+
+    const asked = await askForReward(db, tapContext(child, new Date(T)), reward);
+    const redemption_id = asked.ok ? asked.redemption_id : '';
+    expect(await balanceOf(db, childId)).toBe(0);
+
+    // A parent's Rejection took coins this device had not pulled, so the server refuses.
+    const server = fakeServer((req) =>
+      empty({
+        rejected: req.ops.map((o) => ({ op_id: o.op_id, reason: 'insufficient_coins' as const })),
+      }),
+    );
+    await syncNow(db, child, server.call);
+
+    expect(await db.select().from(redemptions)).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.id, redeemEntryId(redemption_id))),
+    ).toEqual([]);
+    expect(await balanceOf(db, childId)).toBe(spent);
+
+    const [row] = await db.select().from(outbox);
+    expect(row).toMatchObject({ status: 'rejected', reason: 'insufficient_coins' });
+    // And it is never sent again.
+    await syncNow(db, child, server.call);
+    expect(server.sent[1]!.ops).toEqual([]);
+  });
+
+  it('undoes a refused cancel: the refund goes and the request stands again', async () => {
+    await seedEarnedCoins(db);
+    const reward = await seedReward(db);
+    const ctx = tapContext(child, new Date(T));
+    const asked = await askForReward(db, ctx, reward);
+    const redemption_id = asked.ok ? asked.redemption_id : '';
+    // The request is the server's now; only the cancel that follows is refused.
+    await syncNow(
+      db,
+      child,
+      fakeServer((req) => empty({ acked: req.ops.map((o) => ({ op_id: o.op_id })) })).call,
+    );
+
+    await cancelRedemption(db, ctx, redemption_id);
+    expect(await balanceOf(db, childId)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+
+    const server = fakeServer((req) =>
+      empty({
+        rejected: req.ops.map((o) => ({ op_id: o.op_id, reason: 'already_decided' as const })),
+      }),
+    );
+    await syncNow(db, child, server.call);
+
+    const [row] = await db.select().from(redemptions);
+    expect(row).toMatchObject({ id: redemption_id, status: 'requested', decided_at: null });
+    expect(
+      await db
+        .select()
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.id, redemptionRefundId(redemption_id))),
+    ).toEqual([]);
+    // The coins are gone again: the parent is deciding a request that still stands.
+    expect(await balanceOf(db, childId)).toBe(0);
+  });
+
+  it('carries the rollback across a restart mid-drain: the outbox and the rows agree either way', async () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'mibo-'));
+    const file = path.join(dir, 'mibo.db');
+    const later = () => new Date(Date.now() + 60_000);
+
+    const first = await openTestDbAt(file);
+    await seedEarnedCoins(first.db);
+    const reward = await seedReward(first.db);
+    const earned = await balanceOf(first.db, childId);
+
+    // The request never reaches a verdict: the phone dies with the rows and the op both in place.
+    const asked = await askForReward(first.db, tapContext(child, new Date(T)), reward);
+    const first_id = asked.ok ? asked.redemption_id : '';
+    await expect(
+      syncNow(first.db, child, () => Promise.reject(new Error('offline'))),
+    ).rejects.toThrow();
+    first.close();
+
+    const second = await openTestDbAt(file);
+    expect((await pendingOps(second.db, later())).map((o) => o.type)).toEqual([
+      'request_redemption',
+    ]);
+    expect(await second.db.select().from(redemptions)).toHaveLength(1);
+    expect(await balanceOf(second.db, childId)).toBe(0);
+
+    // The backoff from the dead request has passed.
+    await second.db
+      .update(outbox)
+      .set({ next_attempt_at: new Date(Date.now() - 1_000).toISOString() })
+      .where(eq(outbox.status, 'pending'));
+
+    // This time the refusal lands, and the phone dies on the page that follows it. The rollback
+    // is committed with the refusal, so the restart finds neither half of it missing.
+    const refuse = (req: SyncRequest): SyncResponse =>
+      empty({
+        rejected: req.ops.map((o) => ({ op_id: o.op_id, reason: 'insufficient_coins' as const })),
+        has_more: true,
+      });
+    let calls = 0;
+    await expect(
+      syncNow(second.db, child, (req) => {
+        if (calls++) return Promise.reject(new Error('offline'));
+        return Promise.resolve(refuse(req));
+      }),
+    ).rejects.toThrow();
+    second.close();
+
+    const third = await openTestDbAt(file);
+    expect(await third.db.select().from(redemptions)).toEqual([]);
+    expect(
+      await third.db
+        .select()
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.id, redeemEntryId(first_id))),
+    ).toEqual([]);
+    expect(await balanceOf(third.db, childId)).toBe(earned);
+    expect(await pendingOps(third.db, later())).toEqual([]);
+    const [refused] = await third.db.select().from(outbox).where(eq(outbox.status, 'rejected'));
+    expect(refused).toMatchObject({ type: 'request_redemption', reason: 'insufficient_coins' });
+    third.close();
   });
 });
