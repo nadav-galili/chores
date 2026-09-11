@@ -50,6 +50,13 @@ async function repair(
     if (kind === 'rejected') await forgetRegisteredToken(db, ctx.now);
     return;
   }
+  if (op.type === 'request_redemption' || op.type === 'cancel_redemption') {
+    // A refused redemption op leaves a balance that lies until the next full pull, so its rows
+    // have to go — the redemption, the `redeem` entry and, for a cancel, the refund (ADR-0014).
+    // That rollback is #43, and it is deliberately not silently half-done here.
+    return;
+  }
+  if (op.type !== 'uncomplete') return;
   if (kind !== 'rejected') return;
   // The undo was refused, so the completion still stands.
   const [completion] = await db

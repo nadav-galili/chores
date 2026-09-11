@@ -53,6 +53,24 @@ describe('kidOpSchema', () => {
     expect(kidOpSchema.safeParse(op).success).toBe(false);
   });
 
+  it('accepts a request_redemption op', () => {
+    const op = {
+      op_id: uuid7(),
+      type: 'request_redemption',
+      payload: {
+        redemption_id: uuid7(),
+        reward_id: uuid7(),
+        requested_at: '2026-09-09T10:00:00.000Z',
+      },
+    };
+    expect(kidOpSchema.safeParse(op).success).toBe(true);
+  });
+
+  it('accepts a cancel_redemption op', () => {
+    const op = { op_id: uuid7(), type: 'cancel_redemption', payload: { redemption_id: uuid7() } };
+    expect(kidOpSchema.safeParse(op).success).toBe(true);
+  });
+
   it('refuses an op type it does not know', () => {
     const op = { op_id: uuid7(), type: 'reject_completion', payload: {} };
     expect(kidOpSchema.safeParse(op).success).toBe(false);

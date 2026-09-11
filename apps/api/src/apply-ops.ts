@@ -6,10 +6,13 @@ import {
   KID_OP_TYPES,
   kidOpSchema,
   reconcileLedger,
+  refundEntry,
+  requestRedemption,
   resolveChoreDate,
   summariesThatMoved,
   withinRedoWindow,
   type IsoDate,
+  type LedgerEntry,
   type RejectReason,
   type SyncOp,
   type SyncResponse,
@@ -27,6 +30,8 @@ import {
   growthEntries,
   households,
   ledgerEntries,
+  redemptions,
+  rewards,
   xpEvents,
 } from './db/schema.ts';
 
@@ -60,7 +65,29 @@ export type ApplyOpsResult = {
   changed: boolean;
 };
 
+/**
+ * The ops whose rows reconciliation reads. A push token is not one, and neither is a redemption:
+ * `reconcileLedger` works from completions and never reverses a `redeem` (ADR-0014), so running
+ * it over a request or a cancel would recompute the same numbers and touch neither entry.
+ */
+const RECONCILED_OP_TYPES: ReadonlySet<string> = new Set(['complete', 'uncomplete']);
+
 const reject = (reason: RejectReason): StoredResult => ({ status: 'rejected', reason });
+
+/** One shared entry as a row of this database. No XP mirrors a redemption's coins (ADR-0004). */
+const ledgerRow = (e: LedgerEntry, now: Date) => ({
+  id: e.id,
+  householdId: e.household_id,
+  childId: e.child_id,
+  kind: e.kind,
+  coins: e.coins,
+  moneyAmount: e.money_amount,
+  refType: e.ref_type,
+  refId: e.ref_id,
+  createdAt: now,
+  createdBy: e.created_by,
+});
+
 const ack = (date_adjusted = false): StoredResult =>
   date_adjusted ? { status: 'acked', date_adjusted: true } : { status: 'acked' };
 
@@ -193,6 +220,86 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       })
       .onConflictDoNothing();
     return ack(date_adjusted);
+  }
+
+  if (op.type === 'request_redemption') {
+    const { redemption_id, reward_id, requested_at } = op.payload;
+    // The row already being here is the device asking twice under a new op id — its optimistic
+    // write reached us once already, and the coins have gone. Writing anything now would spend
+    // them twice, so this answers yes and moves nothing.
+    const [existing] = await tx.select().from(redemptions).where(eq(redemptions.id, redemption_id));
+    if (existing) return existing.childId === ctx.childId ? ack() : reject('unknown_redemption');
+
+    // What a reward costs is the catalog's to say, not the device's; a hidden or deleted reward
+    // is not in the shop at all.
+    const [reward] = await tx
+      .select()
+      .from(rewards)
+      .where(and(eq(rewards.id, reward_id), eq(rewards.householdId, ctx.householdId)));
+    if (!reward || !reward.active || reward.deletedAt) return reject('unknown_reward');
+
+    // Balance is `SUM(coins)`, read here and held aside nowhere (ADR-0014). The device asked the
+    // same question before it wrote, but a parent's Rejection can have clawed back coins it has
+    // not pulled yet, so this refusal is ordinary rather than a sign of a bad device.
+    const [held] = await tx
+      .select({ coins: sql<number>`coalesce(sum(${ledgerEntries.coins}), 0)::int` })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.childId, ctx.childId));
+    const decided = requestRedemption({
+      household_id: ctx.householdId,
+      child_id: ctx.childId,
+      redemption_id,
+      cost_coins: reward.costCoins,
+      created_at: ctx.now.toISOString(),
+      created_by: ctx.childId,
+      balance: held?.coins ?? 0,
+    });
+    if (!decided.ok) return reject(decided.reason);
+
+    await tx
+      .insert(redemptions)
+      .values({
+        id: redemption_id,
+        rewardId: reward.id,
+        childId: ctx.childId,
+        householdId: ctx.householdId,
+        // A snapshot: a parent re-pricing the reward later does not rewrite what was asked for.
+        costCoins: reward.costCoins,
+        status: 'requested',
+        requestedAt: new Date(requested_at),
+      })
+      .onConflictDoNothing();
+    await tx.insert(ledgerEntries).values(ledgerRow(decided.entry, ctx.now)).onConflictDoNothing();
+    return ack();
+  }
+
+  if (op.type === 'cancel_redemption') {
+    const { redemption_id } = op.payload;
+    const [row] = await tx
+      .select()
+      .from(redemptions)
+      .where(and(eq(redemptions.id, redemption_id), eq(redemptions.childId, ctx.childId)));
+    if (!row) return reject('unknown_redemption');
+    // Approved or declined, the parent got there first and the coins are theirs to move.
+    if (row.status === 'approved' || row.status === 'declined') return reject('already_decided');
+    // Already cancelled: the refund was written under the id both paths share, so this is the
+    // same intent arriving twice and there is nothing left to do.
+    if (row.status === 'requested') {
+      await tx
+        .update(redemptions)
+        .set({ status: 'cancelled', decidedAt: ctx.now })
+        .where(and(eq(redemptions.id, redemption_id), eq(redemptions.status, 'requested')));
+      const refund = refundEntry({
+        household_id: ctx.householdId,
+        child_id: ctx.childId,
+        redemption_id,
+        cost_coins: row.costCoins,
+        created_at: ctx.now.toISOString(),
+        created_by: ctx.childId,
+      });
+      await tx.insert(ledgerEntries).values(ledgerRow(refund, ctx.now)).onConflictDoNothing();
+    }
+    return ack();
   }
 
   const [completion] = await tx
@@ -358,8 +465,7 @@ export async function applyOps(tx: Tx, ctx: OpContext, ops: SyncOp[]): Promise<A
         .insert(appliedOps)
         .values({ opId: raw.op_id, deviceId: ctx.deviceId, result, at: ctx.now })
         .onConflictDoNothing();
-      // Only a completion changes what a child has earned; a push token does not.
-      if (result.status === 'acked' && raw.type !== 'register_push_token') changed = true;
+      if (result.status === 'acked' && RECONCILED_OP_TYPES.has(raw.type)) changed = true;
     }
     if (result.status === 'acked') {
       acked.push(
