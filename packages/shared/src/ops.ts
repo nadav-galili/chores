@@ -122,6 +122,9 @@ export const rejectReasonSchema = z.enum([
   /**
    * The child cancelled first. The refund has been written once under the id both paths share
    * (ADR-0014), so the parent's decision moves no coins and is answered this instead.
+   *
+   * Its producer is the parent's decide-redemption endpoint, which is ticket #45: nothing returns
+   * it yet, and that is a missing endpoint rather than a dead code path.
    */
   'already_cancelled',
   /**
