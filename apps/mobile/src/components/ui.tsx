@@ -2,12 +2,14 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
   type TextInputProps,
 } from 'react-native';
-import { formatNumber, t } from '@/lib/i18n';
+import { CHEVRON, formatNumber, t } from '@/lib/i18n';
 import { usePop } from '@/lib/motion';
 import { useCountUp } from '@/lib/use-count-up';
 import { useTheme, useThemedStyles, type Theme } from '@/theme';
@@ -25,9 +27,15 @@ import { useTheme, useThemedStyles, type Theme } from '@/theme';
  * `Left`/`Right` — so Hebrew mirrors without a single conditional.
  */
 
-export function Screen({ children }: { children: React.ReactNode }) {
+/**
+ * The page. A form centres its handful of fields, which is what most of this app's screens are;
+ * a list does not — `list` starts it at the top and tightens the gap, because the parent's
+ * evening scan wants as many children on screen as will fit and a centred column with a
+ * form's air around it wastes the half of the screen the scan is for.
+ */
+export function Screen({ children, list = false }: { children: React.ReactNode; list?: boolean }) {
   const styles = useThemedStyles(screenStyles);
-  return <View style={styles.screen}>{children}</View>;
+  return <View style={[styles.screen, list && styles.listScreen]}>{children}</View>;
 }
 
 export function Loading() {
@@ -91,27 +99,78 @@ export function Choice<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  return (
+    <ChipGroup label={label}>
+      {options.map((o) => (
+        <Chip
+          key={o.value}
+          title={o.title}
+          active={o.value === value}
+          onPress={() => onChange(o.value)}
+          role="radio"
+        />
+      ))}
+    </ChipGroup>
+  );
+}
+
+/**
+ * A label above a wrapping row of chips. Both the single-choice `Choice` and the multi-select
+ * rows in the chore form are this shape, so the shape lives here once and neither of them
+ * holds a spacing or a colour of its own.
+ *
+ * `footer` is for a control that acts on the chips — "select all", and nothing else so far. It
+ * sits inside the group rather than after it, on the field's tight gap, so it reads as belonging
+ * to the chips it changes instead of as the form's next row.
+ */
+export function ChipGroup({
+  label,
+  children,
+  footer,
+}: {
+  label: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
   const styles = useThemedStyles(fieldStyles);
   const chips = useThemedStyles(chipStyles);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <View style={chips.row}>
-        {options.map((o) => (
-          <Pressable
-            key={o.value}
-            style={[chips.chip, o.value === value && chips.chipActive]}
-            onPress={() => onChange(o.value)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: o.value === value }}
-          >
-            <Text style={[chips.chipText, o.value === value && chips.chipTextActive]}>
-              {o.title}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <View style={chips.row}>{children}</View>
+      {footer}
     </View>
+  );
+}
+
+/**
+ * One chip. Active is the `action` fill — the one colour that means "act" — and nothing else in
+ * the app draws a chip, so a second chip elsewhere cannot drift from this one.
+ *
+ * `role` is how it announces itself: `radio` where one of the set is chosen, `checkbox` where
+ * any number may be.
+ */
+export function Chip({
+  title,
+  active,
+  onPress,
+  role = 'checkbox',
+}: {
+  title: string;
+  active: boolean;
+  onPress: () => void;
+  role?: 'radio' | 'checkbox';
+}) {
+  const chips = useThemedStyles(chipStyles);
+  return (
+    <Pressable
+      style={[chips.chip, active && chips.chipActive]}
+      onPress={onPress}
+      accessibilityRole={role}
+      accessibilityState={role === 'radio' ? { selected: active } : { checked: active }}
+    >
+      <Text style={[chips.chipText, active && chips.chipTextActive]}>{title}</Text>
+    </Pressable>
   );
 }
 
@@ -203,6 +262,76 @@ export function OfflineStrip({ message }: { message: string }) {
   return (
     <View style={styles.strip}>
       <Text style={styles.stripText}>{message}</Text>
+    </View>
+  );
+}
+
+/**
+ * The same page, for a screen that can grow taller than the phone. It is the `Screen` chrome on
+ * a scroll rather than a second page shape declared somewhere else, so there is one definition
+ * of what a page looks like and a form cannot drift from it.
+ */
+export function ScrollScreen({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(screenStyles);
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={[styles.screen, styles.scrollContent]}
+      keyboardShouldPersistTaps="handled"
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
+/**
+ * One row of a list that goes somewhere: what it is, a line about it, and the chevron that says
+ * there is more. Separated by a hairline rather than by a gap, so a household's children and a
+ * household's chores read as one list at a glance instead of as a stack of cards — the parent
+ * side is denser than the child's by exactly this kind of choice.
+ *
+ * The chevron points the way the reader is going, so it is already correct in Hebrew.
+ */
+export function ListRow({
+  title,
+  meta,
+  onPress,
+}: {
+  title: string;
+  meta?: string;
+  onPress: () => void;
+}) {
+  const styles = useThemedStyles(listRowStyles);
+  return (
+    <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
+      <View style={styles.text}>
+        <Text style={styles.title}>{title}</Text>
+        {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+      </View>
+      <Text style={styles.chevron}>{CHEVRON}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Several destinations in the height one Button would take. The parent's today screen is a scan,
+ * and a stack of full-width buttons pushes the thing being scanned off the bottom of the phone;
+ * these wrap instead, and still meet the theme's touch target.
+ *
+ * It borrows the chip's pill rather than growing a third one beside `buttonSecondary` and
+ * `chip` — the app has two tappable surfaces and a nav item is not a reason for a third. What it
+ * does not borrow is the role: a chip announces a selection, and these go somewhere, so they
+ * announce themselves as buttons. Keyed by position because the labels are translated copy.
+ */
+export function NavRow({ items }: { items: { title: string; onPress: () => void }[] }) {
+  const chips = useThemedStyles(chipStyles);
+  return (
+    <View style={chips.row}>
+      {items.map((item, i) => (
+        <Pressable key={i} style={chips.chip} onPress={item.onPress} accessibilityRole="button">
+          <Text style={chips.chipText}>{item.title}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -317,6 +446,14 @@ export function ChoreRow({
   );
 }
 
+/**
+ * For the one child of a `Screen list` that should take the height left over — the list itself.
+ * React Native does not shrink a child to fit the way the web does, so without this a long
+ * household overflows the screen and pushes the actions below it off the bottom instead of
+ * scrolling inside its own bounds. It holds no colour and no spacing, so it needs no theme.
+ */
+export const FILL = { flex: 1 } as const;
+
 /** Placeholder art, swapped for drawn assets with the rest of it. */
 const DONE_GLYPH = '✅';
 const CHORE_GLYPH = '⭐';
@@ -329,6 +466,13 @@ const screenStyles = (theme: Theme) => ({
     justifyContent: 'center' as const,
     backgroundColor: theme.colors.ground,
   },
+  listScreen: {
+    justifyContent: 'flex-start' as const,
+    gap: theme.space.md,
+    paddingVertical: theme.space.lg,
+  },
+  scroll: { flex: 1, backgroundColor: theme.colors.ground },
+  scrollContent: { justifyContent: 'flex-start' as const, flexGrow: 1 },
   loading: { flex: 1, justifyContent: 'center' as const, backgroundColor: theme.colors.ground },
 });
 
@@ -415,6 +559,24 @@ const cardStyles = (theme: Theme) => ({
     gap: theme.space.md,
   },
   tappable: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
+});
+
+const listRowStyles = (theme: Theme) => ({
+  row: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: theme.space.md,
+    minHeight: theme.touchTarget,
+    paddingVertical: theme.space.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.muted,
+  },
+  text: { flex: 1 },
+  // A weight is safe on `body`: the no-`fontWeight` rule guards the two Rubik steps, whose
+  // weight lives in the face (docs/spec/06-design.md). This step is the system font.
+  title: { ...theme.type.body, color: theme.colors.text, fontWeight: '600' as const },
+  meta: { ...theme.type.label, color: theme.colors.muted },
+  chevron: { ...theme.type.heading, color: theme.colors.muted },
 });
 
 const coinStyles = (theme: Theme) => ({
