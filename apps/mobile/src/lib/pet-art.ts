@@ -9,12 +9,13 @@ import { t } from '@/lib/i18n';
  * Eight images cover fifteen combinations — five bodies against three marks — which is what keeps
  * the whole set holdable in one style (docs/spec/04-milestones.md, risks: "placeholder art in M1
  * tells you nothing about the mechanic; budget real art before the week-3 verdict"). The images
- * here are placeholders; the real renders arrive as a swap of the two maps below and nothing else,
- * because everything that reads a pet goes through `petArt`.
+ * here are the finished renders, swapped in over the placeholders without touching a require:
+ * everything that reads a pet goes through `petArt`, so the swap was eight files and no code.
  *
  * The requires are literal because Metro resolves an asset path only at build time — a computed
  * path bundles nothing and fails at runtime. The filenames are the ones the manifest in
- * `docs/design/prompts.md` reserves, so the swap replaces eight files and touches no code.
+ * `docs/design/prompts.md` fixes, and the five bodies share one baseline — content bottom at 85%
+ * of the canvas — so a level change moves the bird's age and not its feet.
  */
 
 export type PetArt = {

@@ -13,10 +13,9 @@ import { t } from '@/lib/i18n';
  *
  * The requires are literal because Metro resolves an asset path only at build time — a computed
  * path bundles nothing and fails at runtime. The filenames are the ones the manifest in
- * `docs/design/prompts.md` reserves, so the art swap replaces nine files and touches no code.
- * What ships here is placeholder art: the same eight silhouettes and the same muted palette as
- * the prompts, drawn as flat shapes because a placeholder that pretends to be the real style is
- * worse than one that plainly is not.
+ * `docs/design/prompts.md` fixes, and the art swap replaced these nine files without touching a
+ * require. What ships here is the finished art: one broadleaf across all eight forms, blossom at
+ * six, fruit at seven, heavy fruit at eight.
  */
 
 const FORMS = [

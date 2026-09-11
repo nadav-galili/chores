@@ -76,7 +76,7 @@ The eye is a simple dark round dot with a single small light catch — never a d
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; parent of the pet ladder |
 
 ### 2. `pet-l2` — hatchling
 
@@ -86,7 +86,7 @@ The eye is a simple dark round dot with a single small light catch — never a d
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `pet-l1` |
 
 ### 3. `pet-l3` — fledgling
 
@@ -96,7 +96,7 @@ The eye is a simple dark round dot with a single small light catch — never a d
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `pet-l2` |
 
 ### 4. `pet-l4` — full
 
@@ -106,7 +106,7 @@ The eye is a simple dark round dot with a single small light catch — never a d
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `pet-l3` |
 
 ### 5. `pet-l5` — splendid
 
@@ -120,7 +120,7 @@ It also turned the bird to face the viewer, which the wording did not ask for an
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 re-render (`pet-l5-new.png`) against the corrected prompt; the first `pet-l5.png` beside it is rejected and was not committed |
 
 ---
 
@@ -138,7 +138,7 @@ Sleepy is the one to get right: the pet is sleepy when the child has done nothin
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted |
 
 ### 7. `pet-mood-content`
 
@@ -148,7 +148,7 @@ Sleepy is the one to get right: the pet is sleepy when the child has done nothin
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted |
 
 ### 8. `pet-mood-sleepy`
 
@@ -158,7 +158,7 @@ Sleepy is the one to get right: the pet is sleepy when the child has done nothin
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted |
 
 ---
 
@@ -182,7 +182,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; parent of the tree ladder |
 
 ### 10. `tree-s2` — form 2, sapling
 
@@ -192,7 +192,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s1` |
 
 ### 11. `tree-s3` — form 3, first crown
 
@@ -202,7 +202,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s2` |
 
 ### 12. `tree-s4` — form 4, branching
 
@@ -212,7 +212,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s3` |
 
 ### 13. `tree-s5` — form 5, full canopy
 
@@ -222,7 +222,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s4` |
 
 ### 14. `tree-s6` — form 6, blossom
 
@@ -232,7 +232,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s5` |
 
 ### 15. `tree-s7` — form 7, fruit
 
@@ -242,7 +242,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s6` |
 
 ### 16. `tree-s8` — form 8, heavy fruit
 
@@ -252,7 +252,7 @@ Every tree stands on the same shallow patch of pale sage-green ground, its base 
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; edit of `tree-s7` |
 
 ---
 
@@ -268,7 +268,7 @@ The shared ground line the grove's trees stand on: a wide strip tiled horizontal
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | pass 1 render, accepted; the only asset that ships at its rendered aspect |
 
 ---
 
@@ -420,3 +420,31 @@ Two smaller things, both handled in post rather than by re-rendering: the painte
 **Re-render, same day — accepted.** `pet-l5` regenerated from `pet-l4` against the corrected prompt. It reads clearly apart from `pet-l4` at 40 points on the cocked tail alone, so fault 3 is closed. Two notes carried into the entry above: it turned the bird front-on, which is kept and the stage rule amended to match; and its ground-patch bottom landed at y=1080 against the other four pets' y=1037. That 3.4% drift is the same fault as the trees', on the one asset pass 1 had cited as evidence the pets did not need aligning — so **Export and post-process** step 3 runs over the pet bodies too, not as a spot check but as the same trim-and-repad the trees get. One re-render was enough to show that no ladder holds its own baseline across a re-generation.
 
 A second pass is only needed if a later pass forces a change to the style block itself. A correction confined to one entry is verified by that entry's re-render.
+
+---
+
+## The swap — 2026-09-11
+
+The seventeen in-app assets went from `~/Downloads/mimbo-assets` into `apps/mobile/assets/`. The four identity assets stay out until the icon ticket. No require changed: every filename was already the manifest's, so the swap replaced seventeen files and edited two doc comments.
+
+**What the five post-process steps actually did.**
+
+1. **Rename.** Three tree sources carry a leading space (`" tree-s1.png"` and its two siblings) and `pet-l5-new.png` is the accepted `pet-l5`. Both were handled by name, not by guessing: the rejected `pet-l5.png` beside it was never read.
+2. **Key out.** Flood-fill to transparent from all four corners at 5% fuzz. That fuzz is the number that reproduces pass 1's own measurements exactly — the five pet bodies came back with their ground patches bottoming at y=1037, 1037, 1037, 1037 and 1080, and the eight trees at y=1069 ×4, y=1145 ×3, y=1169, which is what pass 1 recorded by hand. A keying that finds the same edges pass 1 found is a keying that took the background and not the subject.
+3. **Trim and repad.** Each ladder onto one baseline on its original 1254 canvas, at 90% for the trees and 85% for the pets, content centred horizontally, no rescaling — the egg must stay smaller than the bird. Verified by re-trimming: all five pets bottom at y=1066, all eight trees at y=1129. One line each.
+4. **Resize and convert.** Lanczos down to the manifest canvas, then WebP at quality 82 with `method=6` and the alpha channel at full quality. 82 is the bottom of the documented band, chosen because the trees are what the budget is spent on.
+5. **Mask check.** Not run — it applies only to the two adaptive-icon layers, which this swap did not bring in.
+
+**The budget, as shipped.** 908 KB for the seventeen, against the ~850 KB the table above allots them.
+
+| group | files | allowance | actual |
+|---|---|---|---|
+| pet bodies | 5 | ~200 KB | 151 KB |
+| mood overlays | 3 | ~45 KB | 44 KB |
+| tree forms | 8 | ~560 KB | 581 KB |
+| ground | 1 | ~45 KB | 131 KB |
+| | **17** | **~850 KB** | **908 KB** |
+
+The pets and the overlays came in under. The trees are 4% over at the quality floor, which is inside the noise of a "~" allowance and not worth the crown detail that the section above says to protect. The ground is the real overage: the allowance assumed a thin strip, and the asset is 1536×512 of painted grass with an alpha edge across its full width — 786k pixels, nearly all of them textured. Quality 60 takes it to 110 KB and no further, so 45 KB was never reachable at this canvas. The allowance is wrong, not the asset; it stands at 131 KB and the group table above keeps its original figures so the gap stays visible. The ticket's own ceiling — ~1.5 MB — has 600 KB of headroom left, which is what the icon ticket needs.
+
+**What the result looks like.** The five bodies read as one creature at five ages, and each of the three overlays composites over each of the five without touching the bird's face. The eight tree forms are individually tellable at 40 points, blossom at six, fruit at seven, heavy fruit at eight, and the row stands on one line. Nothing shows the faint background tile that pass 1 predicted, because nothing has a background any more.
