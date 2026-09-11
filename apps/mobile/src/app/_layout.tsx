@@ -1,3 +1,6 @@
+// First import in the app: `uuid7()` needs `crypto.getRandomValues`, which Hermes does not have,
+// and every write depends on it.
+import '@/lib/crypto';
 import { ClerkProvider } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { Stack } from 'expo-router';

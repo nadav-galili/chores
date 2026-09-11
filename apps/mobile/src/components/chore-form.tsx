@@ -8,6 +8,7 @@ import {
   type UpsertChoreOp,
 } from '@chores/shared';
 import { useState } from 'react';
+import { ApiError } from '@/lib/api';
 import { Pressable, Text } from 'react-native';
 import {
   Button,
@@ -98,8 +99,8 @@ export function ChoreForm({
     setError(null);
     try {
       await onSubmit(parsed.data);
-    } catch {
-      setError(t('errors.save'));
+    } catch (e) {
+      setError(withCause(t('errors.save'), e));
       setBusy(false);
     }
   };
@@ -110,8 +111,8 @@ export function ChoreForm({
     setError(null);
     try {
       await onDelete();
-    } catch {
-      setError(t('errors.delete'));
+    } catch (e) {
+      setError(withCause(t('errors.delete'), e));
       setBusy(false);
     }
   };
@@ -204,3 +205,16 @@ const choreFormStyles = (theme: Theme) => ({
   linkTarget: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
   link: { ...theme.type.label, color: theme.colors.action },
 });
+
+/**
+ * A failed write, with the reason attached.
+ *
+ * The bare string was untranslatable into action: "Could not save" reads the same whether the
+ * server rejected the shape, the token had expired, or the phone was offline — and the parent is
+ * the only person who can see it. The status and code are not localized on purpose; they are for
+ * repeating back, not for reading.
+ */
+function withCause(message: string, e: unknown): string {
+  if (e instanceof ApiError) return `${message} (${e.status} ${e.code})`;
+  return e instanceof Error && e.message ? `${message} (${e.message})` : message;
+}

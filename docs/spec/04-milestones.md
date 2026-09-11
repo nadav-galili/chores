@@ -41,11 +41,17 @@ Exit: two kids, two devices, real chores, offline works, per-day opens visible i
 - **Push token rot** — re-register on open; null on `DeviceNotRegistered`.
 
 ## Dependencies (approved once, here)
-- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font
+- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto
 - api: hono, @hono/node-server, drizzle-orm, postgres, zod, @clerk/backend, posthog-node, expo-server-sdk, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 - tooling: turbo, vitest, tsx, drizzle-kit, eslint, prettier, typescript
 
 Anything not on this list is asked for separately.
+
+`expo-crypto` supplies the one WebCrypto call the app makes. `uuid7()` in `packages/shared` uses
+`crypto.getRandomValues`; Node has it and Hermes does not, so `apps/mobile/src/lib/crypto.ts` assigns
+the global from `expo-crypto` before any screen loads. It is load-bearing for every write the device
+makes — a chore, a completion, an outbox op — and without it the app reads normally and silently
+writes nothing at all.
 
 `react-native-reanimated`, `expo-haptics` and `expo-font` are approved for the design milestone
 (issue #19), which lands between M1 and M2. Motion and haptics are spent on the done moment only;

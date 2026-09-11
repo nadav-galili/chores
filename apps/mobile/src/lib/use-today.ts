@@ -254,6 +254,12 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           // separately because they are separate quantities (ADR-0004, ADR-0011).
           settle({ coins: paid, grew: stage.current > grown });
           await refresh();
+        } catch (e) {
+          // A tap that cannot be written is the child's whole app failing, so it must never pass
+          // unseen: without this the promise rejected into nothing and the row simply stayed due.
+          // The child is not shown the reason — there is nothing a 7-year-old can do with it — but
+          // the device says it out loud, which is how a missing `crypto.getRandomValues` was found.
+          console.error('tap failed to write', e);
         } finally {
           // A write that threw still has to let the moment go, or the card would never leave.
           settle({});
