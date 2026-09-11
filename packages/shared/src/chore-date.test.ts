@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, choreDate, daysBetween, resolveChoreDate } from './chore-date.ts';
+import {
+  addDays,
+  choreDate,
+  daysBetween,
+  REDO_WINDOW_DAYS,
+  resolveChoreDate,
+  withinRedoWindow,
+} from './chore-date.ts';
 
 const at = (iso: string) => new Date(iso);
 
@@ -138,5 +145,19 @@ describe('resolveChoreDate', () => {
       chore_date: '2026-09-09',
       date_adjusted: true,
     });
+  });
+});
+
+describe('withinRedoWindow', () => {
+  it('is the instance’s own chore date and the two after it', () => {
+    expect(REDO_WINDOW_DAYS).toBe(2);
+    expect(withinRedoWindow('2026-09-09', '2026-09-09')).toBe(true);
+    expect(withinRedoWindow('2026-09-09', '2026-09-10')).toBe(true);
+    expect(withinRedoWindow('2026-09-09', '2026-09-11')).toBe(true);
+    expect(withinRedoWindow('2026-09-09', '2026-09-12')).toBe(false);
+  });
+
+  it('does not close on a date that has not arrived yet', () => {
+    expect(withinRedoWindow('2026-09-12', '2026-09-09')).toBe(true);
   });
 });
