@@ -46,6 +46,8 @@ export function DoneMoment({
   const grow = useRise(reaction.grew);
   // A day complete has more to look at, so the card holds longer before it goes.
   const hold = reaction.grew ? MOTION.holdGrew : MOTION.hold;
+  // When this card appeared. The screen mounts one of these per tap, keyed, so this is the tap.
+  const appeared = useRef(Date.now()).current;
 
   // The card arrives. Once per tap and nothing else: the tap's own correction a few milliseconds
   // later — the bonus it paid, the tree it planted — must not restart this, or the card would be
@@ -62,25 +64,33 @@ export function DoneMoment({
     return () => arrive.stop();
   }, [reaction.key, progress]);
 
-  // And, after its hold, goes. Scheduled separately from the arrival precisely so that learning
-  // the tap grew a tree can lengthen the hold without disturbing anything already on screen.
+  // And, after its hold, goes — but never before the tap's own write has reported, so a slow
+  // device cannot take the tree away from the child by ending the moment before the row that
+  // planted it was counted. It is only ever SQLite that is waited on here; the network is not
+  // part of the moment at all.
+  //
+  // Scheduled separately from the arrival, and measured from the moment the card appeared rather
+  // than from now, so that learning the tap grew a tree lengthens the hold without disturbing
+  // anything already on screen or pushing the whole moment later.
   useEffect(() => {
+    if (!reaction.settled) return;
     const leave = Animated.timing(progress, {
       toValue: 0,
       duration: MOTION.out,
       easing: Easing.in(Easing.quad),
       useNativeDriver: true,
     });
+    const remaining = Math.max(0, appeared + MOTION.in + hold - Date.now());
     const timer = setTimeout(() => {
       leave.start(({ finished: ok }) => {
         if (ok) finished.current();
       });
-    }, MOTION.in + hold);
+    }, remaining);
     return () => {
       clearTimeout(timer);
       leave.stop();
     };
-  }, [reaction.key, hold, progress]);
+  }, [reaction.key, reaction.settled, hold, appeared, progress]);
 
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
   const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });

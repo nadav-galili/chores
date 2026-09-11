@@ -67,6 +67,12 @@ export type DoneReaction = {
   at: number;
   /** The tap completed the day, so it planted a tree; the grove reacts too. */
   grew: boolean;
+  /**
+   * The tap's own local write has reported, so `coins` and `grew` are final. Until it has, the
+   * moment stays on screen: the card may not leave before the tree it might have planted has had
+   * its chance to appear. Only SQLite is waited on — never the network.
+   */
+  settled: boolean;
 };
 
 export type Today = TodayState & {
@@ -224,23 +230,34 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           coins: COINS_PER_CHORE,
           at: Date.now(),
           grew: false,
+          settled: false,
         });
       }
+      // The correction this tap's own write owes the moment already running, applied once. Keyed,
+      // so a tap that lands while an older one is still writing corrects nobody else's moment.
+      const key = taps.current;
+      const settle = (correction: Partial<DoneReaction>) =>
+        setReaction((r) =>
+          r === null || r.key !== key || r.settled ? r : { ...r, ...correction, settled: true },
+        );
       void (async () => {
-        const db = await openDeviceDb();
         const grown = stage.current;
-        const paid = await tapToggle(db, tapContext(child), item);
-        // The tap has counted, in SQLite, whether or not there is a network — which is the whole
-        // offline promise, and why the event carries whether there was one.
-        if (completed) capture(choreCompleted({ offline: state.offline }));
-        // The child sees the new coins, streak and tree before anything reaches the network.
-        await readLocal(db, state.offline);
-        // The animation is already running; this only corrects it, from what the tap itself
-        // wrote. A tap that completed the day paid a bonus and planted a tree — the two are
-        // asked separately because they are separate quantities.
-        if (paid > COINS_PER_CHORE) setReaction((r) => (r === null ? r : { ...r, coins: paid }));
-        if (stage.current > grown) setReaction((r) => (r === null ? r : { ...r, grew: true }));
-        await refresh();
+        try {
+          const db = await openDeviceDb();
+          const paid = await tapToggle(db, tapContext(child), item);
+          // The tap has counted, in SQLite, whether or not there is a network — which is the whole
+          // offline promise, and why the event carries whether there was one.
+          if (completed) capture(choreCompleted({ offline: state.offline }));
+          // The child sees the new coins, streak and tree before anything reaches the network.
+          await readLocal(db, state.offline);
+          // A tap that completed the day paid a bonus and planted a tree — the two are asked
+          // separately because they are separate quantities (ADR-0004, ADR-0011).
+          settle({ coins: paid, grew: stage.current > grown });
+          await refresh();
+        } finally {
+          // A write that threw still has to let the moment go, or the card would never leave.
+          settle({});
+        }
       })();
     },
     [child, readLocal, refresh, state.items, state.offline],
