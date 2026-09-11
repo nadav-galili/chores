@@ -6,6 +6,7 @@ import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { Coins } from '@/components/ui';
 import { t } from '@/lib/i18n';
+import { useTheme } from '@/theme';
 import type { Tree } from '@/sync/grove';
 import type { DoneReaction } from '@/lib/use-today';
 
@@ -31,6 +32,9 @@ export function DoneMoment({
   streak: number;
   onDone: () => void;
 }) {
+  // The voice of the copy is a `ui_mode` difference, and the theme is where the mode is read
+  // from — the same value that sized the type this card is drawn in.
+  const { uiMode } = useTheme();
   const progress = useRef(new Animated.Value(0)).current;
   const finished = useRef(onDone);
   finished.current = onDone;
@@ -66,7 +70,7 @@ export function DoneMoment({
       <Animated.View
         style={[styles.card, { opacity: progress, transform: [{ scale }, { translateY: lift }] }]}
         accessibilityLiveRegion="polite"
-        accessibilityLabel={t('kid.doneMoment', { coins: reaction.coins })}
+        accessibilityLabel={t(`kid.${uiMode}.doneMoment`, { coins: reaction.coins })}
       >
         <Coins amount={reaction.coins} variant="pays" step="display" />
         {pet.enabled && (
@@ -82,7 +86,7 @@ export function DoneMoment({
         {reaction.grew && grove.enabled && (
           <View style={styles.grew}>
             <TreeFigure tree={grove.tree} ownName={grove.ownName} size={72} showLabel={false} />
-            <Text style={styles.grewText}>{t('grove.grew')}</Text>
+            <Text style={styles.grewText}>{t(`kid.${uiMode}.grew`)}</Text>
           </View>
         )}
         <StreakBadge days={streak} />

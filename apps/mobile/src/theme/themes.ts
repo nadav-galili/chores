@@ -33,6 +33,13 @@ export type Theme = {
   type: TypeScale;
   /** The minimum height and width of anything tappable, in points. */
   touchTarget: number;
+  /**
+   * The mode this theme was selected for, so the two differences a component has to draw for
+   * itself — where the pet sits, and the voice of the copy — are read from the same value that
+   * sized the type and the touch targets, and cannot drift from it. The parent theme carries
+   * `big` because the parent side has no child to have a mode.
+   */
+  uiMode: UiMode;
 };
 
 /** Rubik 600 is spent on the two largest steps only. */
@@ -57,19 +64,30 @@ function buildTypeScale(multiplier: number): TypeScale {
   ) as TypeScale;
 }
 
-function buildTheme(colors: ColorTokens, typeMultiplier: number, touchTarget: number): Theme {
+function buildTheme(
+  colors: ColorTokens,
+  typeMultiplier: number,
+  touchTarget: number,
+  uiMode: UiMode,
+): Theme {
   return Object.freeze({
     colors: Object.freeze({ ...colors }),
     space,
     radius,
     type: buildTypeScale(typeMultiplier),
     touchTarget,
+    uiMode,
   });
 }
 
-export const kidBigTheme = buildTheme(kidColors, 1, touchTargets.big);
-export const kidLittleTheme = buildTheme(kidColors, LITTLE_TYPE_MULTIPLIER, touchTargets.little);
-export const parentTheme = buildTheme(parentColors, 1, touchTargets.big);
+export const kidBigTheme = buildTheme(kidColors, 1, touchTargets.big, 'big');
+export const kidLittleTheme = buildTheme(
+  kidColors,
+  LITTLE_TYPE_MULTIPLIER,
+  touchTargets.little,
+  'little',
+);
+export const parentTheme = buildTheme(parentColors, 1, touchTargets.big, 'big');
 
 /**
  * Picks one of three frozen themes. It selects; it does not compute — every

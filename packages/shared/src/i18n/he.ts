@@ -21,17 +21,29 @@ export const he: Catalog = {
     kid: 'ילד/ה',
   },
   kid: {
-    greeting: 'היי %{name}!',
     offline: 'מוצג מה ששמור במכשיר הזה.',
     refused: {
       one: 'הקשה אחת לא נשמרה. הקישו כדי להסתיר.',
       two: 'שתי הקשות לא נשמרו. הקישו כדי להסתיר.',
       other: '%{count} הקשות לא נשמרו. הקישו כדי להסתיר.',
     },
-    empty: 'אין מה לעשות היום.',
-    emptyLittle: '🎈 אין מה לעשות היום!',
     petButton: '%{name}, רמה %{level}',
-    doneMoment: 'יופי! עוד %{coins} מטבעות',
+    little: {
+      greeting: 'היי %{name}!',
+      empty: '🎈 אין מה לעשות היום!',
+      grove: 'החורשה שלכם צומחת!',
+      coins: 'תראו כמה מטבעות יש לכם!',
+      doneMoment: 'יופי! עוד %{coins} מטבעות',
+      grew: 'העץ שלכם צמח! 🌱',
+    },
+    big: {
+      greeting: 'היי %{name}',
+      empty: 'אין מה לעשות היום.',
+      grove: 'החורשה שלכם',
+      coins: 'המטבעות שלכם',
+      doneMoment: 'עוד %{coins} מטבעות',
+      grew: 'העץ שלכם צמח 🌱',
+    },
   },
   coins: {
     tally: '%{coins} 🪙',
@@ -73,7 +85,6 @@ export const he: Catalog = {
     mine: 'אני',
     trees: { one: 'עץ אחד', two: 'שני עצים', other: '%{count} עצים' },
     empty: 'סיימו הכול היום והזרע הזה יתחיל לצמוח.',
-    grew: 'העץ שלכם צמח! 🌱',
     treeLabel: {
       one: '%{name}, עץ אחד',
       two: '%{name}, שני עצים',

@@ -47,6 +47,21 @@ describe('the catalogs', () => {
     }
   });
 
+  // The third of the three `ui_mode` differences (docs/spec/06-design.md). Voice is otherwise
+  // unfalsifiable, so it is pinned to the one part of it a test can hold: `big` never shouts.
+  it('speaks to a 10-year-old without exclamation marks, and to a 7-year-old differently', () => {
+    for (const [name, catalog] of Object.entries(CATALOGS)) {
+      const big = Object.entries(catalog).filter(([key]) => key.startsWith('kid.big.'));
+      expect(big.length, name).toBeGreaterThan(0);
+      for (const [key, value] of big) expect(value, `${name} ${key}`).not.toContain('!');
+      for (const [key, value] of big) {
+        const little = catalog[key.replace('kid.big.', 'kid.little.')];
+        expect(little, `${name} ${key}`).toBeDefined();
+        expect(little, `${name} ${key}`).not.toBe(value);
+      }
+    }
+  });
+
   it('keeps every plural whole: a `one` always has an `other` beside it', () => {
     const plurals = Object.keys(CATALOGS.en).filter((k) => k.endsWith('.one'));
     expect(plurals.length).toBeGreaterThan(0);
