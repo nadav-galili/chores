@@ -178,7 +178,15 @@ export const redemptions = sqliteTable('redemptions', {
  */
 export const outbox = sqliteTable('outbox', {
   op_id: text('op_id').primaryKey(),
-  type: text('type', { enum: ['complete', 'uncomplete', 'register_push_token'] }).notNull(),
+  type: text('type', {
+    enum: [
+      'complete',
+      'uncomplete',
+      'register_push_token',
+      'request_redemption',
+      'cancel_redemption',
+    ],
+  }).notNull(),
   payload: json<Record<string, unknown>>('payload').notNull(),
   created_at: text('created_at').notNull(),
   attempts: integer('attempts').notNull().default(0),
