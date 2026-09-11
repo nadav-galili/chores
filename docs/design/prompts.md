@@ -276,7 +276,9 @@ The shared ground line the grove's trees stand on: a wide strip tiled horizontal
 
 The icon is the pet, and the brand on it is "Mibo" and nothing else — see `docs/spec/05-store-listing.md`. The bird on the icon is the same bird as `pet-l4`, painted once more at icon scale rather than cropped from it: a 512-pixel painting reduced to a launcher tile loses the brush.
 
-`icon` is a square iOS/store tile and may sit close to its edges. `android-icon-foreground` is masked by the launcher and may not: Android's guaranteed-visible zone is a centred circle of only **61%** of the canvas, so the bird and every leaf tip have to fit inside the middle 60%.
+`icon` is a square iOS/store tile and may sit close to its edges. `android-icon-foreground` is masked by the launcher and may not: Android's guaranteed-visible zone is a centred circle of only **61%** of the canvas, so the bird and every leaf tip have to fit inside that circle.
+
+**The circle is the test, not the box.** The prompt below asks for a 60% box because a box is a thing a model can aim at, but a box is not a circle: fit the subject snugly to the box and its corners still fall outside the mask. The box is the instruction to the model; the circle is the acceptance check, and **Export and post-process** step 5 counts the pixels outside it rather than looking at the result. The identity swap below is where that distinction was found, one step past where pass 1 found the first version of it.
 
 **Pass 1 correction.** The first `android-icon-foreground` was an edit of `icon` that kept its scale — content spanned 19% to 85% of the canvas — and a circular launcher mask cut off the tail and both leaf tips. The prompt below now asks for 60% rather than 66% and says so in pixels; the mask check is in **Export and post-process**, because this is the one identity asset a bad guess silently breaks on a real home screen.
 
@@ -288,7 +290,7 @@ The icon is the pet, and the brand on it is "Mibo" and nothing else — see `doc
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | Accepted. Bird head and shoulders above the leaf sprig; content spans 68% of the width and 77% of the height, wider than the two thirds asked for and sitting a little high, which a square iOS tile does not care about. |
 
 ### 19. `android-icon-foreground`
 
@@ -298,7 +300,7 @@ The icon is the pet, and the brand on it is "Mibo" and nothing else — see `doc
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | Style and transparency accepted; content still spans 22%–82% of the canvas, rescaled in post to clear the 61% circle. |
 
 ### 20. `android-icon-background`
 
@@ -308,7 +310,7 @@ The icon is the pet, and the brand on it is "Mibo" and nothing else — see `doc
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | Accepted. Flat wash with the sage in the lower right, nothing else in frame. |
 
 ### 21. `splash-icon`
 
@@ -320,7 +322,7 @@ The splash is the egg, not the bird: the app opens on the thing that has not hap
 
 | model | seed | date | notes |
 |---|---|---|---|
-|  |  |  |  |
+| Nano Banana | not recorded | 2026-09-10 | Accepted. Came back already transparent, the egg at 52% of the canvas height. |
 
 ---
 
@@ -332,7 +334,7 @@ The models return large square PNGs — Nano Banana returned 1254×1254 for ever
 2. **Drop the painted background on the seventeen in-app assets.** The pet bodies and tree forms come back with `#F2F6F1` painted in, and pass 1 measured it landing anywhere from `rgb(240,244,240)` to `rgb(243,246,242)` — within three of the token and not equal to each other. Against the app's exact `ground` token each one is a faint visible tile, and every asset a slightly different one. Key the flat background out to transparent and let the token show through. This also frees the same art to sit on the parent theme's `#F5F7F5`.
 3. **Put each ladder on one ground line.** Trim every tree to its content, then pad it back to a square canvas with the bottom of the ground patch at exactly 90% of the canvas height and the trunk centred horizontally. Verify by trimming all eight again and confirming one identical bottom edge. **Run the same trim-and-repad over the five pet bodies**, at 85%: pass 1's original five happened to align within a pixel, and the single `pet-l5` re-render immediately broke that by 43 pixels. A baseline that holds only until the next re-generation is not a baseline, so both ladders are aligned here rather than trusted.
 4. **Resize to the manifest canvas and convert.** Down to 512, 768, 1536×512 or 1024 as the manifest says, then WebP lossy at quality 82–88 for the seventeen in-app assets, alpha preserved. Downscaling from 1254 is fine; never upscale.
-5. **Check the two masked assets before believing them.** Composite `android-icon-foreground` over `android-icon-background`, mask it to a centred circle of 61% of the canvas, and look at the result. If a beak, a tail or a leaf tip is cut, scale the foreground down and repeat. Do the same with a squircle. This is the check that pass 1 failed.
+5. **Check the two masked assets before believing them, and count rather than look.** Composite `android-icon-foreground` over `android-icon-background`, mask it to a centred circle of 61% of the canvas, and **count the painted pixels that fall outside that circle**. The number has to be zero; if it is not, scale the foreground down and repeat. Look at a squircle and a rounded square too, but the circle is decided by the count — the identity swap found 776 pixels outside a foreground that looked untouched by eye and sat entirely inside the 60% box. This is the check that pass 1 failed, and eyeballing it is how it failed.
 
 `android-icon-monochrome.png` is produced here too, not generated: take the finished foreground, flatten it to a single flat silhouette, and keep it inside the same 60% box.
 
@@ -448,3 +450,38 @@ The seventeen in-app assets went from `~/Downloads/mimbo-assets` into `apps/mobi
 The pets and the overlays came in under. The trees are 4% over at the quality floor, which is inside the noise of a "~" allowance and not worth the crown detail that the section above says to protect. The ground is the real overage: the allowance assumed a thin strip, and the asset is 1536×512 of painted grass with an alpha edge across its full width — 786k pixels, nearly all of them textured. Quality 60 takes it to 110 KB and no further, so 45 KB was never reachable at this canvas. The allowance is wrong, not the asset; it stands at 131 KB and the group table above keeps its original figures so the gap stays visible. The ticket's own ceiling — ~1.5 MB — has 600 KB of headroom left, which is what the icon ticket needs.
 
 **What the result looks like.** The five bodies read as one creature at five ages, and each of the three overlays composites over each of the five without touching the bird's face. The eight tree forms are individually tellable at 40 points, blossom at six, fruit at seven, heavy fruit at eight, and the row stands on one line. Nothing shows the faint background tile that pass 1 predicted, because nothing has a background any more.
+
+---
+
+## The identity swap — 2026-09-11
+
+The four identity renders came in from `~/Downloads/mimbo-assets` and `android-icon-monochrome` was derived from one of them, so `apps/mobile/assets/images/` now holds five painted files instead of five Expo placeholders. Nothing in `src/` reads them — the icon, the two adaptive-icon layers, the monochrome layer and the splash mark are all referenced from `app.json` alone, and every path there was already the manifest's.
+
+**The two colours in `app.json` were wrong and are now the ground token.** The splash sat on `#208AEF` and the adaptive icon on `#E6F4FE`, both Expo template blues: a cold start flashed blue and then opened a `#F2F6F1` app. Both are `#F2F6F1` now, which is what makes the splash read as one surface with the mark on it rather than as a card. `imageWidth` went from 76 to 200 for the same reason — at 76 the egg was a speck in the middle of a full screen of off-white.
+
+**What the post-process did to each.**
+
+1. **`icon`.** Keyed the painted ground out from all four corners at 5% fuzz — the fuzz the in-app swap established — and flattened the result back onto the exact `#F2F6F1`. The render was within two of the token and not on it; the iOS slot forbids alpha, so it is flattened and the alpha channel removed outright rather than merely unused. Lanczos to 1024.
+2. **`android-icon-foreground`.** The one asset pass 1 recorded as broken, and the re-render did not fix it: content still spanned 22%–82% of the canvas, which a circular launcher mask cuts. Cropped to the alpha bounding box and rescaled, centred on 1024.
+
+   **The 60% box in entry 19 is not the test; the circle is.** Fitted to 614 px the subject sits inside the box and *still* puts 776 painted pixels outside the 61% circle, because the box's corners are outside the circle — a leaf tip and the tail tip graze it. So the fit is chosen against the circle directly: 544 px is the largest scale at which zero painted pixels fall outside, and that is what ships. Content runs 264→758 horizontally and 240→783 vertically. Fitting the box and calling it circle-safe is the same mistake pass 1 made one step further in.
+3. **`android-icon-background`.** Opaque, Lanczos to 1024, then a 3 px blur before palettising. The blur is the whole saving: the wash is flat and the grain on it is high-frequency noise that no palette compresses, so the file was 1.1 MB of texture that is invisible behind a foreground layer at launcher size. Then the flat field is remapped to exactly `#F2F6F1` — it rendered at `rgb(243,246,241)`, one off the token, which is the same near-miss step 2 of **Export and post-process** exists to catch, and the remap leaves the sage wash untouched. Blurred, remapped and quantised it is 19 KB and looks the same.
+4. **`splash-icon`.** Already transparent from the model, so only Lanczos to 1024.
+5. **`android-icon-monochrome`.** Derived, not generated: the finished foreground's alpha thresholded at 40% into one flat silhouette in `#1B2A22`, inside the same 60% box. The RGB is irrelevant — Android tints the layer and reads only the alpha — but a silhouette that is not a recognisable bird would be, and this one is.
+
+**The mask check, which pass 1 failed, now passes — and it is counted, not eyeballed.** Foreground composited over background and masked three ways: the 61% circle, a squircle and a rounded square. Looking at the result is how pass 1 concluded the old foreground was fine, so the circle is also measured — the count of painted pixels falling outside it, which is **0** for the foreground and 0 for the monochrome silhouette. At 48 px the icon is still a bird and not a brown smudge.
+
+**PNG has no lossy quality dial, so the dial is the palette.** All four ship as 8-bit palette PNG: 128 colours requested for the three painted assets, 64 for the flat wash, 2 for the silhouette. The quantiser keeps fewer than it is offered where the image does not need them — the wash ends on five. At 128 colours the icon is indistinguishable from the 24-bit original side by side at full size, and the alpha survives because a palette PNG carries a full `tRNS` table rather than binary transparency.
+
+| file | allowance | actual |
+|---|---|---|
+| `icon` | ~200 KB | 186 KB |
+| `android-icon-foreground` | ~200 KB | 94 KB |
+| `android-icon-background` | ~200 KB | 19 KB |
+| `android-icon-monochrome` | — | 3 KB |
+| `splash-icon` | ~60 KB | 104 KB |
+| **total** | **~660 KB** | **405 KB** |
+
+The splash is 44 KB over its own line and the group is 255 KB under, which is the trade worth making: the egg is the first thing the app ever shows and the three icon assets had room. The bundle is 1.28 MB for all twenty-one assets, under the ~1.5 MB ceiling.
+
+**Still open.** The last acceptance criterion on the ticket is a real device — home screen, launcher, app switcher and cold start — and that needs a dev build, which no post-process can stand in for.
