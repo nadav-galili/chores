@@ -217,6 +217,13 @@ export const he: Catalog = {
     failed: 'לא הצלחנו לקבל קוד',
     newCode: 'קוד חדש',
   },
+  rewards: {
+    builtin: {
+      snack: 'לבחור חטיף',
+      screen_time: '30 דקות מסך',
+      friday_dinner: 'לבחור ארוחת שישי',
+    },
+  },
   notifications: {
     channel: 'תזכורות',
   },

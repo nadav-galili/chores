@@ -281,8 +281,9 @@ describe('POST /sync pull', () => {
     for (const title of ['A', 'B', 'C', 'D']) {
       await putChore(uuid7(), { title, kind: 'daily', assignees: [noa.id] });
     }
-    // 2 child rows + 4 chores + 4 assignees + 4 instances = 14 changes at a page size of 3.
-    // Both children ride along because the grove is the household's (ADR-0011).
+    // 3 built-in rewards + 2 child rows + 4 chores + 4 assignees + 4 instances = 17 changes at a
+    // page size of 3. Both children ride along because the grove is the household's (ADR-0011),
+    // and the catalog because it belongs to the household rather than to any child.
     const page1 = await sync(noa.session, 0);
     expect(page1.body.changes).toHaveLength(3);
     expect(page1.body.has_more).toBe(true);
@@ -292,8 +293,8 @@ describe('POST /sync pull', () => {
     expect(page2.body.changes[0]!.seq).toBeGreaterThan(page1.body.cursor);
 
     const all = await pullAll(noa.session);
-    expect(all.pages).toBe(5);
-    expect(all.changes).toHaveLength(14);
+    expect(all.pages).toBe(6);
+    expect(all.changes).toHaveLength(17);
     const seqs = all.changes.map((c) => c.seq);
     expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
     expect(new Set(seqs).size).toBe(seqs.length);

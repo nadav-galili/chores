@@ -219,6 +219,16 @@ export const en = {
     failed: 'Could not get a code',
     newCode: 'New code',
   },
+  // Built-in reward titles, keyed by `builtin_key` verbatim (packages/shared/src/reward.ts): the
+  // seeded row carries the key and no title, so the shop renders its name in the reader's own
+  // language rather than the one the household happened to be created in.
+  rewards: {
+    builtin: {
+      snack: 'Pick a snack',
+      screen_time: '30 min screen time',
+      friday_dinner: 'Pick Friday dinner',
+    },
+  },
   notifications: {
     channel: 'Reminders',
   },

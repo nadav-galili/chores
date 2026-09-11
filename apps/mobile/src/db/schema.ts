@@ -6,7 +6,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import type { Locale } from '@chores/shared';
+import type { BuiltinRewardKey, Locale } from '@chores/shared';
 import type { ChoreClocks, RejectReason } from '@chores/shared';
 
 /**
@@ -139,10 +139,17 @@ export const growthEntries = sqliteTable('growth_entries', {
   created_at: text('created_at').notNull(),
 });
 
+/**
+ * The household's reward catalog, copied in when the household was created — built-ins included,
+ * which is why `household_id` is not nullable (docs/spec/02-data-model.md). A built-in carries a
+ * `builtin_key` and no `title`: the shop renders its name from i18n, so the same row reads in
+ * whatever language this device is set to.
+ */
 export const rewards = sqliteTable('rewards', {
   id: text('id').primaryKey(),
-  household_id: text('household_id'),
-  title: text('title').notNull(),
+  household_id: text('household_id').notNull(),
+  builtin_key: text('builtin_key').$type<BuiltinRewardKey>(),
+  title: text('title'),
   icon: text('icon'),
   cost_coins: integer('cost_coins').notNull(),
   is_builtin: bool('is_builtin').notNull().default(false),
