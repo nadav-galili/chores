@@ -120,7 +120,10 @@ export function householdRoutes(db: Db, analytics: Analytics) {
           sort: r.sort,
           updatedAt: new Date(r.updated_at),
         })),
-      );
+      )
+      // Reward ids are deterministic (ADR-0010), so a retried creation seeds the same three rows
+      // rather than giving the household a second snack.
+      .onConflictDoNothing();
       return { household: household!, parent: parent! };
     });
     analytics.capture({

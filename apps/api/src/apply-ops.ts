@@ -12,6 +12,7 @@ import {
   summariesThatMoved,
   withinRedoWindow,
   type IsoDate,
+  type KidOpType,
   type LedgerEntry,
   type RejectReason,
   type SyncOp,
@@ -70,7 +71,7 @@ export type ApplyOpsResult = {
  * `reconcileLedger` works from completions and never reverses a `redeem` (ADR-0014), so running
  * it over a request or a cancel would recompute the same numbers and touch neither entry.
  */
-const RECONCILED_OP_TYPES: ReadonlySet<string> = new Set(['complete', 'uncomplete']);
+const RECONCILED_OP_TYPES: ReadonlySet<KidOpType> = new Set<KidOpType>(['complete', 'uncomplete']);
 
 const reject = (reason: RejectReason): StoredResult => ({ status: 'rejected', reason });
 
@@ -130,13 +131,14 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       .from(choreAssignees)
       .where(and(eq(choreAssignees.choreId, chore_id), eq(choreAssignees.childId, ctx.childId)));
 
-    const exists = async (date: IsoDate) => {
+    const statusAt = async (date: IsoDate) => {
       const [row] = await tx
-        .select({ id: choreInstances.id })
+        .select({ status: choreInstances.status })
         .from(choreInstances)
         .where(eq(choreInstances.id, instanceId(chore_id, ctx.childId, date)));
-      return row !== undefined;
+      return row?.status;
     };
+    const exists = async (date: IsoDate) => (await statusAt(date)) !== undefined;
     /**
      * A day the chore can honestly belong to: one that already has an instance, or one the
      * recurrence puts it on. Deletion is ignored here — a deleted chore still pays — but the
@@ -176,11 +178,18 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         ? resolved.chore_date
         : computed;
     const date_adjusted = chore_date !== claimed;
-    // Past the Redo Window the day is the parent's to change, not the child's.
+    /**
+     * The Redo Window bounds a redo and nothing else (docs/spec/03-sync.md): past it, a chore the
+     * parent sent back is theirs to change again, not the child's. A `due` instance is a first
+     * completion of a day that was genuinely the child's, so a device back from three days offline
+     * is written on its own Chore Date rather than refused and undone. Creating an instance is
+     * bounded by the ±1 clock guard above, not by this.
+     */
     const today = choreDate(ctx.now, ctx.household.tz, ctx.household.dayBoundaryHour);
-    if (!withinRedoWindow(chore_date, today)) return reject('too_late');
+    const status = await statusAt(chore_date);
+    if (status === 'redo' && !withinRedoWindow(chore_date, today)) return reject('too_late');
     const instance_id = instanceId(chore_id, ctx.childId, chore_date);
-    if (!assigned && !(await exists(chore_date))) {
+    if (!assigned && status === undefined) {
       // Unassigned mid-day: the instance the child is looking at still counts, nothing else does.
       return reject('unknown_chore');
     }
@@ -465,7 +474,10 @@ export async function applyOps(tx: Tx, ctx: OpContext, ops: SyncOp[]): Promise<A
         .insert(appliedOps)
         .values({ opId: raw.op_id, deviceId: ctx.deviceId, result, at: ctx.now })
         .onConflictDoNothing();
-      if (result.status === 'acked' && RECONCILED_OP_TYPES.has(raw.type)) changed = true;
+      // `raw.type` is unvalidated wire input, widened here the way `KID_OP_TYPES` is above; the
+      // set itself stays typed so a renamed op type fails to compile rather than going quiet.
+      const reconciled = (RECONCILED_OP_TYPES as ReadonlySet<string>).has(raw.type);
+      if (result.status === 'acked' && reconciled) changed = true;
     }
     if (result.status === 'acked') {
       acked.push(

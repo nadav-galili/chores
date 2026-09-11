@@ -508,6 +508,33 @@ describe('POST /sync complete on an instance the server already materialized', (
     expect(instance!.status).toBe('redo');
   });
 
+  it('accepts a long-offline device’s completion of a still-due day of its own', async () => {
+    // Not a redo: the instance was never rejected, so the Redo Window has nothing to say about
+    // it. Refusing this would have the device undo three days of honest work.
+    const { noa, householdId, addChore } = await setup('user_offline_due');
+    const choreId = await addChore('Dishes', [noa.id]);
+    const date = addDays(today(), -3);
+    await writeHouseholdInstances(db, householdId, date);
+    const op = completeOp(choreId, { chore_date: date });
+
+    const { body } = await sync(noa.session, [op]);
+    expect(body.rejected).toEqual([]);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, op.payload.completion_id));
+    expect(completion!.choreDate).toBe(date);
+
+    const [instance] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, date)));
+    expect(instance!.status).toBe('done');
+    expect(await balance(noa.id)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+  });
+
   it('still adjusts a wrong-clock completion when no such instance exists', async () => {
     const { noa, addChore } = await setup('user_redo_no_instance');
     const choreId = await addChore('Dishes', [noa.id]);

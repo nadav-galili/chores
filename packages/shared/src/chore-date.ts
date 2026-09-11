@@ -79,5 +79,13 @@ export const REDO_WINDOW_DAYS = 2;
  * two after it. A date in the future is inside it; only age closes the window.
  */
 export function withinRedoWindow(date: IsoDate, today: IsoDate): boolean {
-  return daysBetween(date, today) <= REDO_WINDOW_DAYS;
+  return date >= redoWindowStart(today);
+}
+
+/**
+ * The oldest Chore Date still inside the window on `today`. The same rule as `withinRedoWindow`,
+ * shaped as a bound so a query can hold it in its `where` instead of filtering rows afterwards.
+ */
+export function redoWindowStart(today: IsoDate): IsoDate {
+  return addDays(today, -REDO_WINDOW_DAYS);
 }
