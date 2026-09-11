@@ -3,6 +3,7 @@ import {
   choreCompleted,
   choreDate,
   currentStreak,
+  finishesTheDay,
   groveGrew,
   kidAppOpen,
   kidDayComplete,
@@ -27,6 +28,7 @@ import { syncNow } from '@/sync/sync';
 import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
+import { playDoneHaptic } from '@/lib/haptics';
 import { arrangeKidReminder } from '@/lib/notifications';
 
 export type TodayState = {
@@ -210,7 +212,13 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     (item: TodayItem) => {
       // Start the done moment in this very tick: the pet must react to the tap, not to SQLite.
       // Undoing is not a celebration, so only a chore going done gets one.
-      if (item.status !== 'done') {
+      const completed = item.status !== 'done';
+      // Whether this is the tap that finished the day, read off the list the child is looking at
+      // — the same answer the ledger reaches a moment later, but available now, which is what the
+      // phone needs to answer the stronger way at the instant of the tap rather than after a
+      // write. The tree still waits for the row the write plants; the buzz does not.
+      playDoneHaptic({ completed, dayComplete: finishesTheDay(state.items, item.id) });
+      if (completed) {
         setReaction({
           key: (taps.current += 1),
           coins: COINS_PER_CHORE,
@@ -224,7 +232,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         const paid = await tapToggle(db, tapContext(child), item);
         // The tap has counted, in SQLite, whether or not there is a network — which is the whole
         // offline promise, and why the event carries whether there was one.
-        if (item.status !== 'done') capture(choreCompleted({ offline: state.offline }));
+        if (completed) capture(choreCompleted({ offline: state.offline }));
         // The child sees the new coins, streak and tree before anything reaches the network.
         await readLocal(db, state.offline);
         // The animation is already running; this only corrects it, from what the tap itself
@@ -235,7 +243,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         await refresh();
       })();
     },
-    [child, readLocal, refresh, state.offline],
+    [child, readLocal, refresh, state.items, state.offline],
   );
 
   // How long the child waited for the pet: the reaction is created in the tap's own tick, so the

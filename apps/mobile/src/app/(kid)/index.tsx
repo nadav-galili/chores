@@ -147,6 +147,10 @@ function Head({ today, onPet }: { today: Today; onPet: () => void }) {
   // control cohort receiving something that reads as a stripped app. An uncached flag reads as
   // on, so this is the shipped experience until a parent's fetch says otherwise (`sync/flags`).
   const heroCoins = !today.pet.enabled && !today.grove.enabled;
+  // The balance climbs to its new number only while a tap is being celebrated. Coins that move
+  // for any other reason — the first read of the day, a clawback arriving with a sync — simply
+  // change, because motion is spent on the done moment and nowhere else.
+  const counting = today.reaction !== null;
 
   const petFigure = today.pet.enabled ? (
     <Pressable
@@ -173,7 +177,7 @@ function Head({ today, onPet }: { today: Today; onPet: () => void }) {
 
   const tallies = (step: 'title' | 'heading') => (
     <View style={styles.tallies}>
-      <Coins amount={today.coins} step={step} />
+      <Coins amount={today.coins} step={step} countUp={counting} />
       <StreakBadge days={today.streak} />
     </View>
   );
@@ -198,7 +202,7 @@ function Head({ today, onPet }: { today: Today; onPet: () => void }) {
         <Card>
           <Text style={styles.sectionTitle}>{t(`kid.${mode}.coins`)}</Text>
           <View style={styles.hero}>
-            <Coins amount={today.coins} step="display" />
+            <Coins amount={today.coins} step="display" countUp={counting} />
             <StreakBadge days={today.streak} />
           </View>
         </Card>

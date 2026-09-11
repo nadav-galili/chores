@@ -1,6 +1,7 @@
 import { Redirect, Stack, usePathname } from 'expo-router';
 import { Loading } from '@/components/ui';
 import { DeviceSessionProvider, useDeviceSession } from '@/lib/device-session';
+import { INSTANT_SCREENS } from '@/lib/navigation';
 import { ThemeProvider } from '@/theme';
 
 /** No session → the join screen; a session → kid mode, and nothing routes back out but /exit. */
@@ -11,7 +12,7 @@ function KidGate() {
   const onJoin = pathname === '/join';
   if (!device.session && !onJoin) return <Redirect href="/(kid)/join" />;
   if (device.session && onJoin) return <Redirect href="/(kid)" />;
-  return <Stack screenOptions={{ headerShown: false, gestureEnabled: false }} />;
+  return <Stack screenOptions={{ ...INSTANT_SCREENS, gestureEnabled: false }} />;
 }
 
 /**

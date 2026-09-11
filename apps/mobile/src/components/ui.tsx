@@ -1,12 +1,15 @@
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   Text,
   TextInput,
   View,
   type TextInputProps,
 } from 'react-native';
+import { usePop } from '@/components/motion';
 import { formatNumber, t } from '@/lib/i18n';
+import { useCountUp } from '@/lib/use-count-up';
 import { useTheme, useThemedStyles, type Theme } from '@/theme';
 
 /**
@@ -150,20 +153,27 @@ export function Card({
  * component can: everything that shows coins goes through here.
  *
  * `tally` is what a child has, `pays` is what a chore is worth.
+ *
+ * `countUp` is the done moment's: while it is on, a balance that rises climbs to its new number
+ * instead of being replaced by it. Off everywhere else, including on this same component the rest
+ * of the time — a number that animates whenever a sync lands would be motion outside the moment.
  */
 export function Coins({
   amount,
   variant = 'tally',
   step = 'body',
+  countUp = false,
 }: {
   amount: number;
   variant?: 'tally' | 'pays';
   step?: CoinStep;
+  countUp?: boolean;
 }) {
   const styles = useThemedStyles(coinStyles);
+  const shown = useCountUp(amount, countUp);
   return (
     <Text style={[styles.coins, styles[step]]}>
-      {t(variant === 'pays' ? 'coins.pays' : 'coins.tally', { coins: formatNumber(amount) })}
+      {t(variant === 'pays' ? 'coins.pays' : 'coins.tally', { coins: formatNumber(shown) })}
     </Text>
   );
 }
@@ -174,6 +184,13 @@ type CoinStep = 'display' | 'title' | 'heading' | 'body' | 'label';
  * One chore on a list: its icon, its title, and what it pays. Tapping it toggles done, and done
  * is drawn by striking the title through rather than by tinting the row — the grove's green is
  * not allowed in chrome, and the action green means "act", not "finished".
+ *
+ * Going done is the first half of the done moment: the row settles into the state rather than
+ * cutting to it, and its tick lands with a pop of its own. Coming back undone does not animate —
+ * an undo returns the screen to how it was, with no celebration — and neither does the row
+ * arriving on screen already done, which is just today's list as it stands.
+ *
+ * The pop is a scale, so it is the same pop in Hebrew: nothing here moves along the reading axis.
  */
 export function ChoreRow({
   title,
@@ -189,20 +206,27 @@ export function ChoreRow({
   onPress: () => void;
 }) {
   const styles = useThemedStyles(choreRowStyles);
+  const pop = usePop(done);
+  const rowScale = pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] });
+  const tickScale = pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.4] });
   return (
-    <Pressable
-      style={styles.row}
-      onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
-      accessibilityLabel={title}
-    >
-      <Text style={styles.icon}>{done ? DONE_GLYPH : (icon ?? CHORE_GLYPH)}</Text>
-      <Text style={[styles.title, done && styles.titleDone]} numberOfLines={2}>
-        {title}
-      </Text>
-      {coins !== undefined && <Coins amount={coins} variant="pays" step="label" />}
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale: rowScale }] }}>
+      <Pressable
+        style={styles.row}
+        onPress={onPress}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: done }}
+        accessibilityLabel={title}
+      >
+        <Animated.Text style={[styles.icon, { transform: [{ scale: tickScale }] }]}>
+          {done ? DONE_GLYPH : (icon ?? CHORE_GLYPH)}
+        </Animated.Text>
+        <Text style={[styles.title, done && styles.titleDone]} numberOfLines={2}>
+          {title}
+        </Text>
+        {coins !== undefined && <Coins amount={coins} variant="pays" step="label" />}
+      </Pressable>
+    </Animated.View>
   );
 }
 

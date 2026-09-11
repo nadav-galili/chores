@@ -2,6 +2,7 @@ import type { PetMood } from '@chores/shared';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { TreeFigure } from '@/components/grove';
+import { MOTION, usePop, useRise } from '@/components/motion';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { Coins } from '@/components/ui';
@@ -38,32 +39,53 @@ export function DoneMoment({
   const progress = useRef(new Animated.Value(0)).current;
   const finished = useRef(onDone);
   finished.current = onDone;
+  // The pet's own reaction, a beat behind the card so it reads as the pet answering the tap
+  // rather than as part of the card arriving. The tree's, when the tap planted one: it pushes up
+  // out of nothing, which is the only moment in the app a tree is ever seen to move.
+  const bounce = usePop(true, { delay: MOTION.in, onMount: true });
+  const grow = useRise(reaction.grew);
+  // A day complete has more to look at, so the card holds longer before it goes.
+  const hold = reaction.grew ? MOTION.holdGrew : MOTION.hold;
 
+  // The card arrives. Once per tap and nothing else: the tap's own correction a few milliseconds
+  // later — the bonus it paid, the tree it planted — must not restart this, or the card would be
+  // seen to pop in twice.
   useEffect(() => {
     progress.setValue(0);
-    const animation = Animated.sequence([
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.back(2)),
-        useNativeDriver: true,
-      }),
-      Animated.delay(700),
-      Animated.timing(progress, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]);
-    animation.start(({ finished: ok }) => {
-      if (ok) finished.current();
+    const arrive = Animated.timing(progress, {
+      toValue: 1,
+      duration: MOTION.in,
+      easing: Easing.out(Easing.back(2)),
+      useNativeDriver: true,
     });
-    return () => animation.stop();
+    arrive.start();
+    return () => arrive.stop();
   }, [reaction.key, progress]);
+
+  // And, after its hold, goes. Scheduled separately from the arrival precisely so that learning
+  // the tap grew a tree can lengthen the hold without disturbing anything already on screen.
+  useEffect(() => {
+    const leave = Animated.timing(progress, {
+      toValue: 0,
+      duration: MOTION.out,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    });
+    const timer = setTimeout(() => {
+      leave.start(({ finished: ok }) => {
+        if (ok) finished.current();
+      });
+    }, MOTION.in + hold);
+    return () => {
+      clearTimeout(timer);
+      leave.stop();
+    };
+  }, [reaction.key, hold, progress]);
 
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
   const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+  const petScale = bounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
+  const treeScale = grow.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
 
   return (
     <View style={styles.overlay} pointerEvents="none">
@@ -74,20 +96,24 @@ export function DoneMoment({
       >
         <Coins amount={reaction.coins} variant="pays" step="display" />
         {pet.enabled && (
-          <PetFigure
-            name={pet.name}
-            level={pet.level}
-            mood={pet.mood}
-            size={96}
-            showStage={false}
-          />
+          <Animated.View style={{ transform: [{ scale: petScale }] }}>
+            <PetFigure
+              name={pet.name}
+              level={pet.level}
+              mood={pet.mood}
+              size={96}
+              showStage={false}
+            />
+          </Animated.View>
         )}
         {/* Only the tap that completed the day planted one, so only that tap shows a tree. */}
         {reaction.grew && grove.enabled && (
-          <View style={styles.grew}>
+          <Animated.View
+            style={[styles.grew, { opacity: grow, transform: [{ scale: treeScale }] }]}
+          >
             <TreeFigure tree={grove.tree} ownName={grove.ownName} size={72} showLabel={false} />
             <Text style={styles.grewText}>{t(`kid.${uiMode}.grew`)}</Text>
-          </View>
+          </Animated.View>
         )}
         <StreakBadge days={streak} />
       </Animated.View>
