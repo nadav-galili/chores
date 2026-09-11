@@ -1,13 +1,13 @@
 import type { PetMood } from '@chores/shared';
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Text, View } from 'react-native';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
 import { Coins } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { MOTION, usePop, useRise } from '@/lib/motion';
-import { useTheme } from '@/theme';
+import { useTheme, useThemedStyles, type Theme } from '@/theme';
 import type { Tree } from '@/sync/grove';
 import type { DoneReaction } from '@/lib/use-today';
 
@@ -36,6 +36,7 @@ export function DoneMoment({
   // The voice of the copy is a `ui_mode` difference, and the theme is where the mode is read
   // from — the same value that sized the type this card is drawn in.
   const { uiMode } = useTheme();
+  const styles = useThemedStyles(doneMomentStyles);
   const progress = useRef(new Animated.Value(0)).current;
   const finished = useRef(onDone);
   finished.current = onDone;
@@ -131,29 +132,33 @@ export function DoneMoment({
   );
 }
 
-const styles = StyleSheet.create({
+const doneMomentStyles = (theme: Theme) => ({
   overlay: {
-    position: 'absolute',
+    position: 'absolute' as const,
     top: 0,
     bottom: 0,
     start: 0,
     end: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   card: {
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 24,
-    paddingHorizontal: 32,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFFF2',
-    shadowColor: '#000',
+    alignItems: 'center' as const,
+    gap: theme.space.md,
+    paddingVertical: theme.space.xl,
+    paddingHorizontal: theme.space.xxl,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.surface,
+    // The text colour doubles as the shadow: it is the darkest value the palette has, and a
+    // shadow is the one place a colour is spent on something other than being seen.
+    shadowColor: theme.colors.text,
     shadowOpacity: 0.18,
+    // A blur, not a corner: the radius scale is corner radii and has nothing to say here.
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
-  grew: { alignItems: 'center', gap: 4 },
-  grewText: { fontSize: 16, fontWeight: '600', color: '#2E7D32' },
+  grew: { alignItems: 'center' as const, gap: theme.space.xs },
+  // The line under the tree is copy, so it is text: the green on this card is the tree's own.
+  grewText: { ...theme.type.label, color: theme.colors.text, fontWeight: '600' as const },
 });

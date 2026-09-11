@@ -53,6 +53,12 @@ export function Title({ children }: { children: string }) {
   return <Text style={styles.title}>{children}</Text>;
 }
 
+/** A line of copy on a page. The `Title`'s counterpart, and the only body text a screen needs. */
+export function Body({ children }: { children: string }) {
+  const styles = useThemedStyles(textStyles);
+  return <Text style={styles.body}>{children}</Text>;
+}
+
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const styles = useThemedStyles(fieldStyles);
   const { colors } = useTheme();
@@ -478,6 +484,7 @@ const screenStyles = (theme: Theme) => ({
 
 const textStyles = (theme: Theme) => ({
   title: { ...theme.type.title, color: theme.colors.text, marginBottom: theme.space.sm },
+  body: { ...theme.type.body, color: theme.colors.text },
   error: { ...theme.type.label, color: theme.colors.danger },
 });
 

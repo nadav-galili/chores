@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { PetFigure, XpBar } from '@/components/pet';
 import { useDeviceSession } from '@/lib/device-session';
 import { BACK_ARROW, t } from '@/lib/i18n';
 import { usePet } from '@/lib/use-pet';
+import { useThemedStyles, type Theme } from '@/theme';
 import type { DeviceSession } from '@chores/shared';
 
 export default function PetScreen() {
@@ -22,6 +23,7 @@ export default function PetScreen() {
 function Pet({ session }: { session: DeviceSession }) {
   const router = useRouter();
   const pet = usePet(session);
+  const styles = useThemedStyles(petScreenStyles);
 
   return (
     <View style={styles.screen}>
@@ -39,12 +41,28 @@ function Pet({ session }: { session: DeviceSession }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, paddingTop: 56, paddingHorizontal: 24 },
-  back: { alignSelf: 'flex-start', paddingVertical: 8, paddingEnd: 16 },
-  backText: { fontSize: 18, fontWeight: '600', color: '#7C5CFF' },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingBottom: 64 },
-  name: { fontSize: 32, fontWeight: '700' },
-  level: { fontSize: 24, fontWeight: '700' },
-  mood: { fontSize: 17, color: '#555', textAlign: 'center' },
+const petScreenStyles = (theme: Theme) => ({
+  screen: {
+    flex: 1,
+    paddingTop: 56,
+    paddingHorizontal: theme.space.xl,
+    backgroundColor: theme.colors.ground,
+  },
+  back: {
+    alignSelf: 'flex-start' as const,
+    paddingVertical: theme.space.sm,
+    paddingEnd: theme.space.lg,
+  },
+  // Drawn exactly as the Grove screen's back link: a link wears the one colour that means "act".
+  backText: { ...theme.type.body, color: theme.colors.action },
+  body: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: theme.space.lg,
+    paddingBottom: 64,
+  },
+  name: { ...theme.type.title, color: theme.colors.text },
+  level: { ...theme.type.heading, color: theme.colors.text, fontWeight: '700' as const },
+  mood: { ...theme.type.body, color: theme.colors.muted, textAlign: 'center' as const },
 });
