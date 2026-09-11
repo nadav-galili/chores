@@ -36,6 +36,16 @@ The asymmetry is the point: the ledger corrects by appending a negative entry; t
 
 **The child's side is never gated by entitlement.** Violation: an entitlement, paywall, subscription or free-tier check anywhere under a `(kid)` route, in a kid-device handler, or in shared logic reached from one. Entitlement gates the parent's side only. (ADR-0005)
 
+## A catch never discards its cause
+
+**Every `catch` either surfaces the cause, logs it, or says in a comment why the silence is safe.** Violation: `catch {}` or `.catch(() => {})` with no comment, on a path where the failure is real — a write that does not land, a request that does not return, a session that does not activate.
+
+Swallowing the *failure* is often right; swallowing the *cause* never is. Where the person who sees the screen can act on it, the cause reaches them (`chore-form.tsx` appends the status and code to a failed save). Where they cannot — anything a child sees — it is logged instead and the child's screen stays calm. Failure that is genuinely inert may be ignored, with a comment saying so; `haptics.ts` is the honest case, because a buzz that does not fire is not an error.
+
+Nothing logged may carry a child's first name, pet name, chore title or join code — the privacy rule above outranks this one (ADR-0009).
+
+This rule is evidence rather than an ADR: four bugs in one session — a discarded OAuth error, two discarded `uuid7()` failures and one with no `catch` at all — each cost a ten-minute instrumented device build to learn something the device already knew. (#36)
+
 ## Frozen identifiers
 
 **`NAMESPACE_CHORES` must never change** — deterministic ids are derived from it, so changing it silently breaks every existing id. Violation: any edit to its value. (ADR-0010)
