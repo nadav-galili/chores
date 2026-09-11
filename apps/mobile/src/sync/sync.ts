@@ -1,6 +1,13 @@
-import type { KidOp, SyncRequest, SyncResponse } from '@chores/shared';
-import { and, eq } from 'drizzle-orm';
-import { choreInstances, completions } from '@/db/schema';
+import {
+  redeemEntryId,
+  redemptionRefundId,
+  type KidOp,
+  type RedemptionStatus,
+  type SyncRequest,
+  type SyncResponse,
+} from '@chores/shared';
+import { and, eq, inArray } from 'drizzle-orm';
+import { choreInstances, completions, ledgerEntries, redemptions } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
 import { applyPull, inTransaction, readCursor } from './engine';
 import { reconcileLocal, tapContext, type ChildContext, type TapContext } from './local';
@@ -15,60 +22,121 @@ let inFlight: Promise<void> | null = null;
  * Undoes the optimistic rows of an op the server refused, or of a completion it filed under a
  * different chore date. The server's own rows arrive as changes and are already applied, so this
  * only has to clear what the device invented.
+ *
+ * One branch per op type, exhaustively: what a refusal undoes is a question only the op that
+ * wrote the rows can answer, and an op with nothing to undo says so in its own branch rather
+ * than by reaching someone else's. The `never` in the default is what keeps that true as ops
+ * are added. Runs inside the caller's transaction, with the op still in the outbox, so a phone
+ * that dies mid-drain finds the queue and the rows telling the same story either way.
  */
 async function repair(
   db: DeviceDb,
   ctx: TapContext,
   op: KidOp,
   kind: 'rejected' | 'date_adjusted',
-) {
-  if (op.type === 'complete') {
-    if (kind === 'rejected') {
-      // Completions are never deleted, on the device no more than on the server: the row stays
-      // and stops counting, exactly as the child's own undo leaves it.
+): Promise<void> {
+  switch (op.type) {
+    case 'complete': {
+      if (kind === 'rejected') {
+        // Completions are never deleted, on the device no more than on the server: the row stays
+        // and stops counting, exactly as the child's own undo leaves it.
+        await db
+          .update(completions)
+          .set({ status: 'undone' })
+          .where(eq(completions.id, op.payload.completion_id));
+      }
+      // The instance the device thought it completed: on a refusal there is nothing to show for
+      // the tap, and on an adjusted date the server filed the completion against another day.
+      await db
+        .update(choreInstances)
+        .set({ status: 'due' })
+        .where(
+          and(
+            eq(choreInstances.chore_id, op.payload.chore_id),
+            eq(choreInstances.chore_date, op.payload.chore_date),
+          ),
+        );
+      return;
+    }
+
+    case 'uncomplete': {
+      if (kind !== 'rejected') return;
+      // The undo was refused, so the completion still stands.
+      const [completion] = await db
+        .select()
+        .from(completions)
+        .where(eq(completions.id, op.payload.completion_id));
+      if (!completion) return;
       await db
         .update(completions)
-        .set({ status: 'undone' })
-        .where(eq(completions.id, op.payload.completion_id));
+        .set({ status: 'accepted' })
+        .where(eq(completions.id, completion.id));
+      await db
+        .update(choreInstances)
+        .set({ status: 'done' })
+        .where(eq(choreInstances.id, completion.instance_id));
+      return;
     }
-    // The instance the device thought it completed: on a refusal there is nothing to show for
-    // the tap, and on an adjusted date the server filed the completion against another day.
-    await db
-      .update(choreInstances)
-      .set({ status: 'due' })
-      .where(
-        and(
-          eq(choreInstances.chore_id, op.payload.chore_id),
-          eq(choreInstances.chore_date, op.payload.chore_date),
-        ),
-      );
-    return;
+
+    case 'register_push_token': {
+      // Nothing local was invented, but the device believes the server holds this token: a refusal
+      // means it does not, so forget it and let the next open register again.
+      if (kind === 'rejected') await forgetRegisteredToken(db, ctx.now);
+      return;
+    }
+
+    case 'request_redemption': {
+      // Only a `complete` is ever filed under another Chore Date, so this verdict cannot be one;
+      // saying so explicitly is the point — there is nothing here to undo, and no branch below
+      // may be reached by falling through to it.
+      if (kind !== 'rejected') return;
+      const { redemption_id } = op.payload;
+      // The one rollback that deletes rather than marks. "Append-only rows" is about the rows the
+      // server has accepted: a refused request was never written there, so the `redemptions` row
+      // and the `redeem` entry are this device's own inventions, and leaving them behind is a
+      // balance that lies until the next full pull (ADR-0014, docs/spec/03-sync.md).
+      //
+      // The refund goes with them: a child who asked and then changed their mind before this sync
+      // wrote one too, and clearing the whole redemption here leaves nothing for the cancel's own
+      // rollback to find, whichever of the two verdicts is handled first.
+      await db
+        .delete(ledgerEntries)
+        .where(
+          inArray(ledgerEntries.id, [
+            redeemEntryId(redemption_id),
+            redemptionRefundId(redemption_id),
+          ]),
+        );
+      await db.delete(redemptions).where(eq(redemptions.id, redemption_id));
+      return;
+    }
+
+    case 'cancel_redemption': {
+      if (kind !== 'rejected') return;
+      const { redemption_id } = op.payload;
+      const [row] = await db.select().from(redemptions).where(eq(redemptions.id, redemption_id));
+      // Gone with the refused request that created it, or already replaced by the server's own
+      // row — a parent's decline writes the same refund under the same id (ADR-0014), so once the
+      // pull has landed there is nothing left here that this device invented.
+      if (!row || row.status !== 'cancelled') return;
+      await db.delete(ledgerEntries).where(eq(ledgerEntries.id, redemptionRefundId(redemption_id)));
+      // Back to what the child's cancel found: a request still waiting on a parent. Whatever the
+      // parent actually decided arrives as a change and overwrites this row with itself.
+      await db
+        .update(redemptions)
+        .set({ status: 'requested' satisfies RedemptionStatus, decided_at: null })
+        .where(eq(redemptions.id, redemption_id));
+      return;
+    }
+
+    default: {
+      // Rollback is defined per op type, never guessed. A new kid op stops compiling here until
+      // it says what a refusal undoes — including saying that it undoes nothing.
+      const unhandled: never = op;
+      void unhandled;
+      return;
+    }
   }
-  if (op.type === 'register_push_token') {
-    // Nothing local was invented, but the device believes the server holds this token: a refusal
-    // means it does not, so forget it and let the next open register again.
-    if (kind === 'rejected') await forgetRegisteredToken(db, ctx.now);
-    return;
-  }
-  if (op.type === 'request_redemption' || op.type === 'cancel_redemption') {
-    // A refused redemption op leaves a balance that lies until the next full pull, so its rows
-    // have to go — the redemption, the `redeem` entry and, for a cancel, the refund (ADR-0014).
-    // That rollback is #43, and it is deliberately not silently half-done here.
-    return;
-  }
-  if (op.type !== 'uncomplete') return;
-  if (kind !== 'rejected') return;
-  // The undo was refused, so the completion still stands.
-  const [completion] = await db
-    .select()
-    .from(completions)
-    .where(eq(completions.id, op.payload.completion_id));
-  if (!completion) return;
-  await db.update(completions).set({ status: 'accepted' }).where(eq(completions.id, completion.id));
-  await db
-    .update(choreInstances)
-    .set({ status: 'done' })
-    .where(eq(choreInstances.id, completion.instance_id));
 }
 
 /** Takes each verdict off the queue and, where the server disagreed with the device, repairs. */
@@ -91,6 +159,11 @@ async function settle(
     for (const ack of response.acked) await dropOp(db, ack.op_id);
     for (const rejection of response.rejected) {
       await markRejected(db, rejection.op_id, rejection.reason);
+      // The screen this lands on is a child's, and there is nothing a 7-year-old can do with
+      // `insufficient_coins`: they see the calm strip the refusals already raise, and the cause is
+      // said out loud here instead (CODING_STANDARDS.md, "A catch never discards its cause"). The
+      // op type and the reason only — no first name, pet name, chore title or join code (ADR-0009).
+      console.error('op refused', byId.get(rejection.op_id)?.type ?? 'unknown', rejection.reason);
     }
     let repaired = false;
     for (const verdict of verdicts) {
