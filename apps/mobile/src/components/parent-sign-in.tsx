@@ -78,7 +78,11 @@ export function ParentSignIn({
     try {
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy: 'oauth_google',
-        redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo', path: 'parent' }),
+        // No path: `(parent)` is a route group, so it is stripped from the URL and there is
+        // no `/parent` to land on — `mibo://parent` hit expo-router's unmatched route with a
+        // valid session already in hand. The root knows where a parent goes: the role was
+        // persisted when they tapped Parent, so `/` redirects into the group for us.
+        redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo' }),
       });
       if (createdSessionId && setActive) await setActive({ session: createdSessionId });
       else setError(t('signIn.googleUnfinished'));
