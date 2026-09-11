@@ -39,6 +39,7 @@ export const en = {
     little: {
       greeting: 'Hi %{name}!',
       empty: '🎈 Nothing to do today!',
+      dayComplete: 'Everything’s done! Amazing!',
       grove: 'Your grove is growing!',
       coins: 'Look how many coins you have!',
       doneMoment: 'Nice! Plus %{coins} coins',
@@ -47,6 +48,7 @@ export const en = {
     big: {
       greeting: 'Hi %{name}',
       empty: 'Nothing to do today.',
+      dayComplete: 'Everything’s done.',
       grove: 'Your grove',
       coins: 'Your coins',
       doneMoment: 'Plus %{coins} coins',

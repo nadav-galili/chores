@@ -1,10 +1,11 @@
 import type { IssuedJoinCode } from '@chores/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
+import { useThemedStyles, type Theme } from '@/theme';
 
 function useNow(intervalMs: number) {
   const [now, setNow] = useState(() => Date.now());
@@ -24,6 +25,7 @@ const mmss = (ms: number) => {
 export default function JoinCode() {
   const state = useHousehold();
   const router = useRouter();
+  const styles = useThemedStyles(joinCodeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [issued, setIssued] = useState<IssuedJoinCode | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,10 +80,21 @@ export default function JoinCode() {
   );
 }
 
-const styles = StyleSheet.create({
-  hint: { fontSize: 16, color: '#555' },
-  codeBox: { alignItems: 'center', paddingVertical: 32, gap: 12 },
-  code: { fontSize: 64, fontWeight: '700', letterSpacing: 12, fontVariant: ['tabular-nums'] },
-  codeExpired: { color: '#bbb' },
-  expiry: { fontSize: 16, color: '#666' },
+/**
+ * The "expired join code" state lives here: when the countdown reaches zero the code dims,
+ * the copy says it expired, and getting a new one is one tap away. Copy plus an action,
+ * no illustration.
+ */
+const joinCodeStyles = (theme: Theme) => ({
+  hint: { ...theme.type.body, color: theme.colors.muted },
+  codeBox: { alignItems: 'center' as const, paddingVertical: theme.space.xxl, gap: theme.space.md },
+  code: {
+    fontSize: 64,
+    fontWeight: '700' as const,
+    letterSpacing: 12,
+    fontVariant: ['tabular-nums' as const],
+    color: theme.colors.text,
+  },
+  codeExpired: { color: theme.colors.muted },
+  expiry: { ...theme.type.body, color: theme.colors.muted },
 });

@@ -6,7 +6,7 @@ import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
-import { Card, ChoreRow, Coins } from '@/components/ui';
+import { Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
 import { wipeDeviceDb } from '@/db/client';
 import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
@@ -80,7 +80,12 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
         keyExtractor={(i) => i.id}
         contentContainerStyle={styles.scroll}
         extraData={today.coins}
-        ListHeaderComponent={<Head today={today} onPet={() => router.push('/(kid)/pet')} />}
+        ListHeaderComponent={
+          <>
+            <Head today={today} onPet={() => router.push('/(kid)/pet')} />
+            {today.status === 'ready' && <DayComplete today={today} />}
+          </>
+        }
         renderItem={({ item }) => (
           <ChoreRow
             title={item.title}
@@ -90,7 +95,7 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
             onPress={() => today.toggle(item)}
           />
         )}
-        ListEmptyComponent={today.status === 'ready' ? <Empty /> : null}
+        ListEmptyComponent={today.status === 'ready' ? <EmptyDay today={today} /> : null}
         ListFooterComponent={
           today.grove.enabled ? (
             <GroveStrip today={today} onPress={() => router.push('/(kid)/grove')} />
@@ -122,12 +127,50 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
   );
 }
 
-/** Nothing to do today. A frozen day is a good day, so it is not drawn as an error. */
-function Empty() {
+/**
+ * The child's two happy-path moments share one shape: the pet at a mood, plus a line of copy
+ * in the mode's voice. A frozen day is a good day, so "no chores today" is drawn as one — the
+ * pet content, never an error and never an absence. A day complete is the moment worth
+ * reaching, so the pet celebrates happy above the struck-through list — never an empty list.
+ * With the pet flag off there is no art to reuse, so both fall back to the typographic state.
+ */
+function EmptyDay({ today }: { today: Today }) {
+  return <DayMoment today={today} when="empty" mood="content" />;
+}
+
+function DayComplete({ today }: { today: Today }) {
+  if (today.items.length === 0 || !today.items.every((i) => i.status === 'done')) return null;
+  return <DayMoment today={today} when="dayComplete" mood="happy" />;
+}
+
+function DayMoment({
+  today,
+  when,
+  mood,
+}: {
+  today: Today;
+  when: 'empty' | 'dayComplete';
+  mood: 'content' | 'happy';
+}) {
   const styles = useThemedStyles(homeStyles);
   const mode = useTheme().uiMode;
-  return <Text style={styles.empty}>{t(`kid.${mode}.empty`)}</Text>;
+  if (!today.pet.enabled) return <EmptyState title={t(`kid.${mode}.${when}`)} />;
+  return (
+    <View style={styles.moment}>
+      <PetFigure
+        name={today.pet.name}
+        level={today.pet.progress.level}
+        mood={mood}
+        size={MOMENT_PET_SIZE[mode]}
+        showStage={false}
+      />
+      <Text style={styles.momentText}>{t(`kid.${mode}.${when}`)}</Text>
+    </View>
+  );
 }
+
+/** The celebratory pet sits smaller than the header pet, which it never shares a screen with. */
+const MOMENT_PET_SIZE = { little: 128, big: 96 } as const;
 
 /** Where the pet sits is a mode difference; how big it is there follows from that. */
 const PET_SIZE = { little: 160, big: 56 } as const;
@@ -204,7 +247,7 @@ function Head({ today, onPet }: { today: Today; onPet: () => void }) {
         </Card>
       )}
 
-      {today.offline && <Text style={styles.offline}>{t('kid.offline')}</Text>}
+      {today.offline && <OfflineStrip message={t('kid.offline')} />}
       {today.refused > 0 && (
         <Pressable style={styles.refused} onPress={today.dismissRefused}>
           <Text style={styles.refusedText}>{t('kid.refused', { count: today.refused })}</Text>
@@ -272,7 +315,6 @@ const homeStyles = (theme: Theme) => ({
     justifyContent: 'center' as const,
     gap: theme.space.lg,
   },
-  offline: { ...theme.type.label, color: theme.colors.muted },
   refused: {
     minHeight: theme.touchTarget,
     justifyContent: 'center' as const,
@@ -283,10 +325,10 @@ const homeStyles = (theme: Theme) => ({
     backgroundColor: theme.colors.surface,
   },
   refusedText: { ...theme.type.label, color: theme.colors.danger },
-  empty: {
+  moment: { alignItems: 'center' as const, gap: theme.space.sm },
+  momentText: {
     ...theme.type.heading,
-    color: theme.colors.muted,
+    color: theme.colors.text,
     textAlign: 'center' as const,
-    marginTop: theme.space.xxl,
   },
 });

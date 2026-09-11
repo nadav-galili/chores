@@ -31,6 +31,7 @@ export const he: Catalog = {
     little: {
       greeting: 'היי %{name}!',
       empty: '🎈 אין מה לעשות היום!',
+      dayComplete: 'סיימתם הכול! מדהים!',
       grove: 'החורשה שלכם צומחת!',
       coins: 'תראו כמה מטבעות יש לכם!',
       doneMoment: 'יופי! עוד %{coins} מטבעות',
@@ -39,6 +40,7 @@ export const he: Catalog = {
     big: {
       greeting: 'היי %{name}',
       empty: 'אין מה לעשות היום.',
+      dayComplete: 'סיימתם הכול.',
       grove: 'החורשה שלכם',
       coins: 'המטבעות שלכם',
       doneMoment: 'עוד %{coins} מטבעות',

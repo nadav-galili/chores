@@ -2,12 +2,13 @@ import { useAuth } from '@clerk/expo';
 import { joinCodeSchema, platformSchema } from '@chores/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput } from 'react-native';
+import { Platform, Text, TextInput } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
 import { ApiError, redeemJoinCode } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { useDeviceSession } from '@/lib/device-session';
 import { clearRole, setRole } from '@/lib/role';
+import { useTheme, useThemedStyles, type Theme } from '@/theme';
 
 const REDEEM_ERRORS = ['invalid_code', 'code_expired', 'code_redeemed', 'rate_limited'] as const;
 type RedeemError = (typeof REDEEM_ERRORS)[number];
@@ -18,6 +19,8 @@ const isRedeemError = (code: string): code is RedeemError =>
 export default function Join() {
   const device = useDeviceSession();
   const router = useRouter();
+  const styles = useThemedStyles(joinStyles);
+  const { colors } = useTheme();
   const { isSignedIn, signOut } = useAuth();
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const [code, setCode] = useState('');
@@ -62,7 +65,7 @@ export default function Join() {
         autoFocus
         maxLength={6}
         placeholder="ABC123"
-        placeholderTextColor="#bbb"
+        placeholderTextColor={colors.muted}
       />
       <ErrorText>{error}</ErrorText>
       <Button
@@ -81,16 +84,24 @@ export default function Join() {
   );
 }
 
-const styles = StyleSheet.create({
-  hint: { fontSize: 16, color: '#555' },
+/**
+ * The "no devices" and "revoked device" states are this screen: a device with no session, or
+ * one whose token was revoked, gets typographic copy and the join form as its action — never
+ * an illustration, and never a dead end. An expired code is the same shape one step down:
+ * the failure names the code and the copy says to ask a parent for a new one.
+ */
+const joinStyles = (theme: Theme) => ({
+  hint: { ...theme.type.body, color: theme.colors.muted },
   input: {
     borderWidth: 2,
-    borderColor: '#208AEF',
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderColor: theme.colors.action,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.space.lg,
     fontSize: 40,
-    fontWeight: '700',
+    fontWeight: '700' as const,
     letterSpacing: 10,
-    textAlign: 'center',
+    textAlign: 'center' as const,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
   },
 });

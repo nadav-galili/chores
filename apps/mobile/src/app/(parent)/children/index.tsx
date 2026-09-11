@@ -1,6 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Button, Screen, Title } from '@/components/ui';
+import { Button, EmptyState, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { CHEVRON, t } from '@/lib/i18n';
 
@@ -16,7 +16,7 @@ export default function ChildrenList() {
       <FlatList
         data={children}
         keyExtractor={(c) => c.id}
-        ListEmptyComponent={<Text style={styles.empty}>{t('parent.noChildren')}</Text>}
+        ListEmptyComponent={<EmptyState title={t('parent.noChildren')} />}
         renderItem={({ item }) => (
           <Link href={{ pathname: '/(parent)/children/[id]', params: { id: item.id } }} asChild>
             <Pressable style={styles.row}>
@@ -44,7 +44,6 @@ export default function ChildrenList() {
 }
 
 const styles = StyleSheet.create({
-  empty: { color: '#666', fontSize: 16, paddingVertical: 24 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

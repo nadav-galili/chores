@@ -2,7 +2,7 @@ import type { Chore } from '@chores/shared';
 import { Link, useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WEEKDAYS } from '@/components/chore-form';
-import { Button, ErrorText, Screen, Title } from '@/components/ui';
+import { Button, EmptyState, ErrorState, ErrorText, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { useChores } from '@/lib/use-chores';
 import { CHEVRON, formatChoreDate, t } from '@/lib/i18n';
@@ -31,12 +31,19 @@ export default function ChoresList() {
   return (
     <Screen>
       <Title>{t('chores.title')}</Title>
-      {chores.status === 'error' && <ErrorText>{chores.message}</ErrorText>}
+      {chores.status === 'error' && (
+        <ErrorState
+          title={chores.message || t('parent.loadFailed')}
+          body={t('parent.unreachable')}
+          actionTitle={t('common.tryAgain')}
+          onAction={() => void chores.refresh()}
+        />
+      )}
       <FlatList
         data={chores.chores}
         keyExtractor={(c) => c.id}
         ListEmptyComponent={
-          chores.status === 'ready' ? <Text style={styles.empty}>{t('chores.empty')}</Text> : null
+          chores.status === 'ready' ? <EmptyState title={t('chores.empty')} /> : null
         }
         renderItem={({ item }) => (
           <Link href={{ pathname: '/(parent)/chores/[id]', params: { id: item.id } }} asChild>
@@ -70,7 +77,6 @@ export default function ChoresList() {
 }
 
 const styles = StyleSheet.create({
-  empty: { color: '#666', fontSize: 16, paddingVertical: 24 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

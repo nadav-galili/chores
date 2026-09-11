@@ -9,7 +9,7 @@ type ChoresState =
   | { status: 'ready'; chores: Chore[] };
 
 /** The household's live (non-deleted) chores, reloaded every time the screen gains focus. */
-export function useChores(): ChoresState {
+export function useChores(): ChoresState & { refresh: () => Promise<void> } {
   const { api, me } = useHousehold();
   const householdId = me?.household?.id ?? null;
   const [state, setState] = useState<ChoresState>({ status: 'loading', chores: [] });
@@ -29,5 +29,5 @@ export function useChores(): ChoresState {
     }, [reload]),
   );
 
-  return state;
+  return { ...state, refresh: reload };
 }
