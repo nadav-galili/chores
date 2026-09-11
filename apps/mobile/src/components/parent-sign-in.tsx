@@ -1,5 +1,6 @@
 import { isClerkAPIResponseError, useSignIn, useSignUp, useSSO } from '@clerk/expo';
 import * as AuthSession from 'expo-auth-session';
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
@@ -20,6 +21,7 @@ export function ParentSignIn({
   const { signIn, fetchStatus: signInFetch } = useSignIn();
   const { signUp, fetchStatus: signUpFetch } = useSignUp();
   const { startSSOFlow } = useSSO();
+  const router = useRouter();
   const [step, setStep] = useState<Step>({ kind: 'email' });
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -76,16 +78,22 @@ export function ParentSignIn({
   const google = async () => {
     setError(null);
     try {
+      // The path is load-bearing twice over. `sso-callback` is a real screen, so the browser
+      // hands back to something rather than expo-router's unmatched route; and it keeps the
+      // redirect a *hierarchical* URI. A pathless `mibo://` reaches the app as the opaque
+      // `mibo:?rotating_token_nonce=...`, which fails the `startsWith(redirectUrl)` test
+      // expo-web-browser ends the auth session on — so the flow resolved `dismiss` and threw
+      // away a sign-in that had actually succeeded.
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy: 'oauth_google',
-        // No path: `(parent)` is a route group, so it is stripped from the URL and there is
-        // no `/parent` to land on — `mibo://parent` hit expo-router's unmatched route with a
-        // valid session already in hand. The root knows where a parent goes: the role was
-        // persisted when they tapped Parent, so `/` redirects into the group for us.
-        redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo' }),
+        redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo', path: 'sso-callback' }),
       });
-      if (createdSessionId && setActive) await setActive({ session: createdSessionId });
-      else setError(t('signIn.googleUnfinished'));
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+        // The redirect left us on `/sso-callback`, which sits outside the `(parent)` group and
+        // so has no gate to send a signed-in parent home. Say it explicitly.
+        router.replace('/(parent)');
+      } else setError(t('signIn.googleUnfinished'));
     } catch (e) {
       setError(e instanceof Error ? e.message : t('signIn.googleFailed'));
     }
