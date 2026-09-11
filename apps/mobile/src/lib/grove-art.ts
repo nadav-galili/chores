@@ -1,33 +1,53 @@
+import { treeForm } from '@chores/shared';
+import type { ImageSourcePropType } from 'react-native';
 import { t } from '@/lib/i18n';
 
 /**
- * Placeholder tree art, bundled in the app: one entry per stage, no files and no network, so the
- * grove draws the same offline as on — the same seam `pet-art.ts` uses, and the same reason
- * (docs/spec/04-milestones.md, risks: "placeholder art in M1 tells you nothing about the mechanic;
- * budget real art before the week-3 verdict"). `pet-art.ts` has already taken its images; swap
- * `glyph` for an image source the same way and every screen that draws a tree keeps working.
+ * The grove's art, bundled in the app: one image per Tree Form and one ground the whole row
+ * stands on. Nothing is fetched, so the grove draws the same offline as on.
+ *
+ * The ladder between an unbounded Grove Stage and something drawable is `treeForm` in
+ * `packages/shared`, not here — this file only holds the eight files it indexes. That is what
+ * makes the drawn form as monotonic as the count behind it: `treeForm` never decreases, growth
+ * entries are never clawed back (ADR-0011), so a rejection that syncs in cannot shrink a tree.
+ *
+ * The requires are literal because Metro resolves an asset path only at build time — a computed
+ * path bundles nothing and fails at runtime. The filenames are the ones the manifest in
+ * `docs/design/prompts.md` reserves, so the art swap replaces nine files and touches no code.
+ * What ships here is placeholder art: the same eight silhouettes and the same muted palette as
+ * the prompts, drawn as flat shapes because a placeholder that pretends to be the real style is
+ * worse than one that plainly is not.
  */
 
-export type TreeArt = {
-  /** The tree at this stage. */
-  glyph: string;
-  /** The ground it stands on. */
-  ground: string;
-};
+const FORMS = [
+  require('../../assets/grove/tree-s1.webp'),
+  require('../../assets/grove/tree-s2.webp'),
+  require('../../assets/grove/tree-s3.webp'),
+  require('../../assets/grove/tree-s4.webp'),
+  require('../../assets/grove/tree-s5.webp'),
+  require('../../assets/grove/tree-s6.webp'),
+  require('../../assets/grove/tree-s7.webp'),
+  require('../../assets/grove/tree-s8.webp'),
+] as const satisfies readonly ImageSourcePropType[];
 
-const GLYPHS = ['🌰', '🌱', '🌿', '🪴', '🌳', '🌸'] as const;
-const GROUNDS = ['#EFEAE1', '#EAF4E3', '#E2F1DA', '#DCEFD2', '#D5ECC9', '#F7E9F2'] as const;
-
-/** How many trees the last stage stands for; past it, the tree keeps its final form. */
-export const TREE_STAGES = GLYPHS.length;
+/** The ground every tree in the grove stands on — one image, shared by the whole row. */
+export const GROVE_GROUND: ImageSourcePropType = require('../../assets/grove/ground.webp');
 
 /**
- * The art for one Grove Stage. A stage past the last drawing keeps the last one — the count goes
- * on rising forever, and the child is never told they have stopped growing.
+ * Where a tree's base sits in its own square, as a fraction of the canvas height. Every form is
+ * trimmed and re-padded to this one line (`docs/design/prompts.md`, post-process step 3), which
+ * is what lets trees drawn at different sizes share a horizon: the drawing bottom is 90% down,
+ * not at the bottom edge.
  */
-export function treeArt(stage: number): TreeArt {
-  const i = Math.min(Math.max(Math.floor(stage), 0), TREE_STAGES - 1);
-  return { glyph: GLYPHS[i]!, ground: GROUNDS[i]! };
+export const TREE_BASE = 0.9;
+
+/**
+ * The art for one Grove Stage: eight files, one per Tree Form. `treeForm` clamps at both ends,
+ * and the index is clamped to the map as well, so a ladder that grows in `packages/shared`
+ * before the art does draws the last form rather than nothing.
+ */
+export function treeArt(stage: number): ImageSourcePropType {
+  return FORMS[Math.min(treeForm(stage), FORMS.length) - 1]!;
 }
 
 /** What a screen reader says instead of the art. */
