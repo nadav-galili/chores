@@ -7,9 +7,9 @@ import {
   kidAppOpen,
   kidDayComplete,
   petReacted,
+  tapCompletesTheDay,
   type DeviceSession,
   type IsoDate,
-  type UiMode,
 } from '@chores/shared';
 import { eq } from 'drizzle-orm';
 import { useFocusEffect } from 'expo-router';
@@ -28,13 +28,13 @@ import { syncNow } from '@/sync/sync';
 import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
+import { playDoneHaptic } from '@/lib/haptics';
 import { arrangeKidReminder } from '@/lib/notifications';
 
 export type TodayState = {
   status: 'loading' | 'ready';
   /** From the local child row once pulled, else what the join code told us. */
   firstName: string;
-  uiMode: UiMode;
   items: TodayItem[];
   streak: number;
   /** Balance, always the sum of the local ledger. */
@@ -67,6 +67,12 @@ export type DoneReaction = {
   at: number;
   /** The tap completed the day, so it planted a tree; the grove reacts too. */
   grew: boolean;
+  /**
+   * The tap's own local write has reported, so `coins` and `grew` are final. Until it has, the
+   * moment stays on screen: the card may not leave before the tree it might have planted has had
+   * its chance to appear. Only SQLite is waited on — never the network.
+   */
+  settled: boolean;
 };
 
 export type Today = TodayState & {
@@ -124,7 +130,6 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   const [state, setState] = useState<TodayState>({
     status: 'loading',
     firstName: session.child.first_name,
-    uiMode: session.child.ui_mode,
     items: [],
     streak: 0,
     coins: 0,
@@ -145,7 +150,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   revoked.current = onRevoked;
 
   const { tz, day_boundary_hour: boundary } = session.household;
-  const { id: childId, ui_mode: joinedUiMode, first_name: joinedName } = session.child;
+  const { id: childId, first_name: joinedName } = session.child;
 
   const child: ChildContext = useMemo(
     () => ({
@@ -178,7 +183,6 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       setState({
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
-        uiMode: rows[0]?.ui_mode ?? joinedUiMode,
         items,
         streak,
         coins,
@@ -195,7 +199,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         stage: grove.ownTree.stage,
       });
     },
-    [childId, tz, boundary, joinedUiMode, joinedName],
+    [childId, tz, boundary, joinedName],
   );
 
   const refresh = useCallback(async () => {
@@ -214,32 +218,49 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     (item: TodayItem) => {
       // Start the done moment in this very tick: the pet must react to the tap, not to SQLite.
       // Undoing is not a celebration, so only a chore going done gets one.
-      if (item.status !== 'done') {
+      const completed = item.status !== 'done';
+      // Whether this is the tap that finished the day, read off the list the child is looking at
+      // — the same answer the ledger reaches a moment later, but available now, which is what the
+      // phone needs to answer the stronger way at the instant of the tap rather than after a
+      // write. The tree still waits for the row the write plants; the buzz does not.
+      playDoneHaptic({ completed, dayComplete: tapCompletesTheDay(state.items, item.id) });
+      if (completed) {
         setReaction({
           key: (taps.current += 1),
           coins: COINS_PER_CHORE,
           at: Date.now(),
           grew: false,
+          settled: false,
         });
       }
+      // The correction this tap's own write owes the moment already running, applied once. Keyed,
+      // so a tap that lands while an older one is still writing corrects nobody else's moment.
+      const key = taps.current;
+      const settle = (correction: Partial<DoneReaction>) =>
+        setReaction((r) =>
+          r === null || r.key !== key || r.settled ? r : { ...r, ...correction, settled: true },
+        );
       void (async () => {
-        const db = await openDeviceDb();
         const grown = stage.current;
-        const paid = await tapToggle(db, tapContext(child), item);
-        // The tap has counted, in SQLite, whether or not there is a network — which is the whole
-        // offline promise, and why the event carries whether there was one.
-        if (item.status !== 'done') capture(choreCompleted({ offline: state.offline }));
-        // The child sees the new coins, streak and tree before anything reaches the network.
-        await readLocal(db, state.offline);
-        // The animation is already running; this only corrects it, from what the tap itself
-        // wrote. A tap that completed the day paid a bonus and planted a tree — the two are
-        // asked separately because they are separate quantities.
-        if (paid > COINS_PER_CHORE) setReaction((r) => (r === null ? r : { ...r, coins: paid }));
-        if (stage.current > grown) setReaction((r) => (r === null ? r : { ...r, grew: true }));
-        await refresh();
+        try {
+          const db = await openDeviceDb();
+          const paid = await tapToggle(db, tapContext(child), item);
+          // The tap has counted, in SQLite, whether or not there is a network — which is the whole
+          // offline promise, and why the event carries whether there was one.
+          if (completed) capture(choreCompleted({ offline: state.offline }));
+          // The child sees the new coins, streak and tree before anything reaches the network.
+          await readLocal(db, state.offline);
+          // A tap that completed the day paid a bonus and planted a tree — the two are asked
+          // separately because they are separate quantities (ADR-0004, ADR-0011).
+          settle({ coins: paid, grew: stage.current > grown });
+          await refresh();
+        } finally {
+          // A write that threw still has to let the moment go, or the card would never leave.
+          settle({});
+        }
       })();
     },
-    [child, readLocal, refresh, state.offline],
+    [child, readLocal, refresh, state.items, state.offline],
   );
 
   // How long the child waited for the pet: the reaction is created in the tap's own tick, so the

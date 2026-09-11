@@ -8,9 +8,19 @@ import {
   type UpsertChoreOp,
 } from '@chores/shared';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Button, ErrorText, Field, Title, Choice } from '@/components/ui';
+import { Pressable, Text } from 'react-native';
+import {
+  Button,
+  Chip,
+  ChipGroup,
+  Choice,
+  ErrorText,
+  Field,
+  ScrollScreen,
+  Title,
+} from '@/components/ui';
 import { fieldError, t, weekdayLabels } from '@/lib/i18n';
+import { useThemedStyles, type Theme } from '@/theme';
 
 /** Labels by mask bit, Mon=0 … Sun=6, in the phone's language. */
 export const WEEKDAYS = weekdayLabels;
@@ -58,6 +68,7 @@ export function ChoreForm({
   onSubmit: (fields: ChoreFields) => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
+  const styles = useThemedStyles(choreFormStyles);
   const [choreTitle, setChoreTitle] = useState(initial.title);
   const [kind, setKind] = useState<ChoreKind>(initial.kind);
   const [mask, setMask] = useState(initial.weekday_mask ?? 0);
@@ -106,7 +117,7 @@ export function ChoreForm({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
+    <ScrollScreen>
       <Title>{title}</Title>
       <Field
         label={t('choreForm.title')}
@@ -125,24 +136,29 @@ export function ChoreForm({
         ]}
       />
       {kind === 'weekdays' && (
-        <View style={styles.field}>
-          <Text style={styles.label}>{t('choreForm.whichDays')}</Text>
-          <View style={styles.row}>
-            {WEEKDAYS().map((day: string, i: number) => (
-              <Chip
-                key={day}
-                title={day}
-                active={(mask & (1 << i)) !== 0}
-                onPress={() => toggleDay(i)}
-              />
-            ))}
-          </View>
-          <Pressable onPress={() => setMask(mask === ALL_WEEKDAYS ? 0 : ALL_WEEKDAYS)}>
-            <Text style={styles.link}>
-              {t(mask === ALL_WEEKDAYS ? 'choreForm.clearAll' : 'choreForm.selectAll')}
-            </Text>
-          </Pressable>
-        </View>
+        <ChipGroup
+          label={t('choreForm.whichDays')}
+          footer={
+            <Pressable
+              style={styles.linkTarget}
+              onPress={() => setMask(mask === ALL_WEEKDAYS ? 0 : ALL_WEEKDAYS)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.link}>
+                {t(mask === ALL_WEEKDAYS ? 'choreForm.clearAll' : 'choreForm.selectAll')}
+              </Text>
+            </Pressable>
+          }
+        >
+          {WEEKDAYS().map((day: string, i: number) => (
+            <Chip
+              key={day}
+              title={day}
+              active={(mask & (1 << i)) !== 0}
+              onPress={() => toggleDay(i)}
+            />
+          ))}
+        </ChipGroup>
       )}
       {kind === 'once' && (
         <Field
@@ -153,49 +169,38 @@ export function ChoreForm({
           keyboardType="numbers-and-punctuation"
         />
       )}
-      <View style={styles.field}>
-        <Text style={styles.label}>{t('choreForm.who')}</Text>
-        <View style={styles.row}>
+      <ChipGroup label={t('choreForm.who')}>
+        <Chip
+          title={t('common.all')}
+          active={allAssigned}
+          onPress={() => setAssignees(allAssigned ? [] : children.map((c) => c.id))}
+        />
+        {children.map((c) => (
           <Chip
-            title={t('common.all')}
-            active={allAssigned}
-            onPress={() => setAssignees(allAssigned ? [] : children.map((c) => c.id))}
+            key={c.id}
+            title={c.first_name}
+            active={assignees.includes(c.id)}
+            onPress={() => toggleAssignee(c.id)}
           />
-          {children.map((c) => (
-            <Chip
-              key={c.id}
-              title={c.first_name}
-              active={assignees.includes(c.id)}
-              onPress={() => toggleAssignee(c.id)}
-            />
-          ))}
-        </View>
-      </View>
+        ))}
+      </ChipGroup>
       <ErrorText>{error}</ErrorText>
       <Button title={t('common.save')} onPress={submit} disabled={busy} />
       {onDelete && (
         <Button title={t('choreForm.delete')} onPress={remove} disabled={busy} secondary />
       )}
-    </ScrollView>
+    </ScrollScreen>
   );
 }
 
-function Chip({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{title}</Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { padding: 24, paddingTop: 48, gap: 16 },
-  field: { gap: 6 },
-  label: { fontSize: 14, color: '#555' },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  link: { color: '#208AEF', fontSize: 14, marginTop: 4 },
-  chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 999, backgroundColor: '#eee' },
-  chipActive: { backgroundColor: '#208AEF' },
-  chipText: { fontSize: 16, color: '#333' },
-  chipTextActive: { color: 'white', fontWeight: '600' },
+/**
+ * The form scrolls rather than centring — it is the one parent screen that can grow taller than
+ * a phone, because choosing weekdays and choosing who adds two rows of chips to it — which is
+ * `ScrollScreen`'s whole job, so the page itself is not redescribed here.
+ */
+const choreFormStyles = (theme: Theme) => ({
+  // A text link is the one place outside a button that wears `action`, and it still has to be
+  // as tappable as a button is.
+  linkTarget: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
+  link: { ...theme.type.label, color: theme.colors.action },
 });

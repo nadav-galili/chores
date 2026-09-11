@@ -1,12 +1,26 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button, Screen, Title } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { getRole, setRole, type Role } from '@/lib/role';
+import { ThemeProvider } from '@/theme';
 
 const ROLE_HOME = { parent: '/(parent)', kid: '/(kid)' } as const;
 
+/**
+ * The first launch, and the one screen that runs before there is a role to theme for. It gets
+ * the parent theme: whoever is choosing here is setting the device up, and the child's world
+ * starts on the other side of the choice.
+ */
 export default function RolePicker() {
+  return (
+    <ThemeProvider role="parent">
+      <Picker />
+    </ThemeProvider>
+  );
+}
+
+function Picker() {
   const router = useRouter();
   const [role, setStoredRole] = useState<Role | null | undefined>(undefined);
 
@@ -24,27 +38,10 @@ export default function RolePicker() {
   };
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>{t('role.question')}</Text>
-      <Pressable style={styles.button} onPress={() => choose('parent')}>
-        <Text style={styles.buttonText}>{t('role.parent')}</Text>
-      </Pressable>
-      <Pressable style={styles.button} onPress={() => choose('kid')}>
-        <Text style={styles.buttonText}>{t('role.kid')}</Text>
-      </Pressable>
-    </View>
+    <Screen>
+      <Title>{t('role.question')}</Title>
+      <Button title={t('role.parent')} onPress={() => void choose('parent')} />
+      <Button title={t('role.kid')} onPress={() => void choose('kid')} />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, padding: 24 },
-  title: { fontSize: 24, fontWeight: '600', marginBottom: 16 },
-  button: {
-    width: '100%',
-    paddingVertical: 20,
-    borderRadius: 16,
-    backgroundColor: '#208AEF',
-    alignItems: 'center',
-  },
-  buttonText: { color: 'white', fontSize: 22, fontWeight: '600' },
-});

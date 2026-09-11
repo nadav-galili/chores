@@ -13,6 +13,8 @@ export type ParentTodayState = {
   today: ParentToday | null;
   /** The last read failed; what is shown is the previous read. */
   message: string | null;
+  /** Read today again — the error state's retry. */
+  refresh: () => Promise<void>;
 };
 
 /**
@@ -58,5 +60,5 @@ export function useParentToday(householdId: string | null): ParentTodayState {
     return () => sub.remove();
   }, [refresh]);
 
-  return { status, today, message };
+  return { status, today, message, refresh };
 }

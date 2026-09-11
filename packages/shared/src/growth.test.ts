@@ -4,6 +4,9 @@ import {
   growthEntrySchema,
   groveStage,
   growthId,
+  treeForm,
+  TREE_FORM_THRESHOLDS,
+  TREE_MAX_FORM,
   type GrowthEntry,
 } from './growth.ts';
 import { reconcileLedger, type LedgerCompletion, type LedgerInstance } from './ledger.ts';
@@ -222,6 +225,76 @@ describe('groveStage', () => {
     ];
     expect(groveStage(grove, noa)).toBe(2);
     expect(groveStage(grove, ari)).toBe(1);
+  });
+});
+
+describe('treeForm', () => {
+  /**
+   * The ladder written out at, just below and just above each of the eight thresholds
+   * (1 / 2 / 4 / 7 / 12 / 20 / 35 / 60), as literals rather than as a rule — the point of the
+   * table is to be an oracle the implementation cannot agree with by sharing its logic.
+   */
+  it.each([
+    [0, 1],
+    [1, 1],
+    [2, 2],
+    [3, 2],
+    [4, 3],
+    [5, 3],
+    [6, 3],
+    [7, 4],
+    [8, 4],
+    [11, 4],
+    [12, 5],
+    [13, 5],
+    [19, 5],
+    [20, 6],
+    [21, 6],
+    [34, 6],
+    [35, 7],
+    [36, 7],
+    [59, 7],
+    [60, 8],
+    [61, 8],
+  ])('grove stage %i is tree form %i', (stage, form) => {
+    expect(treeForm(stage)).toBe(form);
+  });
+
+  it('clamps at the eighth form however large the grove gets', () => {
+    expect(treeForm(61)).toBe(8);
+    expect(treeForm(400)).toBe(8);
+    expect(treeForm(Number.MAX_SAFE_INTEGER)).toBe(8);
+  });
+
+  it('is still paying out in week three', () => {
+    expect(treeForm(15)).toBeGreaterThan(treeForm(7));
+    expect(treeForm(21)).toBeGreaterThan(treeForm(15));
+  });
+
+  it('is total: a stage off the happy path still yields a drawable form', () => {
+    [-1, 0.5, 12.5, Number.NaN, Number.POSITIVE_INFINITY].forEach((stage) => {
+      const form = treeForm(stage);
+      expect(Number.isInteger(form)).toBe(true);
+      expect(form).toBeGreaterThanOrEqual(1);
+      expect(form).toBeLessThanOrEqual(TREE_MAX_FORM);
+    });
+  });
+
+  it('the last threshold is the last form', () => {
+    expect(TREE_FORM_THRESHOLDS).toHaveLength(TREE_MAX_FORM);
+    expect(treeForm(TREE_FORM_THRESHOLDS[TREE_MAX_FORM - 1]!)).toBe(TREE_MAX_FORM);
+  });
+
+  it('is monotonic, whole and inside 1–8 for every stage', () => {
+    let previous = 0;
+    for (let stage = 0; stage <= 200; stage++) {
+      const form = treeForm(stage);
+      expect(Number.isInteger(form)).toBe(true);
+      expect(form).toBeGreaterThanOrEqual(1);
+      expect(form).toBeLessThanOrEqual(TREE_MAX_FORM);
+      expect(form).toBeGreaterThanOrEqual(previous);
+      previous = form;
+    }
   });
 });
 

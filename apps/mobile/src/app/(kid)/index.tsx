@@ -1,29 +1,45 @@
 import { COINS_PER_CHORE } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
+import { Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
 import { wipeDeviceDb } from '@/db/client';
 import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
-import { formatNumber, t } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
 import { clearRole } from '@/lib/role';
-import { useToday } from '@/lib/use-today';
-import type { TodayItem } from '@/sync/engine';
+import { useToday, type Today } from '@/lib/use-today';
+import { useTheme, useThemedStyles, type Theme } from '@/theme';
 import type { DeviceSession } from '@chores/shared';
 
 export default function KidHome() {
   const device = useDeviceSession();
   if (!device.session) return null;
-  return <Today device={device} session={device.session} />;
+  return <Home device={device} session={device.session} />;
 }
 
-function Today({ device, session }: { device: DeviceSessionValue; session: DeviceSession }) {
+/**
+ * The child's whole app, on one screen they scroll: the pet, today's chores, and a strip of the
+ * grove, in that order. There is no tab bar — a 7-year-old should not have to learn one, and a
+ * flag that is off then hides its own section instead of leaving a dead destination behind. It is
+ * also what puts the coins, the pet and the tree all on screen at the moment a child taps done.
+ *
+ * `ui_mode` changes three things here and only three (docs/spec/06-design.md): type and target
+ * size, which arrive through the theme without anything here naming them; where the pet sits; and
+ * the voice of the copy. The two this file does draw for itself read the mode off the theme, so
+ * they cannot disagree with the type they are drawn in.
+ *
+ * Not different: the set of screens, how many chores are shown, and the motion — a 10-year-old
+ * still wants the pet to react.
+ */
+function Home({ device, session }: { device: DeviceSessionValue; session: DeviceSession }) {
   const router = useRouter();
+  const styles = useThemedStyles(homeStyles);
 
   // Household tz and boundary never ride the change log, so refresh them on open; the local
   // rows carry everything else.
@@ -46,7 +62,6 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
   }, [router, device]);
 
   const today = useToday(session, () => void onRevoked());
-  const little = today.uiMode === 'little';
 
   return (
     <View style={styles.screen}>
@@ -58,78 +73,32 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
-      <View style={styles.header}>
-        {today.status === 'ready' && today.pet.enabled && (
-          <Pressable
-            onPress={() => router.push('/(kid)/pet')}
-            accessibilityRole="button"
-            accessibilityLabel={t('kid.petButton', {
-              name: today.pet.name,
-              level: today.pet.progress.level,
-            })}
-          >
-            <PetFigure
-              name={today.pet.name}
-              level={today.pet.progress.level}
-              mood={today.pet.mood}
-              size={64}
-              showStage={false}
-            />
-          </Pressable>
-        )}
-        <Text style={little ? styles.greetingLittle : styles.greeting}>
-          {t('kid.greeting', { name: today.firstName })}
-        </Text>
-        <View style={styles.tallies}>
-          <Text style={styles.coinTally}>
-            {t('kid.coinTally', { coins: formatNumber(today.coins) })}
-          </Text>
-          {!little && <StreakBadge days={today.streak} />}
-        </View>
-        {/* The way into the grove, and a tree standing at the child's own stage. Drawn only
-            while `grove_enabled` is on, so the flag hides the screen and its entry point
-            together. Big enough to hit in little mode; the label carries the count either way. */}
-        {today.status === 'ready' && today.grove.enabled && (
-          <Pressable
-            onPress={() => router.push('/(kid)/grove')}
-            accessibilityRole="button"
-            accessibilityLabel={t('grove.buttonLabel', { count: today.grove.ownTree.stage })}
-          >
-            <TreeFigure
-              tree={today.grove.ownTree}
-              ownName={today.firstName}
-              size={little ? 72 : 56}
-              showLabel={false}
-            />
-          </Pressable>
-        )}
-      </View>
-      {today.offline && <Text style={styles.offline}>{t('kid.offline')}</Text>}
-      {today.refused > 0 && (
-        <Pressable style={styles.refused} onPress={today.dismissRefused}>
-          <Text style={styles.refusedText}>{t('kid.refused', { count: today.refused })}</Text>
-        </Pressable>
-      )}
+      {/* One scroll, three sections. The list is the scroll container rather than a child of one,
+          so today's chores stay virtualized and nothing nests a scroll inside a scroll. */}
       <FlatList
-        key={today.uiMode}
         data={today.items}
         keyExtractor={(i) => i.id}
-        numColumns={little ? 2 : 1}
-        columnWrapperStyle={little ? styles.tileRow : undefined}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={styles.scroll}
         extraData={today.coins}
-        renderItem={({ item }) =>
-          little ? (
-            <Tile item={item} onPress={() => today.toggle(item)} />
-          ) : (
-            <Row item={item} onPress={() => today.toggle(item)} />
-          )
+        ListHeaderComponent={
+          <>
+            <Head today={today} onPet={() => router.push('/(kid)/pet')} />
+            {today.status === 'ready' && <DayComplete today={today} />}
+          </>
         }
-        ListEmptyComponent={
-          today.status === 'ready' ? (
-            <Text style={little ? styles.emptyLittle : styles.empty}>
-              {t(little ? 'kid.emptyLittle' : 'kid.empty')}
-            </Text>
+        renderItem={({ item }) => (
+          <ChoreRow
+            title={item.title}
+            icon={item.icon}
+            done={item.status === 'done'}
+            coins={COINS_PER_CHORE}
+            onPress={() => today.toggle(item)}
+          />
+        )}
+        ListEmptyComponent={today.status === 'ready' ? <EmptyDay today={today} /> : null}
+        ListFooterComponent={
+          today.grove.enabled ? (
+            <GroveStrip today={today} onPress={() => router.push('/(kid)/grove')} />
           ) : null
         }
       />
@@ -158,92 +127,212 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
   );
 }
 
-/** Little mode: one big icon per chore, the title underneath. Tapping it toggles done. */
-function Tile({ item, onPress }: { item: TodayItem; onPress: () => void }) {
-  const done = item.status === 'done';
+/**
+ * The child's two happy-path moments share one shape: the pet at a mood, plus a line of copy
+ * in the mode's voice. A frozen day is a good day, so "no chores today" is drawn as one — the
+ * pet content, never an error and never an absence. A day complete is the moment worth
+ * reaching, so the pet celebrates happy above the struck-through list — never an empty list.
+ * With the pet flag off there is no art to reuse, so both fall back to the typographic state.
+ */
+function EmptyDay({ today }: { today: Today }) {
+  return <DayMoment today={today} when="empty" mood="content" />;
+}
+
+function DayComplete({ today }: { today: Today }) {
+  if (today.items.length === 0 || !today.items.every((i) => i.status === 'done')) return null;
+  return <DayMoment today={today} when="dayComplete" mood="happy" />;
+}
+
+function DayMoment({
+  today,
+  when,
+  mood,
+}: {
+  today: Today;
+  when: 'empty' | 'dayComplete';
+  mood: 'content' | 'happy';
+}) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  if (!today.pet.enabled) return <EmptyState title={t(`kid.${mode}.${when}`)} />;
   return (
-    <Pressable
-      style={[styles.tile, done && styles.tileDone]}
-      onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
-      accessibilityLabel={item.title}
-    >
-      <Text style={styles.tileIcon}>{done ? '✅' : (item.icon ?? '⭐')}</Text>
-      <Text style={styles.tileTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-    </Pressable>
+    <View style={styles.moment}>
+      <PetFigure
+        name={today.pet.name}
+        level={today.pet.progress.level}
+        mood={mood}
+        size={MOMENT_PET_SIZE[mode]}
+        showStage={false}
+      />
+      <Text style={styles.momentText}>{t(`kid.${mode}.${when}`)}</Text>
+    </View>
   );
 }
 
-/** Big mode: a compact row with the coins the chore pays. */
-function Row({ item, onPress }: { item: TodayItem; onPress: () => void }) {
-  const done = item.status === 'done';
-  return (
+/** The celebratory pet sits smaller than the header pet, which it never shares a screen with. */
+const MOMENT_PET_SIZE = { little: 128, big: 96 } as const;
+
+/** Where the pet sits is a mode difference; how big it is there follows from that. */
+const PET_SIZE = { little: 160, big: 56 } as const;
+
+/**
+ * Everything above today's list: the greeting, the pet, the tallies, and the two strips that only
+ * appear when something has gone wrong.
+ *
+ * The pet's placement is the second of the three mode differences — above the list in `little`,
+ * where it is the biggest thing on the screen, and collapsed into the header row in `big`.
+ */
+function Head({ today, onPet }: { today: Today; onPet: () => void }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  const little = mode === 'little';
+  // Both bets are off for this child, so the coins carry the screen on their own rather than the
+  // control cohort receiving something that reads as a stripped app. An uncached flag reads as
+  // on, so this is the shipped experience until a parent's fetch says otherwise (`sync/flags`).
+  const heroCoins = !today.pet.enabled && !today.grove.enabled;
+  // The balance climbs to its new number only while a tap is being celebrated. Coins that move
+  // for any other reason — the first read of the day, a clawback arriving with a sync — simply
+  // change, because motion is spent on the done moment and nowhere else.
+  const counting = today.reaction !== null;
+
+  const petFigure = today.pet.enabled ? (
     <Pressable
-      style={[styles.row, done && styles.rowDone]}
-      onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
-      accessibilityLabel={item.title}
+      onPress={onPet}
+      accessibilityRole="button"
+      accessibilityLabel={t('kid.petButton', {
+        name: today.pet.name,
+        level: today.pet.progress.level,
+      })}
     >
-      <Text style={styles.rowIcon}>{done ? '✅' : (item.icon ?? '⭐')}</Text>
-      <Text style={[styles.rowTitle, done && styles.rowTitleDone]} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={styles.coins}>
-        {t('kid.chorePays', { coins: formatNumber(COINS_PER_CHORE) })}
-      </Text>
+      <PetFigure
+        name={today.pet.name}
+        level={today.pet.progress.level}
+        mood={today.pet.mood}
+        size={PET_SIZE[mode]}
+        showStage={false}
+      />
     </Pressable>
+  ) : null;
+
+  const greeting = (
+    <Text style={styles.greeting}>{t(`kid.${mode}.greeting`, { name: today.firstName })}</Text>
+  );
+
+  const tallies = (step: 'title' | 'heading') => (
+    <View style={styles.tallies}>
+      <Coins amount={today.coins} step={step} countUp={counting} />
+      <StreakBadge days={today.streak} />
+    </View>
+  );
+
+  return (
+    <View style={styles.head}>
+      {little ? (
+        <>
+          {greeting}
+          {petFigure && <View style={styles.petAbove}>{petFigure}</View>}
+          {!heroCoins && tallies('title')}
+        </>
+      ) : (
+        <View style={styles.headRow}>
+          {petFigure}
+          <View style={styles.headRowText}>{greeting}</View>
+          {!heroCoins && tallies('heading')}
+        </View>
+      )}
+
+      {heroCoins && (
+        <Card>
+          <Text style={styles.sectionTitle}>{t(`kid.${mode}.coins`)}</Text>
+          <View style={styles.hero}>
+            <Coins amount={today.coins} step="display" countUp={counting} />
+            <StreakBadge days={today.streak} />
+          </View>
+        </Card>
+      )}
+
+      {today.offline && <OfflineStrip message={t('kid.offline')} />}
+      {today.refused > 0 && (
+        <Pressable style={styles.refused} onPress={today.dismissRefused}>
+          <Text style={styles.refusedText}>{t('kid.refused', { count: today.refused })}</Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, paddingTop: 56, paddingHorizontal: 16 },
-  secretCorner: { position: 'absolute', top: 0, end: 0, width: 72, height: 72, zIndex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  greeting: { fontSize: 28, fontWeight: '700' },
-  greetingLittle: { fontSize: 36, fontWeight: '700' },
-  tallies: { alignItems: 'flex-end' },
-  coinTally: { fontSize: 20, fontWeight: '700' },
-  offline: { color: '#777', marginTop: 4 },
+/**
+ * The end of the scroll: the household's trees at a glance, and the way into the full grove.
+ *
+ * The whole strip is one target, so it is as easy to hit in `little` as anything else here, and
+ * the trees in it are drawn from local rows — the same picture offline, and one that only ever
+ * gains trees (ADR-0011).
+ */
+function GroveStrip({ today, onPress }: { today: Today; onPress: () => void }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  return (
+    <Card
+      onPress={onPress}
+      accessibilityLabel={t('grove.buttonLabel', { count: today.grove.ownTree.stage })}
+    >
+      <Text style={styles.sectionTitle}>{t(`kid.${mode}.grove`)}</Text>
+      {/* The trees stand on one ground line, so a short tree and a tall one share a horizon. The
+          row wraps rather than scrolling sideways: a scroll inside this one would eat the tap. */}
+      <View style={styles.groveRow}>
+        {today.grove.trees.map((tree) => (
+          <TreeFigure
+            key={tree.childId}
+            tree={tree}
+            ownName={today.firstName}
+            size={tree.isSelf ? 96 : 72}
+            showLabel={false}
+          />
+        ))}
+      </View>
+    </Card>
+  );
+}
+
+const homeStyles = (theme: Theme) => ({
+  screen: { flex: 1, backgroundColor: theme.colors.ground },
+  // The kid stack draws no header, so the scroll clears the status bar itself.
+  scroll: {
+    paddingTop: theme.space.xxl + theme.space.xl,
+    paddingHorizontal: theme.space.lg,
+    paddingBottom: theme.space.xxl,
+    gap: theme.space.md,
+  },
+  secretCorner: { position: 'absolute' as const, top: 0, end: 0, width: 72, height: 72, zIndex: 1 },
+  head: { gap: theme.space.md },
+  headRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: theme.space.md },
+  headRowText: { flex: 1 },
+  petAbove: { alignItems: 'center' as const },
+  greeting: { ...theme.type.title, color: theme.colors.text },
+  tallies: { alignItems: 'center' as const, gap: theme.space.xs },
+  hero: { alignItems: 'center' as const, gap: theme.space.sm },
+  sectionTitle: { ...theme.type.heading, color: theme.colors.text, textAlign: 'center' as const },
+  groveRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    alignItems: 'flex-end' as const,
+    justifyContent: 'center' as const,
+    gap: theme.space.lg,
+  },
   refused: {
-    marginTop: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#FDE7E7',
+    minHeight: theme.touchTarget,
+    justifyContent: 'center' as const,
+    padding: theme.space.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.colors.surface,
   },
-  refusedText: { color: '#8a1c1c', fontWeight: '600' },
-  list: { paddingVertical: 16, gap: 12 },
-  tileRow: { gap: 12 },
-  tile: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: 24,
-    backgroundColor: '#E6F4FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    gap: 8,
+  refusedText: { ...theme.type.label, color: theme.colors.danger },
+  moment: { alignItems: 'center' as const, gap: theme.space.sm },
+  momentText: {
+    ...theme.type.heading,
+    color: theme.colors.text,
+    textAlign: 'center' as const,
   },
-  tileDone: { backgroundColor: '#DFF5E1' },
-  tileIcon: { fontSize: 64 },
-  tileTitle: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    backgroundColor: '#f4f4f4',
-  },
-  rowDone: { backgroundColor: '#DFF5E1' },
-  rowIcon: { fontSize: 28 },
-  rowTitle: { flex: 1, fontSize: 18, fontWeight: '500' },
-  rowTitleDone: { textDecorationLine: 'line-through', color: '#6b6b6b' },
-  coins: { fontSize: 16, fontWeight: '600', color: '#555' },
-  empty: { textAlign: 'center', color: '#777', marginTop: 32, fontSize: 16 },
-  emptyLittle: { textAlign: 'center', marginTop: 32, fontSize: 28 },
 });
