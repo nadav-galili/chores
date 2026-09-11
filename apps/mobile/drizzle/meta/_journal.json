@@ -43,6 +43,13 @@
       "when": 1789031107837,
       "tag": "0005_analytics",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789146679034,
+      "tag": "0006_rewards",
+      "breakpoints": true
     }
   ]
 }

@@ -26,7 +26,12 @@ export const ledgerKindSchema = z.enum([
 ]);
 export type LedgerKind = z.infer<typeof ledgerKindSchema>;
 
-export const ledgerRefTypeSchema = z.enum(['completion', 'chore_date', 'ledger_entry']);
+export const ledgerRefTypeSchema = z.enum([
+  'completion',
+  'chore_date',
+  'ledger_entry',
+  'redemption',
+]);
 export type LedgerRefType = z.infer<typeof ledgerRefTypeSchema>;
 
 export type LedgerEntry = {

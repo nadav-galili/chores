@@ -17,8 +17,11 @@ import {
 import {
   DEFAULT_LOCALE,
   LOCALES,
+  ledgerRefTypeSchema,
   notificationKindSchema,
   notificationTargetSchema,
+  redemptionStatusSchema,
+  type BuiltinRewardKey,
   type ChoreClocks,
 } from '@chores/shared';
 
@@ -237,11 +240,7 @@ export const ledgerKindEnum = pgEnum('ledger_kind', [
   'payout',
   'adjust',
 ]);
-export const ledgerRefTypeEnum = pgEnum('ledger_ref_type', [
-  'completion',
-  'chore_date',
-  'ledger_entry',
-]);
+export const ledgerRefTypeEnum = pgEnum('ledger_ref_type', ledgerRefTypeSchema.options);
 
 /**
  * A child marking an instance done. Append-only: the row is written once and afterwards only its
@@ -345,6 +344,64 @@ export const growthEntries = pgTable(
     createdAt: timestamptz('created_at').notNull().defaultNow(),
   },
   (t) => [index('growth_entries_child').on(t.childId)],
+);
+
+export const redemptionStatusEnum = pgEnum('redemption_status', redemptionStatusSchema.options);
+
+/**
+ * What a child can ask for with coins. Every reward belongs to a household, built-ins included:
+ * the catalog is copied in when the household is created, so no row has to reach a `change_log`
+ * scoped by a household it does not have (docs/spec/02-data-model.md). A built-in carries a
+ * `builtin_key` and no `title` — the device renders the title from i18n — and hiding one is
+ * `active = false` on the household's own row, never a global edit.
+ */
+export const rewards = pgTable(
+  'rewards',
+  {
+    id: uuid('id').primaryKey(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    /** Set on a built-in only; a custom reward (M3) carries a title instead. */
+    builtinKey: text('builtin_key').$type<BuiltinRewardKey>(),
+    title: text('title'),
+    icon: text('icon'),
+    costCoins: integer('cost_coins').notNull(),
+    isBuiltin: boolean('is_builtin').notNull().default(false),
+    active: boolean('active').notNull().default(true),
+    sort: integer('sort').notNull().default(0),
+    updatedAt: timestamptz('updated_at').notNull(),
+    deletedAt: timestamptz('deleted_at'),
+  },
+  (t) => [index('rewards_household').on(t.householdId)],
+);
+
+/**
+ * A child's request to spend coins on a reward. The `redeem` entry is written when the request is
+ * made, not when it is approved, so the status here records which story it was and never what the
+ * balance is (ADR-0014). `cost_coins` is a snapshot: a parent re-pricing a reward later does not
+ * rewrite what was already asked for.
+ */
+export const redemptions = pgTable(
+  'redemptions',
+  {
+    id: uuid('id').primaryKey(),
+    rewardId: uuid('reward_id')
+      .notNull()
+      .references(() => rewards.id),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    costCoins: integer('cost_coins').notNull(),
+    status: redemptionStatusEnum('status').notNull(),
+    requestedAt: timestamptz('requested_at').notNull(),
+    decidedAt: timestamptz('decided_at'),
+    decidedBy: uuid('decided_by').references(() => parents.id),
+  },
+  (t) => [index('redemptions_child').on(t.childId)],
 );
 
 /** The four kinds and the two targets come from the shared schema; there is one list of each. */

@@ -21,10 +21,16 @@ import { parseBody } from './parse-body.ts';
  * crosses is a sibling's chores, coins, completions, xp, day summaries and instances — those stay
  * filtered by `child_id`, and `sync.test.ts` holds that line.
  *
- * The household predicate below is now the only thing bounding these two tables. It was
+ * `rewards` is here for a different reason and is not a third hole in sibling isolation: it is
+ * the household's reward catalog, not one child's data. Its rows carry no `child_id` at all, so
+ * the trigger logs them with a NULL one and the child predicate would never match them; without
+ * this entry the shop would be empty on every device. Nothing about a sibling is in a reward.
+ * `redemptions` are a child's own and stay filtered by `child_id`.
+ *
+ * The household predicate below is now the only thing bounding these tables. It was
  * belt-and-braces while every row was pinned to one child id; it is load-bearing now.
  */
-const HOUSEHOLD_WIDE = ['children', 'growth_entries'] as const;
+const HOUSEHOLD_WIDE = ['children', 'growth_entries', 'rewards'] as const;
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type ChoreRow = typeof chores.$inferSelect;
