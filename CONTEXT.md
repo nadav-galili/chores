@@ -101,7 +101,7 @@ The cumulative record of a household's effort: one tree per child, standing in a
 _Avoid_: Garden, forest, world, map
 
 **Tree**:
-One child's growth within the grove. Its stage is the count of that child's growth entries.
+One child's growth within the grove. How far it has grown is that child's grove stage.
 _Avoid_: Plant, sapling, progress bar
 
 **Growth Entry**:
@@ -109,8 +109,12 @@ An append-only row appended when a chore date is day complete for a child, with 
 _Avoid_: Growth event, tree row, day record
 
 **Grove Stage**:
-A child's tree stage, always `COUNT(*)` of their growth entries. Never a stored column.
-_Avoid_: Tree level, growth count, progress
+How far a child's tree has grown, always `COUNT(*)` of their growth entries. Never a stored column.
+_Avoid_: Tree form, growth count, progress
+
+**Tree Form**:
+The art form a tree is drawn in, one of eight, derived from its grove stage. Grove stage counts; tree form is what that count looks like. Never decreases.
+_Avoid_: Tree level, tree stage, growth stage
 
 **Bonus**:
 Coins and XP granted beyond per-chore earnings: the daily bonus for day complete and streak bonuses at milestone lengths.

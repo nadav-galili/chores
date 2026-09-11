@@ -30,10 +30,12 @@ export const he: Catalog = {
     },
     empty: 'אין מה לעשות היום.',
     emptyLittle: '🎈 אין מה לעשות היום!',
-    coinTally: '%{coins} 🪙',
-    chorePays: '+%{coins} 🪙',
     petButton: '%{name}, רמה %{level}',
     doneMoment: 'יופי! עוד %{coins} מטבעות',
+  },
+  coins: {
+    tally: '%{coins} 🪙',
+    pays: '+%{coins} 🪙',
   },
   streak: {
     badge: { one: '🔥 יום אחד', two: '🔥 יומיים', other: '🔥 %{count} ימים' },
@@ -51,8 +53,8 @@ export const he: Catalog = {
     stage: {
       egg: 'ביצה',
       hatchling: 'בוקע',
-      chick: 'אפרוח',
       fledgling: 'גוזל',
+      full: 'בוגר',
       splendid: 'מפואר',
     },
     artLabel: '%{name}, רמה %{level}, %{mood}',

@@ -4,8 +4,8 @@ import { t } from '@/lib/i18n';
  * Placeholder tree art, bundled in the app: one entry per stage, no files and no network, so the
  * grove draws the same offline as on — the same seam `pet-art.ts` uses, and the same reason
  * (docs/spec/04-milestones.md, risks: "placeholder art in M1 tells you nothing about the mechanic;
- * budget real art before the week-3 verdict"). Swap `glyph` for an image source and every screen
- * that draws a tree keeps working.
+ * budget real art before the week-3 verdict"). `pet-art.ts` has already taken its images; swap
+ * `glyph` for an image source the same way and every screen that draws a tree keeps working.
  */
 
 export type TreeArt = {

@@ -6,10 +6,11 @@ import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
+import { Coins } from '@/components/ui';
 import { wipeDeviceDb } from '@/db/client';
 import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
-import { formatNumber, t } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
 import { clearRole } from '@/lib/role';
 import { useToday } from '@/lib/use-today';
@@ -81,9 +82,7 @@ function Today({ device, session }: { device: DeviceSessionValue; session: Devic
           {t('kid.greeting', { name: today.firstName })}
         </Text>
         <View style={styles.tallies}>
-          <Text style={styles.coinTally}>
-            {t('kid.coinTally', { coins: formatNumber(today.coins) })}
-          </Text>
+          <Coins amount={today.coins} step="heading" />
           {!little && <StreakBadge days={today.streak} />}
         </View>
         {/* The way into the grove, and a tree standing at the child's own stage. Drawn only
@@ -192,9 +191,7 @@ function Row({ item, onPress }: { item: TodayItem; onPress: () => void }) {
       <Text style={[styles.rowTitle, done && styles.rowTitleDone]} numberOfLines={1}>
         {item.title}
       </Text>
-      <Text style={styles.coins}>
-        {t('kid.chorePays', { coins: formatNumber(COINS_PER_CHORE) })}
-      </Text>
+      <Coins amount={COINS_PER_CHORE} variant="pays" step="label" />
     </Pressable>
   );
 }
@@ -206,7 +203,6 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 28, fontWeight: '700' },
   greetingLittle: { fontSize: 36, fontWeight: '700' },
   tallies: { alignItems: 'flex-end' },
-  coinTally: { fontSize: 20, fontWeight: '700' },
   offline: { color: '#777', marginTop: 4 },
   refused: {
     marginTop: 8,
@@ -243,7 +239,6 @@ const styles = StyleSheet.create({
   rowIcon: { fontSize: 28 },
   rowTitle: { flex: 1, fontSize: 18, fontWeight: '500' },
   rowTitleDone: { textDecorationLine: 'line-through', color: '#6b6b6b' },
-  coins: { fontSize: 16, fontWeight: '600', color: '#555' },
   empty: { textAlign: 'center', color: '#777', marginTop: 32, fontSize: 16 },
   emptyLittle: { textAlign: 'center', marginTop: 32, fontSize: 28 },
 });

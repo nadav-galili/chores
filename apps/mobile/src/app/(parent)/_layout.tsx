@@ -3,6 +3,7 @@ import { Redirect, Stack, usePathname } from 'expo-router';
 import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
+import { ThemeProvider } from '@/theme';
 
 /** Signed in → needs a household → create-household; has one → the children list. */
 function HouseholdGate() {
@@ -28,7 +29,16 @@ function HouseholdGate() {
   return <Stack screenOptions={{ headerShown: false }} />;
 }
 
+/** The parent's theme covers the whole group, sign-in and the loading state included. */
 export default function ParentLayout() {
+  return (
+    <ThemeProvider role="parent">
+      <SignInGate />
+    </ThemeProvider>
+  );
+}
+
+function SignInGate() {
   const { isLoaded, isSignedIn } = useAuth();
   const pathname = usePathname();
   if (!isLoaded) return <Loading />;

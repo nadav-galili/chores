@@ -1,5 +1,5 @@
 import type { PetMood, PetProgress } from '@chores/shared';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { t } from '@/lib/i18n';
 import { petArt, petArtLabel } from '@/lib/pet-art';
 
@@ -18,6 +18,9 @@ export function PetFigure({
   showStage?: boolean;
 }) {
   const art = petArt(level, mood);
+  // The art is square and the ground is a circle: the largest square that fits is the inscribed
+  // one, so nothing a render puts in a corner — a cocked tail, a sprig — is cut off.
+  const box = Math.round(size * 0.7);
   return (
     <View style={styles.figure}>
       <View
@@ -28,8 +31,10 @@ export function PetFigure({
         accessibilityRole="image"
         accessibilityLabel={petArtLabel(name, level, mood)}
       >
-        <Text style={{ fontSize: size * 0.5 }}>{art.glyph}</Text>
-        <Text style={[styles.face, { fontSize: size * 0.22 }]}>{art.face}</Text>
+        <View style={{ width: box, height: box }}>
+          <Image source={art.body} style={styles.art} resizeMode="contain" />
+          <Image source={art.mark} style={styles.art} resizeMode="contain" />
+        </View>
       </View>
       {showStage && <Text style={styles.stage}>{art.stage}</Text>}
     </View>
@@ -68,7 +73,7 @@ export function XpBar({ progress }: { progress: PetProgress }) {
 const styles = StyleSheet.create({
   figure: { alignItems: 'center', gap: 8 },
   ground: { alignItems: 'center', justifyContent: 'center' },
-  face: { position: 'absolute', top: '12%', end: '12%' },
+  art: { position: 'absolute', width: '100%', height: '100%' },
   stage: { fontSize: 16, fontWeight: '600', color: '#555' },
   bar: { gap: 6, width: '100%' },
   track: { height: 16, borderRadius: 8, backgroundColor: '#E4E4EA', overflow: 'hidden' },

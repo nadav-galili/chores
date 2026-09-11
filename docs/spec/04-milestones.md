@@ -41,11 +41,17 @@ Exit: two kids, two devices, real chores, offline works, per-day opens visible i
 - **Push token rot** — re-register on open; null on `DeviceNotRegistered`.
 
 ## Dependencies (approved once, here)
-- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid
+- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font
 - api: hono, @hono/node-server, drizzle-orm, postgres, zod, @clerk/backend, posthog-node, expo-server-sdk, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 - tooling: turbo, vitest, tsx, drizzle-kit, eslint, prettier, typescript
 
 Anything not on this list is asked for separately.
+
+`react-native-reanimated`, `expo-haptics` and `expo-font` are approved for the design milestone
+(issue #19), which lands between M1 and M2. Motion and haptics are spent on the done moment only;
+`expo-font` carries the one bundled face — Rubik 600, for display and title — because Rubik covers
+Hebrew and Latin in one family. Only `expo-font` is installed so far; the other two arrive with the
+tickets that use them.
 
 `react-dom` is pinned in `apps/mobile` and in `pnpm.overrides` at the same version as `react`. Nothing
 imports it — pnpm auto-installs it as a peer of expo-router's runtime and hoists it, and a hoisted copy
