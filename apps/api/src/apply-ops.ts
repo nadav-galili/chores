@@ -8,6 +8,7 @@ import {
   reconcileLedger,
   resolveChoreDate,
   summariesThatMoved,
+  withinRedoWindow,
   type IsoDate,
   type RejectReason,
   type SyncOp,
@@ -135,11 +136,22 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
     const completedAt = new Date(completed_at);
     const computed = choreDate(completedAt, ctx.household.tz, ctx.household.dayBoundaryHour);
     const resolved = resolveChoreDate(claimed, computed);
-    const chore_date =
-      !resolved.date_adjusted && (await plausible(resolved.chore_date))
+    /**
+     * The ±1 day clock guard applies only when the instance would have to be created
+     * (docs/spec/02-data-model.md, timezone rules): it exists so a device with a wrong clock
+     * cannot invent a day, and an instance the server already materialized was not invented by a
+     * device. A completion naming one is written on that instance's chore date however far back
+     * it is, which is what makes the Redo Window work at all.
+     */
+    const chore_date = (await exists(claimed))
+      ? claimed
+      : !resolved.date_adjusted && (await plausible(resolved.chore_date))
         ? resolved.chore_date
         : computed;
     const date_adjusted = chore_date !== claimed;
+    // Past the Redo Window the day is the parent's to change, not the child's.
+    const today = choreDate(ctx.now, ctx.household.tz, ctx.household.dayBoundaryHour);
+    if (!withinRedoWindow(chore_date, today)) return reject('too_late');
     const instance_id = instanceId(chore_id, ctx.childId, chore_date);
     if (!assigned && !(await exists(chore_date))) {
       // Unassigned mid-day: the instance the child is looking at still counts, nothing else does.
