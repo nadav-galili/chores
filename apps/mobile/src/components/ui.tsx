@@ -121,6 +121,87 @@ export function ErrorText({ children }: { children: string | null }) {
 }
 
 /**
+ * The typographic states (docs/spec/06-design.md): a line of copy and an action, no
+ * illustration. Six of the eight empty, error and offline states are these — everything
+ * except the child's two happy-path moments, which reuse the Pet instead.
+ *
+ * `EmptyState` is for nothing-to-show; `ErrorState` is for something-went-wrong, so its
+ * title wears the danger colour and says what happened while `body` says what the reader
+ * can do. Both centre their copy, pad symmetrically, and never name a direction, so they
+ * lay out correctly right-to-left without a single conditional.
+ */
+export function EmptyState({
+  title,
+  body,
+  actionTitle,
+  onAction,
+}: {
+  title: string;
+  body?: string;
+  actionTitle?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <StateShell title={title} body={body} actionTitle={actionTitle} onAction={onAction} error={false} />
+  );
+}
+
+export function ErrorState({
+  title,
+  body,
+  actionTitle,
+  onAction,
+}: {
+  title: string;
+  body?: string;
+  actionTitle?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <StateShell title={title} body={body} actionTitle={actionTitle} onAction={onAction} error />
+  );
+}
+
+function StateShell({
+  title,
+  body,
+  actionTitle,
+  onAction,
+  error,
+}: {
+  title: string;
+  body?: string;
+  actionTitle?: string;
+  onAction?: () => void;
+  error: boolean;
+}) {
+  const styles = useThemedStyles(stateStyles);
+  return (
+    <View style={styles.state}>
+      <Text style={[styles.stateTitle, error && styles.errorTitle]}>{title}</Text>
+      {body ? <Text style={styles.stateBody}>{body}</Text> : null}
+      {actionTitle && onAction ? (
+        <Button title={actionTitle} secondary={!error} onPress={onAction} />
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Offline is an inline strip, never a full-screen state. The app is offline-first; a
+ * blocking "you're offline" screen would contradict the product, so this leaves whatever
+ * screen it sits on fully usable and only says what is saved.
+ */
+export function OfflineStrip({ message }: { message: string }) {
+  const styles = useThemedStyles(stateStyles);
+  return (
+    <View style={styles.strip}>
+      <Text style={styles.stripText}>{message}</Text>
+    </View>
+  );
+}
+
+/**
  * A surface standing on the ground. Tappable when given an `onPress`, and then never smaller
  * than the theme's touch target — which is the size `little` grows.
  */
@@ -248,6 +329,22 @@ const screenStyles = (theme: Theme) => ({
 const textStyles = (theme: Theme) => ({
   title: { ...theme.type.title, color: theme.colors.text, marginBottom: theme.space.sm },
   error: { ...theme.type.label, color: theme.colors.danger },
+});
+
+const stateStyles = (theme: Theme) => ({
+  state: { alignItems: 'center' as const, gap: theme.space.sm, paddingVertical: theme.space.xl },
+  stateTitle: { ...theme.type.heading, color: theme.colors.text, textAlign: 'center' as const },
+  errorTitle: { color: theme.colors.danger },
+  stateBody: { ...theme.type.body, color: theme.colors.muted, textAlign: 'center' as const },
+  strip: {
+    paddingVertical: theme.space.sm,
+    paddingHorizontal: theme.space.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.muted,
+  },
+  stripText: { ...theme.type.label, color: theme.colors.muted, textAlign: 'center' as const },
 });
 
 const fieldStyles = (theme: Theme) => ({

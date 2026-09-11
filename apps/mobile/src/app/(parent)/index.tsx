@@ -3,7 +3,7 @@ import type { ParentTodayChild, ParentTodayItem } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
-import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
+import { Button, EmptyState, ErrorState, Loading, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t } from '@/lib/i18n';
 import { useParentToday } from '@/lib/use-parent-today';
@@ -61,13 +61,24 @@ export default function ParentToday() {
   return (
     <Screen>
       <Title>{t('parent.todayTitle', { household: household.name })}</Title>
-      {today.status === 'error' && <ErrorText>{today.message}</ErrorText>}
+      {today.status === 'error' && (
+        <ErrorState
+          title={today.message ?? t('parent.loadFailed')}
+          body={t('parent.unreachable')}
+          actionTitle={t('common.tryAgain')}
+          onAction={() => void today.refresh()}
+        />
+      )}
       {today.status === 'loading' && today.today === null ? (
         <Loading />
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
           {today.today?.children.length === 0 && (
-            <Text style={styles.empty}>{t('parent.noChildren')}</Text>
+            <EmptyState
+              title={t('parent.noChildren')}
+              actionTitle={t('children.add')}
+              onAction={() => router.push('/(parent)/children/new')}
+            />
           )}
           {today.today?.children.map((child) => (
             <ChildCard key={child.child_id} child={child} tz={household.tz} />
