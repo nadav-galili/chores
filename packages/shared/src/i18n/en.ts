@@ -27,16 +27,31 @@ export const en = {
     kid: 'Kid',
   },
   kid: {
-    greeting: 'Hi %{name}!',
     offline: 'Showing what’s saved on this device.',
     refused: plural({
       one: 'One tap didn’t save. Tap to hide.',
       other: '%{count} taps didn’t save. Tap to hide.',
     }),
-    empty: 'Nothing to do today.',
-    emptyLittle: '🎈 Nothing to do today!',
     petButton: '%{name}, level %{level}',
-    doneMoment: 'Nice! Plus %{coins} coins',
+    // Voice is the third of the three differences between the modes (docs/spec/06-design.md):
+    // celebratory for a 7-year-old, neutral for a 10-year-old. `big` carries no exclamation
+    // mark anywhere — that is the whole of what "neutral" means here, and it is checkable.
+    little: {
+      greeting: 'Hi %{name}!',
+      empty: '🎈 Nothing to do today!',
+      grove: 'Your grove is growing!',
+      coins: 'Look how many coins you have!',
+      doneMoment: 'Nice! Plus %{coins} coins',
+      grew: 'Your tree grew! 🌱',
+    },
+    big: {
+      greeting: 'Hi %{name}',
+      empty: 'Nothing to do today.',
+      grove: 'Your grove',
+      coins: 'Your coins',
+      doneMoment: 'Plus %{coins} coins',
+      grew: 'Your tree grew 🌱',
+    },
   },
   // The coin display's own strings: the glyph sits where the language wants it, which is why a
   // number and an emoji need a catalog entry at all.
@@ -76,7 +91,6 @@ export const en = {
     mine: 'You',
     trees: plural({ one: '%{count} tree', other: '%{count} trees' }),
     empty: 'Finish everything today and this seed starts growing.',
-    grew: 'Your tree grew! 🌱',
     treeLabel: plural({ one: '%{name}, one tree', other: '%{name}, %{count} trees' }),
   },
   join: {

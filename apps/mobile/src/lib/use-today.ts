@@ -9,7 +9,6 @@ import {
   petReacted,
   type DeviceSession,
   type IsoDate,
-  type UiMode,
 } from '@chores/shared';
 import { eq } from 'drizzle-orm';
 import { useFocusEffect } from 'expo-router';
@@ -34,7 +33,6 @@ export type TodayState = {
   status: 'loading' | 'ready';
   /** From the local child row once pulled, else what the join code told us. */
   firstName: string;
-  uiMode: UiMode;
   items: TodayItem[];
   streak: number;
   /** Balance, always the sum of the local ledger. */
@@ -124,7 +122,6 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   const [state, setState] = useState<TodayState>({
     status: 'loading',
     firstName: session.child.first_name,
-    uiMode: session.child.ui_mode,
     items: [],
     streak: 0,
     coins: 0,
@@ -145,7 +142,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   revoked.current = onRevoked;
 
   const { tz, day_boundary_hour: boundary } = session.household;
-  const { id: childId, ui_mode: joinedUiMode, first_name: joinedName } = session.child;
+  const { id: childId, first_name: joinedName } = session.child;
 
   const child: ChildContext = useMemo(
     () => ({
@@ -178,7 +175,6 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       setState({
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
-        uiMode: rows[0]?.ui_mode ?? joinedUiMode,
         items,
         streak,
         coins,
@@ -195,7 +191,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         stage: grove.ownTree.stage,
       });
     },
-    [childId, tz, boundary, joinedUiMode, joinedName],
+    [childId, tz, boundary, joinedName],
   );
 
   const refresh = useCallback(async () => {
