@@ -13,6 +13,7 @@ import type {
   ParentToday,
   RedeemJoinCodeInput,
   RejectCompletionResult,
+  Reward,
   SyncRequest,
   SyncResponse,
   UpsertChoreOp,
@@ -85,6 +86,15 @@ export function createApi(getToken: GetToken) {
       call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',
       }),
+    listRewards: (householdId: string) =>
+      call<Reward[]>(getToken, `/households/${householdId}/rewards`),
+    // Hiding a built-in, and nothing more: a custom reward is M3's `custom_reward` gate.
+    setRewardActive: (householdId: string, rewardId: string, active: boolean) =>
+      call<Reward>(
+        getToken,
+        `/households/${householdId}/rewards/${rewardId}`,
+        json('PATCH', { active }),
+      ),
     listChores: (householdId: string) =>
       call<Chore[]>(getToken, `/households/${householdId}/chores`),
     upsertChore: (householdId: string, choreId: string, op: UpsertChoreOp) =>

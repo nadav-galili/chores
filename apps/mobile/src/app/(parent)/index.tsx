@@ -212,6 +212,7 @@ export default function ParentToday() {
         items={[
           { title: t('parent.nav.children'), onPress: () => router.push('/(parent)/children') },
           { title: t('parent.nav.chores'), onPress: () => router.push('/(parent)/chores') },
+          { title: t('parent.nav.rewards'), onPress: () => router.push('/(parent)/rewards') },
           { title: t('parent.nav.partner'), onPress: () => router.push('/(parent)/partner') },
           { title: t('parent.nav.signOut'), onPress: () => void signOut() },
         ]}
