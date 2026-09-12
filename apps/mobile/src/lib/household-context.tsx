@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { openDeviceDb } from '@/db/client';
 import { refreshFlags, startParentAnalytics } from '@/lib/analytics';
 import { createApi, type Api, type Me } from '@/lib/api';
+import { registerParentPush } from '@/lib/notifications';
 
 type State =
   | { status: 'loading'; me: null }
@@ -42,6 +43,10 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       const me = await api.me();
       setState({ status: 'ready', me });
       void reportParent(me);
+      const householdId = me.household?.id;
+      // Every open re-registers this phone for push; `registerParentPush` swallows its own
+      // failures, so a refusal never reaches the screen the parent is waiting on.
+      if (householdId) void registerParentPush((input) => api.registerDevice(householdId, input));
     } catch (e) {
       setState({ status: 'error', me: null, message: e instanceof Error ? e.message : 'failed' });
     }

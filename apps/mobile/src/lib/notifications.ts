@@ -1,4 +1,4 @@
-import { kidReminderCopy, localTimeFor } from '@chores/shared';
+import { kidReminderCopy, localTimeFor, type ParentDeviceInput } from '@chores/shared';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -97,4 +97,32 @@ export async function arrangeKidReminder(
   // does not, so only one of the two is ever scheduled.
   const local = (await serverHoldsToken(db)) ? null : child.reminderTime;
   await scheduleReminder(db, local, localReminder(child.tz), now);
+}
+
+/**
+ * Registers this parent's phone for push, on every open: a token rots, and the language the phone
+ * reads can change between opens, so the server is told both again rather than asked to remember.
+ * A parent who says no to notifications, a build with no push credentials and a phone with no
+ * network all end here quietly — nothing the parent is looking at depends on it.
+ */
+export async function registerParentPush(
+  register: (input: ParentDeviceInput) => Promise<unknown>,
+): Promise<void> {
+  try {
+    if (!(await permitted())) return;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+    if (!projectId) return;
+    const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+    await register({
+      expo_push_token: data,
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      locale,
+    });
+  } catch (e) {
+    // The parent sees their household, not this: a digest that does not arrive is not something
+    // they can act on from the screen they are on. The device still says why, because a refused
+    // registration and a phone that was merely offline look identical from the outside. Only the
+    // error goes to the console, never the token.
+    console.error('parent push registration failed', e);
+  }
 }

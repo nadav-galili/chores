@@ -1,0 +1,1 @@
+ALTER TABLE "parent_devices" ADD COLUMN "locale" "locale" DEFAULT 'en' NOT NULL;

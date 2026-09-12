@@ -1,7 +1,12 @@
-import { kidReminderCopy, notificationId, type DueReminder } from '@chores/shared';
+import {
+  kidReminderCopy,
+  notificationId,
+  type DueReminder,
+  type NotificationTarget,
+} from '@chores/shared';
 import { and, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
-import { childDevices, notifications } from './db/schema.ts';
+import { childDevices, notifications, parentDevices } from './db/schema.ts';
 import type { Push, PushError, PushMessage } from './push.ts';
 
 /**
@@ -21,8 +26,23 @@ export type Sent = { claimed: boolean; forgotten: boolean };
 const reminderIdOf = (due: DueReminder) =>
   notificationId('kid_reminder', due.child_id, due.chore_date);
 
-/** A token Expo refuses is dead: forget it, so nothing is sent to it again (M1 risks). */
-export async function forgetToken(db: Db, deviceId: string): Promise<void> {
+/**
+ * A token Expo refuses is dead: forget it, so nothing is sent to it again (M1 risks). A child and
+ * a parent keep their devices in separate tables, so the notification's `target` is what says
+ * which of the two the id belongs to — guessing by trying both would null a stranger's row.
+ */
+export async function forgetToken(
+  db: Db,
+  target: NotificationTarget,
+  deviceId: string,
+): Promise<void> {
+  if (target === 'parent_device') {
+    await db
+      .update(parentDevices)
+      .set({ expoPushToken: null })
+      .where(eq(parentDevices.id, deviceId));
+    return;
+  }
   await db.update(childDevices).set({ expoPushToken: null }).where(eq(childDevices.id, deviceId));
 }
 
@@ -118,7 +138,7 @@ export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Da
     .set({ payload: sql`${notifications.payload} || ${JSON.stringify({ error })}::jsonb` })
     .where(eq(notifications.id, id));
   if (error === 'DeviceNotRegistered') {
-    await forgetToken(db, device.id);
+    await forgetToken(db, 'child_device', device.id);
     return { claimed: true, forgotten: true };
   }
   return { claimed: true, forgotten: false };
@@ -134,6 +154,7 @@ export async function readReceipts(db: Db, push: Push, now: Date): Promise<numbe
     .select({
       id: notifications.id,
       ticket: notifications.ticket,
+      target: notifications.target,
       targetId: notifications.targetId,
     })
     .from(notifications)
@@ -160,7 +181,7 @@ export async function readReceipts(db: Db, push: Push, now: Date): Promise<numbe
       })
       .where(eq(notifications.id, row.id));
     if (!receipt.ok && receipt.error === 'DeviceNotRegistered' && row.targetId) {
-      await forgetToken(db, row.targetId);
+      await forgetToken(db, row.target, row.targetId);
       forgotten++;
     }
   }
