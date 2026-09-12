@@ -96,10 +96,12 @@ export function createApi(getToken: GetToken, onGate?: OnGate) {
         ['children', 'redemptions'],
         'today',
       ),
-    // The child's last seven Chore Dates. Ungated — seven days is the free tier's promise — so
-    // there is nothing here to catch a paywall answer.
-    childWeek: (householdId: string, childId: string) =>
-      request<ParentWeek>(`/households/${householdId}/children/${childId}/week`),
+    // History is clamped in a successful response rather than answering 402. The screen alone
+    // turns that flag into an explicit path to the paywall.
+    childWeek: (householdId: string, childId: string, from?: string) =>
+      request<ParentWeek>(
+        `/households/${householdId}/children/${childId}/week${from ? `?from=${encodeURIComponent(from)}` : ''}`,
+      ),
     // Rejecting names a completion, never an instance: the id comes from the today payload.
     rejectCompletion: (householdId: string, completionId: string) =>
       request<{ status: RejectCompletionResult }>(

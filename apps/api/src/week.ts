@@ -1,4 +1,13 @@
-import { choreDate, historyWindow, type ParentWeek, type ParentWeekChore } from '@chores/shared';
+import {
+  addDays,
+  choreDate,
+  daysBetween,
+  historyWindow,
+  isoDateSchema,
+  type IsoDate,
+  type ParentWeek,
+  type ParentWeekChore,
+} from '@chores/shared';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Db } from './db/client.ts';
@@ -12,8 +21,8 @@ import { householdScope, type ScopedEnv } from './scope.ts';
  * parent acts the next morning.
  *
  * Ungated on purpose. Seven days of history is what the free tier promises (docs/spec/01-product.md,
- * Tiers), so nothing here consults `households.entitlement`; M3's `full_history` gate extends the
- * same window backwards rather than opening it.
+ * Tiers). A free household asking farther back gets those seven days with `clamped: true`, never a
+ * 402; premium gets the requested range.
  *
  * Read-only, unlike the today screen: `writeHouseholdInstances` is never called for a past date,
  * because materializing history after the fact would invent instances for days a chore was not
@@ -37,8 +46,24 @@ export function weekRoutes(db: Db) {
 
     // Household-local, and ending on the household's today — never the server's UTC date.
     const today = choreDate(new Date(), household.tz, household.dayBoundaryHour);
-    const dates = historyWindow(today);
-    const from = dates[0]!;
+    const freeDates = historyWindow(today);
+    const requestedFromRaw = c.req.query('from');
+    const requestedFrom = requestedFromRaw
+      ? isoDateSchema.safeParse(requestedFromRaw)
+      : { success: true as const, data: undefined };
+    if (!requestedFrom.success || (requestedFrom.data && requestedFrom.data > today)) {
+      return c.json({ error: 'invalid_from' }, 400);
+    }
+
+    const freeFrom = freeDates[0]!;
+    const clamped =
+      requestedFrom.data !== undefined &&
+      household.entitlement === 'free' &&
+      requestedFrom.data < freeFrom;
+    const from: IsoDate = clamped ? freeFrom : (requestedFrom.data ?? freeFrom);
+    const dates = requestedFrom.data
+      ? Array.from({ length: daysBetween(from, today) + 1 }, (_, i) => addDays(from, i))
+      : freeDates;
 
     const [instanceRows, completionRows] = await Promise.all([
       // The rows are driven by the instances, not by the chores, so a chore with nothing in the
@@ -103,6 +128,7 @@ export function weekRoutes(db: Db) {
 
     const body: ParentWeek = {
       child_id: child.id,
+      ...(requestedFrom.data === undefined ? {} : { clamped }),
       chore_dates: dates,
       chores: [...byChore.values()],
     };

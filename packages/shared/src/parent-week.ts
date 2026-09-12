@@ -36,14 +36,14 @@ export const parentWeekChoreSchema = z.object({
 export type ParentWeekChore = z.infer<typeof parentWeekChoreSchema>;
 
 /**
- * One child's last seven Chore Dates, as chores against days. Ungated: seven days is what the
- * free tier promises (docs/spec/01-product.md, Tiers), and it is also the only way a parent
- * reaches a completion from an earlier day — the Digest that prompts a rejection arrives at
- * 20:00 and the parent acts the next morning, still inside the Redo Window.
+ * One child's requested Chore Date history, as chores against days. Seven days stays ungated;
+ * an older requested `from` is either returned in full or clamped and marked by the API.
  */
 export type ParentWeek = {
   child_id: string;
-  /** The seven Chore Dates, oldest first, ending on the household's today. */
+  /** Present only when `from` was requested; true when the free tier shortened that range. */
+  clamped?: boolean;
+  /** The returned Chore Dates, oldest first, ending on the household's today. */
   chore_dates: IsoDate[];
   /** Only chores with at least one Instance in the window, by title. */
   chores: ParentWeekChore[];

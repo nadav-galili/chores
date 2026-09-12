@@ -138,9 +138,14 @@ async function complete(session: DeviceSession, choreId: string, chore_date: Iso
   return completionId;
 }
 
-const getWeek = async (clerkUserId: string, householdId: string, childId: string) => {
+const getWeek = async (
+  clerkUserId: string,
+  householdId: string,
+  childId: string,
+  from?: IsoDate,
+) => {
   const res = await app.request(
-    `/households/${householdId}/children/${childId}/week`,
+    `/households/${householdId}/children/${childId}/week${from ? `?from=${from}` : ''}`,
     asParent(clerkUserId),
   );
   return { status: res.status, body: (await res.json()) as ParentWeek };
@@ -297,6 +302,50 @@ describe('GET /households/:id/children/:id/week', () => {
     expect(status).toBe(200);
     expect(body.chore_dates).toHaveLength(7);
     expect(body.chores).toHaveLength(1);
+    expect(body).not.toHaveProperty('clamped');
+  });
+
+  it('clamps a free household asking for older history to seven days and flags the answer', async () => {
+    const owner = 'user_week_free_clamped_at_example.com';
+    const { householdId, noa, putChore, today } = await setup(owner);
+    const dishes = await putChore({ title: 'Dishes', kind: 'daily', assignees: [noa.id] });
+    const tenAgo = addDays(today(), -10);
+    await writeHouseholdInstances(db, householdId, tenAgo);
+    await writeHouseholdInstances(db, householdId, today());
+
+    const { status, body } = await getWeek(owner, householdId, noa.id, tenAgo);
+    expect(status).toBe(200);
+    expect(body.clamped).toBe(true);
+    expect(body.chore_dates).toEqual(historyWindow(today()));
+    expect(body.chores.find((chore) => chore.chore_id === dishes)!.cells).toHaveLength(1);
+  });
+
+  it('returns the full requested range to a premium household without materializing it', async () => {
+    const owner = 'user_week_premium_full_at_example.com';
+    const { householdId, noa, putChore, today } = await setup(owner);
+    await db.update(households).set({ entitlement: 'premium' }).where(eq(households.id, householdId));
+    const dishes = await putChore({ title: 'Dishes', kind: 'daily', assignees: [noa.id] });
+    const tenAgo = addDays(today(), -10);
+    await writeHouseholdInstances(db, householdId, tenAgo);
+    await writeHouseholdInstances(db, householdId, today());
+
+    const before = await db
+      .select({ id: choreInstances.id })
+      .from(choreInstances)
+      .where(eq(choreInstances.householdId, householdId));
+    const { status, body } = await getWeek(owner, householdId, noa.id, tenAgo);
+    const after = await db
+      .select({ id: choreInstances.id })
+      .from(choreInstances)
+      .where(eq(choreInstances.householdId, householdId));
+
+    expect(status).toBe(200);
+    expect(body.clamped).toBe(false);
+    expect(body.chore_dates).toHaveLength(11);
+    expect(body.chore_dates[0]).toBe(tenAgo);
+    expect(body.chore_dates.at(-1)).toBe(today());
+    expect(body.chores.find((chore) => chore.chore_id === dishes)!.cells).toHaveLength(2);
+    expect(after).toEqual(before);
   });
 
   it('is scoped to the caller: another household 404s, another household’s child 404s, no token 401s', async () => {

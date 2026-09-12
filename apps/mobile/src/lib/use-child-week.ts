@@ -9,14 +9,17 @@ type WeekState =
   | { status: 'ready'; week: ParentWeek };
 
 /**
- * One child's last seven Chore Dates, reloaded when the screen comes into focus and after a
- * rejection. No poll: history is not a live scan the way the today screen is, and a grid that
+ * One child's requested Chore Date history, reloaded when the screen comes into focus and after
+ * a rejection. No poll: history is not a live scan the way the today screen is, and a grid that
  * redrew every minute would move under a parent reading it.
  *
  * The last good payload is kept through a failure, so a dropped request leaves the grid on
  * screen with a line above it rather than blanking the page.
  */
-export function useChildWeek(childId: string | null): WeekState & { refresh: () => Promise<void> } {
+export function useChildWeek(
+  childId: string | null,
+  from?: string,
+): WeekState & { refresh: () => Promise<void> } {
   const { api, me } = useHousehold();
   const householdId = me?.household?.id ?? null;
   const [state, setState] = useState<WeekState>({ status: 'loading', week: null });
@@ -24,7 +27,7 @@ export function useChildWeek(childId: string | null): WeekState & { refresh: () 
   const reload = useCallback(async () => {
     if (!householdId || !childId) return;
     try {
-      setState({ status: 'ready', week: await api.childWeek(householdId, childId) });
+      setState({ status: 'ready', week: await api.childWeek(householdId, childId, from) });
     } catch (e) {
       setState((held) => ({
         status: 'error',
@@ -32,7 +35,7 @@ export function useChildWeek(childId: string | null): WeekState & { refresh: () 
         message: e instanceof Error ? e.message : 'failed',
       }));
     }
-  }, [api, childId, householdId]);
+  }, [api, childId, from, householdId]);
 
   useFocusEffect(
     useCallback(() => {

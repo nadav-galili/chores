@@ -182,8 +182,11 @@ export const en = {
     week: {
       open: 'Last seven days',
       title: 'Last seven days · %{name}',
+      fullTitle: 'History · %{name}',
       empty: 'Nothing recorded in the last seven days.',
+      fullEmpty: 'Nothing recorded yet.',
       loadFailed: 'Could not load the last seven days.',
+      seeMore: 'See more',
       // What a cell reads as to a screen reader: the chore, the day, and where it stands.
       cell: '%{title}, %{date}: %{state}',
       state: {

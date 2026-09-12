@@ -1,4 +1,4 @@
-import { weekdayOf, type InstanceStatus, type ParentWeekChore } from '@chores/shared';
+import { choreDate, weekdayOf, type InstanceStatus, type ParentWeekChore } from '@chores/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -33,7 +33,7 @@ function DayHeader({ date }: { date: string }) {
 }
 
 /**
- * One chore across the seven days. `cells` is sparse — a chore has no cell on a day it was not
+ * One chore across the returned dates. `cells` is sparse — a chore has no cell on a day it was not
  * due — so each column is looked up by its Chore Date and an absent one draws nothing, which is
  * the truth about a weekly chore on a Tuesday.
  *
@@ -96,7 +96,7 @@ function ChoreRow({
 }
 
 /**
- * One child's last seven Chore Dates as chores against days. This is how a parent reaches a
+ * One child's Chore Date history as chores against days. This is how a parent reaches a
  * completion from an earlier day at all: the Digest arrives at 20:00 and the parent acts the next
  * morning, still inside the Redo Window, so without this screen the window barely opens.
  *
@@ -111,8 +111,13 @@ export default function ChildWeek() {
   const styles = useThemedStyles(weekStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
-  const householdId = state.status === 'ready' ? (state.me.household?.id ?? null) : null;
-  const week = useChildWeek(child?.id ?? null);
+  const household = state.status === 'ready' ? state.me.household : null;
+  const householdId = household?.id ?? null;
+  const historyFrom =
+    child && household
+      ? choreDate(new Date(child.created_at), household.tz, household.day_boundary_hour)
+      : undefined;
+  const week = useChildWeek(child?.id ?? null, historyFrom);
   const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
   const { api } = state;
@@ -153,7 +158,11 @@ export default function ChildWeek() {
 
   return (
     <Screen list>
-      <Title>{t('parent.week.title', { name: child.first_name })}</Title>
+      <Title>
+        {t(week.week?.clamped === false ? 'parent.week.fullTitle' : 'parent.week.title', {
+          name: child.first_name,
+        })}
+      </Title>
       {notice && <Text style={[styles.notice, notice.bad && styles.noticeBad]}>{notice.text}</Text>}
       {week.status === 'error' && (
         <ErrorState
@@ -166,7 +175,9 @@ export default function ChildWeek() {
       {week.status === 'loading' && week.week === null ? (
         <Loading />
       ) : week.week !== null && week.week.chores.length === 0 ? (
-        <EmptyState title={t('parent.week.empty')} />
+        <EmptyState
+          title={t(week.week.clamped === false ? 'parent.week.fullEmpty' : 'parent.week.empty')}
+        />
       ) : (
         // Two scrolls, vertical outside: a household with more chores than the phone is tall
         // scrolls down, and a grid wider than the phone scrolls across with its day headers
@@ -193,6 +204,15 @@ export default function ChildWeek() {
             </View>
           </ScrollView>
         </ScrollView>
+      )}
+      {week.week?.clamped === true && (
+        <Button
+          title={t('parent.week.seeMore')}
+          onPress={() =>
+            router.push({ pathname: '/(parent)/paywall', params: { gate: 'full_history' } })
+          }
+          secondary
+        />
       )}
       <Button title={t('common.done')} onPress={() => router.back()} />
     </Screen>

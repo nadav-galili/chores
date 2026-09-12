@@ -172,8 +172,11 @@ export const he: Catalog = {
     week: {
       open: 'שבעת הימים האחרונים',
       title: 'שבעת הימים האחרונים · %{name}',
+      fullTitle: 'היסטוריה · %{name}',
       empty: 'לא נרשם דבר בשבעת הימים האחרונים.',
+      fullEmpty: 'עוד לא נרשם דבר.',
       loadFailed: 'לא הצלחנו לטעון את שבעת הימים האחרונים.',
+      seeMore: 'הצגת עוד',
       cell: '%{title}, %{date}: %{state}',
       state: {
         due: 'לא בוצעה',
