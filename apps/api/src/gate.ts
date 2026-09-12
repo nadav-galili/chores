@@ -11,7 +11,7 @@ export type GateAnswer = Extract<GateResult, { ok: true }> | Response;
  * every parent action reaches the household row here immediately before it is performed.
  */
 export async function gate(
-  db: Db,
+  db: Pick<Db, 'query'>,
   action: GatedAction,
   { householdId, ...ctx }: ApiGateContext,
 ): Promise<GateAnswer> {

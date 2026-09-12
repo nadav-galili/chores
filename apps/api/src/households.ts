@@ -150,6 +150,18 @@ export function householdRoutes(db: Db, analytics: Analytics) {
     const body = await parseBody(c, childInputSchema);
     if (!body.ok) return body.response;
     const householdId = c.get('householdId');
+    const [childCount] = await db
+      .select({ n: count() })
+      .from(children)
+      .where(eq(children.householdId, householdId));
+    const answer = await gate(db, 'add_child', {
+      householdId,
+      now: new Date().toISOString(),
+      child_count: childCount?.n ?? 0,
+      parent_count: 0,
+    });
+    if (answer instanceof Response) return answer;
+
     const [row] = await db
       .insert(children)
       .values({
@@ -159,6 +171,7 @@ export function householdRoutes(db: Db, analytics: Analytics) {
         uiMode: body.data.ui_mode,
         petName: body.data.pet_name,
         reminderTime: body.data.reminder_time,
+        readOnlyAfter: 'read_only_after' in answer ? new Date(answer.read_only_after) : null,
         sort: sql`(select coalesce(max(${children.sort}) + 1, 0) from ${children} where ${children.householdId} = ${householdId})`,
       })
       .returning();
@@ -168,6 +181,20 @@ export function householdRoutes(db: Db, analytics: Analytics) {
   scoped.patch('/households/:householdId/children/:childId', async (c) => {
     const body = await parseBody(c, childInputSchema);
     if (!body.ok) return body.response;
+    const householdId = c.get('householdId');
+    const child = await db.query.children.findFirst({
+      where: and(eq(children.id, c.req.param('childId')), eq(children.householdId, householdId)),
+    });
+    if (!child) return c.json({ error: 'not_found' }, 404);
+    const answer = await gate(db, 'edit_child', {
+      householdId,
+      now: new Date().toISOString(),
+      child_count: 0,
+      parent_count: 0,
+      child: { read_only_after: child.readOnlyAfter?.toISOString() ?? null },
+    });
+    if (answer instanceof Response) return answer;
+
     const [row] = await db
       .update(children)
       .set({
@@ -176,12 +203,7 @@ export function householdRoutes(db: Db, analytics: Analytics) {
         petName: body.data.pet_name,
         reminderTime: body.data.reminder_time,
       })
-      .where(
-        and(
-          eq(children.id, c.req.param('childId')),
-          eq(children.householdId, c.get('householdId')),
-        ),
-      )
+      .where(and(eq(children.id, c.req.param('childId')), eq(children.householdId, householdId)))
       .returning();
     if (!row) return c.json({ error: 'not_found' }, 404);
     return c.json(childToApi(row));

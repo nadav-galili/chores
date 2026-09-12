@@ -36,7 +36,7 @@ export type GateContext = {
   child_count: number;
   /** Parents already in the household. */
   parent_count: number;
-  /** The child acted on, for `edit_child`. */
+  /** The child whose row or chore-assignment membership a parent is editing. */
   child?: { read_only_after: string | null };
 };
 
@@ -62,7 +62,10 @@ export function gateFor(action: GatedAction): Gate {
 
 /**
  * Whether a parent in `household` may perform `action`. Premium may do everything; the free
- * tier hits gates. Only parent actions are listed: the child side is never gated (ADR-0005).
+ * tier hits gates. `edit_child` narrowly covers the child's own row and adding or removing that
+ * child as a chore assignee. It does not cover a chore's title, icon or recurrence: a shared chore
+ * belongs to the household, not to any one assignee. Only parent actions are listed; the child
+ * side is never gated (ADR-0005).
  */
 export function canDo(
   household: Pick<Household, 'entitlement'>,

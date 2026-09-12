@@ -12,6 +12,7 @@ import { z } from 'zod';
 import type { Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import { children, choreAssignees, chores } from './db/schema.ts';
+import { gate } from './gate.ts';
 import { parseBody } from './parse-body.ts';
 import { choreFieldsFromRow, choreToApi } from './serialize.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -91,6 +92,11 @@ export function choreRoutes(db: Db, analytics: Analytics) {
         return { status: 400 as const, error: 'invalid_chore', issues: merged.issues };
 
       if (merged.changed.includes('assignees')) {
+        const previous = before?.fields.assignees ?? [];
+        const affected = [
+          ...previous.filter((id) => !merged.fields.assignees.includes(id)),
+          ...merged.fields.assignees.filter((id) => !previous.includes(id)),
+        ];
         const known = await tx
           .select({ id: children.id })
           .from(children)
@@ -102,6 +108,22 @@ export function choreRoutes(db: Db, analytics: Analytics) {
           );
         if (known.length !== new Set(merged.fields.assignees).size) {
           return { status: 400 as const, error: 'unknown_assignee' };
+        }
+        if (affected.length) {
+          const affectedChildren = await tx
+            .select({ readOnlyAfter: children.readOnlyAfter })
+            .from(children)
+            .where(and(eq(children.householdId, householdId), inArray(children.id, affected)));
+          for (const child of affectedChildren) {
+            const answer = await gate(tx, 'edit_child', {
+              householdId,
+              now: new Date().toISOString(),
+              child_count: 0,
+              parent_count: 0,
+              child: { read_only_after: child.readOnlyAfter?.toISOString() ?? null },
+            });
+            if (answer instanceof Response) return answer;
+          }
         }
       }
 
@@ -156,6 +178,7 @@ export function choreRoutes(db: Db, analytics: Analytics) {
       return { status: 200 as const, chore: choreToApi(row!, fields.assignees) };
     });
 
+    if (result instanceof Response) return result;
     if (result.status === 404) return c.json({ error: 'not_found' }, 404);
     if (result.status === 400) {
       return c.json({ error: result.error, issues: result.issues ?? [] }, 400);

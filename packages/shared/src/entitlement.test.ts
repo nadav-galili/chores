@@ -44,7 +44,7 @@ describe('canDo', () => {
     expect(canDo(premium, 'add_child', ctx(5))).toEqual({ ok: true });
   });
 
-  it('edit_child: a free-tier child becomes read-only for parents once read_only_after passes', () => {
+  it('edit_child: locks the child row and assignment membership only after its own grace passes', () => {
     const editable = { read_only_after: null };
     const soon = { read_only_after: '2026-09-10T00:00:00.000Z' };
     const passed = { read_only_after: '2026-09-09T12:00:00.000Z' };
