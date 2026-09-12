@@ -88,3 +88,17 @@ export const deviceSessionSchema = z.object({
   household: householdSummarySchema,
 });
 export type DeviceSession = z.infer<typeof deviceSessionSchema>;
+
+/**
+ * A Kid Device as its parent sees it on the devices screen. The device token's hash, the push
+ * token and the analytics anon id are all credentials or identities (ADR-0009) and none of them
+ * is echoed. A revoked device keeps its row and is shown as revoked: reconnecting is a new join
+ * code, never an un-revoke, because redeeming rotates the anon id.
+ */
+export const childDeviceSchema = z.object({
+  id: z.string().uuid(),
+  platform: platformSchema,
+  last_seen_at: z.string().datetime(),
+  revoked_at: z.string().datetime().nullable(),
+});
+export type ChildDevice = z.infer<typeof childDeviceSchema>;

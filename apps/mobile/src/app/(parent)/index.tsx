@@ -6,7 +6,7 @@ import type {
   ParentTodayRedemption,
   RedemptionDecision,
 } from '@chores/shared';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
@@ -86,6 +86,22 @@ const DECIDED_NOTICE: Record<DecideRedemptionResult, TranslationKey> = {
   already_decided: 'parent.requests.alreadyDecided',
   already_cancelled: 'parent.requests.alreadyCancelled',
 };
+
+/**
+ * The order the requests are read in. Normally the server's; when a tap on a `redemption_requested`
+ * push brought the parent here, the one that push was about comes first, so the thing they were
+ * interrupted for is the thing under their thumb (#51). An id naming a request that is no longer
+ * waiting — already decided, or cancelled by the child — changes nothing: the list is what the
+ * pull says it is, and the parameter only ever reorders it.
+ */
+function askedAboutFirst(
+  requests: ParentTodayRedemption[],
+  first: string | undefined,
+): ParentTodayRedemption[] {
+  if (!first) return requests;
+  const asked = requests.filter((request) => request.redemption_id === first);
+  return asked.length ? [...asked, ...requests.filter((r) => r.redemption_id !== first)] : requests;
+}
 
 /**
  * What the children have asked for and nobody has answered, counted in its own heading so the
@@ -211,6 +227,8 @@ function ChildCard({
 export default function ParentToday() {
   const state = useHousehold();
   const router = useRouter();
+  // Set only by a notification tap (`useNotificationTapRouting`), and only ever a uuid.
+  const { redemption } = useLocalSearchParams<{ redemption?: string }>();
   const { signOut } = useAuth();
   const styles = useThemedStyles(todayStyles);
   const household = state.status === 'ready' ? state.me.household : null;
@@ -314,7 +332,7 @@ export default function ParentToday() {
           )}
           {today.today !== null && today.today.redemptions.length > 0 && (
             <RequestCard
-              requests={today.today.redemptions}
+              requests={askedAboutFirst(today.today.redemptions, redemption)}
               onDecide={(request, decision) => void decide(request, decision)}
               deciding={deciding}
             />

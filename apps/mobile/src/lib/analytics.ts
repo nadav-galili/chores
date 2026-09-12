@@ -2,8 +2,10 @@ import {
   ANALYTICS_HOST,
   kidProperties,
   parentIdentity,
+  pushOpened,
   type AnalyticsEvent,
   type DeviceSession,
+  type NotificationKind,
 } from '@chores/shared';
 import PostHog from 'posthog-react-native';
 import type { DeviceDb } from '@/db/types';
@@ -82,6 +84,7 @@ export async function startKidAnalytics(session: DeviceSession): Promise<void> {
   await client?.register(
     kidProperties({ ui_mode: session.child.ui_mode, household_id: session.household.id }),
   );
+  flushOpenedPush();
 }
 
 /** Parent mode's client: the Clerk user, in their household's group. */
@@ -100,10 +103,31 @@ export async function startParentAnalytics(
   const identity = parentIdentity(clerkUserId, householdId);
   client?.identify(identity.distinct_id);
   for (const [type, key] of Object.entries(identity.groups)) client?.group(type, key);
+  flushOpenedPush();
 }
 
 export function capture(event: AnalyticsEvent): void {
   client?.capture(event.event, event.properties);
+}
+
+/** A tap that arrived before either mode had a client, waiting for one. */
+let openedPush: NotificationKind | null = null;
+
+/**
+ * Reports that a notification of this kind was opened, holding it if no client is up yet. A tap is
+ * usually what launched the app, and the mode's client comes up several frames later, so an open
+ * rate that dropped those would be measuring warm taps only (docs/spec/01-product.md, digest open
+ * rate). At most one is held — what the rate is counting is that the app was opened from a push.
+ */
+export function capturePushOpened(kind: NotificationKind): void {
+  openedPush = kind;
+  if (client) flushOpenedPush();
+}
+
+function flushOpenedPush(): void {
+  const kind = openedPush;
+  openedPush = null;
+  if (kind) capture(pushOpened({ kind }));
 }
 
 /**

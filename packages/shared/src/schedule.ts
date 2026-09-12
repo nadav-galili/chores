@@ -110,6 +110,39 @@ export function remindersDue(
   return due;
 }
 
+export type DigestHousehold = {
+  id: string;
+  tz: string;
+  day_boundary_hour: number;
+  /** Household-local whole hour, 0–23: when the evening digest goes out. */
+  digest_hour: number;
+};
+export type DueDigest = { household_id: string; chore_date: IsoDate };
+
+/**
+ * The households whose digest hour passed within the last `window` minutes, each with the Chore
+ * Date its digest is about — the one that is **still open**. A parent can only act on a day that
+ * has not ended, and with a day boundary as late as 06:00 "yesterday" can mean thirty hours ago
+ * (docs/spec/01-product.md, notifications). Mirrors `remindersDue`: a wall-clock promise read as
+ * one, per household rather than per child because `digest_hour` lives on the household.
+ */
+export function digestsDue(
+  households: readonly DigestHousehold[],
+  now: Date,
+  window = TICK_WINDOW_MINUTES,
+): DueDigest[] {
+  const due: DueDigest[] = [];
+  for (const h of households) {
+    const time = `${String(h.digest_hour).padStart(2, '0')}:00`;
+    if (minutesSinceLocalTime(now, h.tz, time) >= window) continue;
+    due.push({
+      household_id: h.id,
+      chore_date: choreDate(now, h.tz, h.day_boundary_hour),
+    });
+  }
+  return due;
+}
+
 function offsetClockFor(tz: string): Intl.DateTimeFormat {
   let f = offsetFormatters.get(tz);
   if (!f) {

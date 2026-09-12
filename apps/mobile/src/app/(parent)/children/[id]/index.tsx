@@ -28,13 +28,32 @@ export default function EditChild() {
         router.back();
       }}
       footer={
-        <Button
-          title={t('childForm.showJoinCode')}
-          secondary
-          onPress={() =>
-            router.push({ pathname: '/(parent)/children/[id]/join-code', params: { id: child.id } })
-          }
-        />
+        <>
+          <Button
+            title={t('parent.week.open')}
+            secondary
+            onPress={() =>
+              router.push({ pathname: '/(parent)/children/[id]/week', params: { id: child.id } })
+            }
+          />
+          <Button
+            title={t('childForm.showJoinCode')}
+            secondary
+            onPress={() =>
+              router.push({
+                pathname: '/(parent)/children/[id]/join-code',
+                params: { id: child.id },
+              })
+            }
+          />
+          <Button
+            title={t('childForm.devices')}
+            secondary
+            onPress={() =>
+              router.push({ pathname: '/(parent)/children/[id]/devices', params: { id: child.id } })
+            }
+          />
+        </>
       }
     />
   );

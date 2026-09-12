@@ -9,8 +9,10 @@ import type {
   Parent,
   Reward,
   ParentDevice,
+  ChildDevice,
 } from '@chores/shared';
 import type {
+  childDevices,
   children,
   chores,
   households,
@@ -115,6 +117,21 @@ export function parentDeviceToApi(row: typeof parentDevices.$inferSelect): Paren
     platform: row.platform,
     locale: row.locale,
     last_seen_at: row.lastSeenAt.toISOString(),
+  };
+}
+
+/**
+ * A Kid Device as its parent sees it. Four fields and no fifth: the token hash, the push token
+ * and the analytics anon id stay on the server — the first two are credentials and the third is
+ * the child's analytics identity (ADR-0009). `revoked_at` is carried rather than filtered on,
+ * because a revoked device is shown as revoked.
+ */
+export function childDeviceToApi(row: typeof childDevices.$inferSelect): ChildDevice {
+  return {
+    id: row.id,
+    platform: row.platform,
+    last_seen_at: row.lastSeenAt.toISOString(),
+    revoked_at: iso(row.revokedAt),
   };
 }
 

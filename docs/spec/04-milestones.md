@@ -49,7 +49,7 @@ Not in M2: custom rewards, the money ledger and photo proof stay behind their M3
 - **Push token rot** — re-register on open; null on `DeviceNotRegistered`.
 
 ## Dependencies (approved once, here)
-- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto
+- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto, @sentry/react-native
 - api: hono, @hono/node-server, drizzle-orm, postgres, zod, @clerk/backend, posthog-node, expo-server-sdk, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 - tooling: turbo, vitest, tsx, drizzle-kit, eslint, prettier, typescript
 
@@ -66,6 +66,37 @@ writes nothing at all.
 `expo-font` carries the one bundled face — Rubik 600, for display and title — because Rubik covers
 Hebrew and Latin in one family. Only `expo-font` is installed so far; the other two arrive with the
 tickets that use them.
+
+`@sentry/react-native` is approved for the mobile app only, for crash and handled-error reporting
+(#35, ADR-0015). It is the one third party that receives anything from a kid device, so what it
+receives is an allowlist built in `packages/shared/src/error-reporting.ts` and nothing else: no
+child identity, no first name, pet name, chore title or join code. The API keeps `posthog-node` and
+Railway logs.
+
+Its build-time config is *not* committed. The PostHog key sits in `eas.json` because it is a
+write-only ingest key; the Sentry values include an auth token that can read the project, so all
+four are EAS environment variables instead. `scripts/setup-sentry.sh` walks through creating the
+project, the DSN and the token, pushes all four, and ends by triggering a real error and reading
+the raw payload — run it once per Sentry project:
+
+```
+./scripts/setup-sentry.sh
+```
+
+It sets these in the `preview` environment (`eas env:set`, so re-running just updates them):
+
+- `EXPO_PUBLIC_SENTRY_DSN` is read at runtime by `src/lib/error-reporting.ts`. With no DSN the
+  reporter is a no-op and the app behaves exactly as before — which is why nothing breaks before
+  these are set. Visibility `sensitive`, not `secret`: an `EXPO_PUBLIC_*` value is inlined into the
+  bundle at build time, and a secret variable is write-only so the build could not read it.
+- `SENTRY_ORG` and `SENTRY_PROJECT` are read at build time by `app.config.ts`, and
+  `SENTRY_AUTH_TOKEN` by the config plugin, to upload source maps. Without the first two the
+  plugin still links the native SDK; only symbolication is lost.
+
+`app.config.ts` exists for those two variables alone, and adds the config plugin; `app.json` is
+still the whole of the app's configuration. `metro.config.js` wraps Expo's default config with
+Sentry's, which is what stamps the debug id that matches an uploaded source map to a released
+build.
 
 `react-dom` is pinned in `apps/mobile` and in `pnpm.overrides` at the same version as `react`. Nothing
 imports it — pnpm auto-installs it as a peer of expo-router's runtime and hoists it, and a hoisted copy

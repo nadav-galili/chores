@@ -34,6 +34,19 @@ The asymmetry is the point: the ledger corrects by appending a negative entry; t
 
 **Child data is first name only, and nothing about a child reaches analytics or a third party.** Violation: a child's name, age, birthday, photo or id in an analytics call, a crash-report payload, a log line that ships off-device, or any third-party SDK argument. Children are anonymous per-device in analytics. (ADR-0009)
 
+**One carve-out, and only this one: a child's first name may appear in push copy addressed to a registered device of a parent of that child's own household** — the parent digest, which is unreadable without saying which child (`digestCopy` in `packages/shared/src/notification.ts`). Nothing else widens: not analytics, not crash reports, not logs, not the child's own pushes, and never a pet name, chore title, reward title or Join Code. (ADR-0009)
+
+**An error's own message is part of that payload.** A crash report carries the string a `throw`
+was given, and no scrubber downstream can tell a chore title inside it from a real error. Violation:
+a `throw new Error(...)`, a rejected promise or a `captureException` context that interpolates a
+child's first name, pet name, a chore title or a Join Code. Name the operation that failed, not the
+row it failed on. (ADR-0015)
+
+**Anything a third-party SDK sends is an allowlist, not a scrub list.** Violation: a `beforeSend`,
+`beforeBreadcrumb` or equivalent that deletes known-bad fields from an object it was handed instead
+of building a new one out of known-good fields — the next SDK release adds a field the deny list has
+never heard of. The allowlists live in `packages/shared/src/error-reporting.ts`. (ADR-0015)
+
 ## Entitlement never gates the child
 
 **The child's side is never gated by entitlement.** Violation: an entitlement, paywall, subscription or free-tier check anywhere under a `(kid)` route, in a kid-device handler, or in shared logic reached from one. Entitlement gates the parent's side only. (ADR-0005)

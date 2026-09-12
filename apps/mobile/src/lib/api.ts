@@ -1,5 +1,6 @@
 import type {
   Child,
+  ChildDevice,
   ChildInput,
   Chore,
   CreateHouseholdInput,
@@ -14,6 +15,7 @@ import type {
   ParentDeviceInput,
   ParentInvite,
   ParentToday,
+  ParentWeek,
   RedeemJoinCodeInput,
   RedemptionDecision,
   RejectCompletionResult,
@@ -72,6 +74,10 @@ export function createApi(getToken: GetToken) {
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
     today: (householdId: string) => call<ParentToday>(getToken, `/households/${householdId}/today`),
+    // The child's last seven Chore Dates. Ungated — seven days is the free tier's promise — so
+    // there is nothing here to catch a paywall answer.
+    childWeek: (householdId: string, childId: string) =>
+      call<ParentWeek>(getToken, `/households/${householdId}/children/${childId}/week`),
     // Rejecting names a completion, never an instance: the id comes from the today payload.
     rejectCompletion: (householdId: string, completionId: string) =>
       call<{ status: RejectCompletionResult }>(
@@ -100,6 +106,16 @@ export function createApi(getToken: GetToken) {
       call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',
       }),
+    listChildDevices: (householdId: string, childId: string) =>
+      call<ChildDevice[]>(getToken, `/households/${householdId}/children/${childId}/devices`),
+    // Revoking is idempotent server-side, so a second tap answers with the first revocation's
+    // timestamp rather than an error. There is no un-revoke: reconnecting is a new join code.
+    revokeChildDevice: (householdId: string, childId: string, deviceId: string) =>
+      call<{ id: string; revoked_at: string }>(
+        getToken,
+        `/households/${householdId}/children/${childId}/devices/${deviceId}`,
+        { method: 'DELETE' },
+      ),
     listRewards: (householdId: string) =>
       call<Reward[]>(getToken, `/households/${householdId}/rewards`),
     // Hiding a built-in, and nothing more: a custom reward is M3's `custom_reward` gate.

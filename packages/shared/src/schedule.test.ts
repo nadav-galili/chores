@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  digestsDue,
   localMinutes,
   localTimeFor,
   minutesSinceLocalTime,
@@ -7,6 +8,7 @@ import {
   remindersDue,
   rolloversDue,
   TICK_WINDOW_MINUTES,
+  type DigestHousehold,
   type ReminderChild,
   type RollingHousehold,
 } from './schedule.ts';
@@ -121,6 +123,75 @@ describe('remindersDue', () => {
       for (const due of remindersDue(children, new Date(t), 1)) fired.push(due.chore_date);
     }
     expect(fired).toEqual(['2026-09-09']);
+  });
+});
+
+describe('digestsDue', () => {
+  const digester = (
+    id: string,
+    tz: string,
+    digest_hour: number,
+    day_boundary_hour = 0,
+  ): DigestHousehold => ({ id, tz, day_boundary_hour, digest_hour });
+
+  it('is the households whose digest hour just passed, each on its own clock', () => {
+    // 17:00 UTC is 20:00 in Jerusalem and 13:00 in New York.
+    const households = [digester('h1', JERUSALEM, 20), digester('h2', NEW_YORK, 20)];
+    expect(digestsDue(households, new Date('2026-09-09T17:00:20Z'))).toEqual([
+      { household_id: 'h1', chore_date: '2026-09-09' },
+    ]);
+    // Four hours on, New York reaches its own 20:00 and Jerusalem's window has closed.
+    expect(digestsDue(households, new Date('2026-09-10T00:00:20Z'))).toEqual([
+      { household_id: 'h2', chore_date: '2026-09-09' },
+    ]);
+  });
+
+  it('honours a household’s own digest hour', () => {
+    const early = digester('h1', JERUSALEM, 18);
+    expect(digestsDue([early], new Date('2026-09-09T17:00:20Z'))).toEqual([]);
+    expect(digestsDue([early], new Date('2026-09-09T15:00:20Z'))).toEqual([
+      { household_id: 'h1', chore_date: '2026-09-09' },
+    ]);
+  });
+
+  it('keeps firing through the catch-up window and stops after it', () => {
+    const households = [digester('h1', JERUSALEM, 20)];
+    const at = (minutes: number) =>
+      digestsDue(households, new Date(Date.parse('2026-09-09T17:00:00Z') + minutes * 60_000));
+    for (let m = 0; m < TICK_WINDOW_MINUTES; m++) expect(at(m)).toHaveLength(1);
+    expect(at(TICK_WINDOW_MINUTES)).toEqual([]);
+  });
+
+  it('is about the chore date that is still open, not the calendar’s', () => {
+    // A 06:00 boundary and a 02:00 digest hour: at 02:00 on the 10th the open day is the 9th,
+    // which is what a parent can still act on — thirty hours after it started.
+    const late = digester('h1', JERUSALEM, 2, 6);
+    expect(digestsDue([late], new Date('2026-09-09T23:00:20Z'))).toEqual([
+      { household_id: 'h1', chore_date: '2026-09-09' },
+    ]);
+  });
+
+  it('is the same open chore date for a midnight digest hour past the boundary', () => {
+    // 00:00 local, boundary 0: the day that has just begun is the open one.
+    const household = digester('h1', JERUSALEM, 0, 0);
+    expect(digestsDue([household], new Date('2026-09-09T21:00:20Z'))).toEqual([
+      { household_id: 'h1', chore_date: '2026-09-10' },
+    ]);
+  });
+
+  it('fires once per household per day over a day of ticks', () => {
+    const households = [digester('h1', JERUSALEM, 20), digester('h2', NEW_YORK, 7, 3)];
+    const fired: string[] = [];
+    for (
+      let t = Date.parse('2026-09-09T00:00:00Z');
+      t < Date.parse('2026-09-10T00:00:00Z');
+      t += 60_000
+    ) {
+      for (const due of digestsDue(households, new Date(t), 1)) {
+        fired.push(`${due.household_id} ${due.chore_date}`);
+      }
+    }
+    expect(fired).toEqual(['h2 2026-09-09', 'h1 2026-09-09']);
   });
 });
 
