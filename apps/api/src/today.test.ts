@@ -11,6 +11,7 @@ import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
+import { setTestPin } from './test/household.ts';
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -37,6 +38,7 @@ async function setup(clerkUserId: string) {
       }),
     )
   ).json()) as { household: { id: string } };
+  await setTestPin(app, clerkUserId, household.id);
 
   const child = async (first_name: string) =>
     (await (
@@ -83,6 +85,7 @@ async function setup(clerkUserId: string) {
 }
 
 async function complete(session: DeviceSession, choreId: string, completedAt: string) {
+  const completionId = uuid7();
   const res = await app.request('/sync', {
     method: 'POST',
     headers: {
@@ -98,7 +101,7 @@ async function complete(session: DeviceSession, choreId: string, completedAt: st
           type: 'complete',
           payload: {
             chore_id: choreId,
-            completion_id: uuid7(),
+            completion_id: completionId,
             completed_at: completedAt,
             chore_date: today(),
           },
@@ -108,7 +111,7 @@ async function complete(session: DeviceSession, choreId: string, completedAt: st
   });
   const body = (await res.json()) as SyncResponse;
   expect(body.rejected).toEqual([]);
-  return body;
+  return { ...body, completionId };
 }
 
 const getToday = async (clerkUserId: string, householdId: string) => {
@@ -124,7 +127,7 @@ describe('GET /households/:id/today', () => {
     const bed = await putChore({ title: 'Bed', icon: '🛏️', kind: 'daily', assignees: [noa.id] });
 
     const doneAt = new Date().toISOString();
-    await complete(session, dishes, doneAt);
+    const { completionId } = await complete(session, dishes, doneAt);
 
     const { status, body } = await getToday(owner, householdId);
     expect(status).toBe(200);
@@ -140,6 +143,8 @@ describe('GET /households/:id/today', () => {
       instance_id: instanceId(dishes, noa.id, today()),
       title: 'Dishes',
       status: 'done',
+      // The completion's id: without it no parent surface can name what it would reject.
+      completion_id: completionId,
     });
     expect(Date.parse(dishesItem.completed_at!)).toBe(Date.parse(doneAt));
     expect(noasDay!.items.find((i) => i.chore_id === bed)).toMatchObject({
@@ -147,6 +152,7 @@ describe('GET /households/:id/today', () => {
       icon: '🛏️',
       status: 'due',
       completed_at: null,
+      completion_id: null,
     });
 
     // Ori has no device and has never synced; the parent still sees today's list, materialized.

@@ -5,6 +5,7 @@ import {
   type IsoDate,
   type ParentToday,
   type ParentTodayItem,
+  type ParentTodayRedemption,
 } from '@chores/shared';
 import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -17,6 +18,8 @@ import {
   daySummaries,
   households,
   ledgerEntries,
+  redemptions,
+  rewards,
 } from './db/schema.ts';
 import { writeHouseholdInstances } from './materialize.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -82,9 +85,11 @@ export function todayRoutes(db: Db) {
       orderBy: asc(children.sort),
     });
     const childIds = childRows.map((r) => r.id);
-    if (!childIds.length) return c.json({ chore_date: today, children: [] } satisfies ParentToday);
+    if (!childIds.length) {
+      return c.json({ chore_date: today, children: [], redemptions: [] } satisfies ParentToday);
+    }
 
-    const [instanceRows, completionRows, balanceRows, summariesByChild] = await Promise.all([
+    const [instanceRows, completionRows, balanceRows, summariesByChild, asked] = await Promise.all([
       db
         .select({
           id: choreInstances.id,
@@ -105,7 +110,11 @@ export function todayRoutes(db: Db) {
         )
         .orderBy(asc(chores.title)),
       db
-        .select({ instanceId: completions.instanceId, completedAt: completions.completedAt })
+        .select({
+          id: completions.id,
+          instanceId: completions.instanceId,
+          completedAt: completions.completedAt,
+        })
         .from(completions)
         .where(
           and(
@@ -113,7 +122,12 @@ export function todayRoutes(db: Db) {
             eq(completions.choreDate, today),
             eq(completions.status, 'accepted'),
           ),
-        ),
+        )
+        // An instance can hold more than one accepted completion — a child with two devices,
+        // both offline, taps it twice — and the map below keeps the last row it reads. Oldest
+        // first makes that the newest completion: the one still holding the instance up, and so
+        // the one a parent rejecting from this screen means.
+        .orderBy(asc(completions.completedAt)),
       // Balance is always SUM(coins) over the whole ledger; never a stored column (ADR-0002).
       db
         .select({
@@ -124,9 +138,28 @@ export function todayRoutes(db: Db) {
         .where(inArray(ledgerEntries.childId, childIds))
         .groupBy(ledgerEntries.childId),
       streakSummaries(db, childIds, today),
+      // Every Redemption nobody has decided, whatever day it was asked for: a request does not
+      // expire with the chore date, and a parent who was away decides yesterday's today.
+      db
+        .select({
+          id: redemptions.id,
+          childId: redemptions.childId,
+          firstName: children.firstName,
+          rewardId: redemptions.rewardId,
+          builtinKey: rewards.builtinKey,
+          title: rewards.title,
+          icon: rewards.icon,
+          costCoins: redemptions.costCoins,
+          requestedAt: redemptions.requestedAt,
+        })
+        .from(redemptions)
+        .innerJoin(rewards, eq(rewards.id, redemptions.rewardId))
+        .innerJoin(children, eq(children.id, redemptions.childId))
+        .where(and(eq(redemptions.householdId, householdId), eq(redemptions.status, 'requested')))
+        .orderBy(asc(redemptions.requestedAt)),
     ]);
 
-    const doneAt = new Map(completionRows.map((r) => [r.instanceId, r.completedAt.toISOString()]));
+    const doneBy = new Map(completionRows.map((r) => [r.instanceId, r]));
     const balanceByChild = new Map(balanceRows.map((r) => [r.childId, r.coins]));
 
     const body: ParentToday = {
@@ -140,7 +173,8 @@ export function todayRoutes(db: Db) {
             title: i.title,
             icon: i.icon,
             status: i.status,
-            completed_at: doneAt.get(i.id) ?? null,
+            completed_at: doneBy.get(i.id)?.completedAt.toISOString() ?? null,
+            completion_id: doneBy.get(i.id)?.id ?? null,
           }));
         return {
           child_id: child.id,
@@ -154,6 +188,19 @@ export function todayRoutes(db: Db) {
           streak: currentStreak(summariesByChild.get(child.id) ?? [], today),
         };
       }),
+      redemptions: asked.map((r): ParentTodayRedemption => ({
+        redemption_id: r.id,
+        child_id: r.childId,
+        first_name: r.firstName,
+        reward_id: r.rewardId,
+        builtin_key: r.builtinKey,
+        // A built-in reward carries no title of its own; the app renders it from `builtin_key`.
+        title: r.title,
+        icon: r.icon,
+        // The snapshot taken when the child asked, not what the catalog says today.
+        cost_coins: r.costCoins,
+        requested_at: r.requestedAt.toISOString(),
+      })),
     };
     return c.json(body);
   });

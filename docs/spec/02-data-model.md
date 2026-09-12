@@ -3,10 +3,10 @@
 Postgres is the source of truth. Devices hold a scoped subset in expo-sqlite with the same Drizzle schema shapes. Ids are client-generated UUIDv7 unless marked **deterministic** (UUIDv5 of the listed inputs). Balances are never stored.
 
 ## Household and people
-- **households**: id · name · tz (IANA) · day_boundary_hour (0–6, default 0) · digest_hour (default 20) · currency (ILS|USD) · coins_per_unit · entitlement (free|premium) · entitlement_source · created_at
-- **parents**: id · household_id · clerk_user_id (unique) · email (lower-cased, from the Clerk token, nullable) · display_name · pin_hash · created_at
+- **households**: id · name · tz (IANA) · day_boundary_hour (0–6, default 0) · digest_hour (default 20) · currency (ILS|USD) · coins_per_unit · entitlement (free|premium) · entitlement_source · pin_hash · pin_salt · created_at. The Parent PIN is one per household and lives here, not on a parent: it is a door out of kid mode, not a credential identifying who opened it (ADR-0013).
+- **parents**: id · household_id · clerk_user_id (unique) · email (lower-cased, from the Clerk token, nullable) · display_name · created_at
 - **parent_invites**: email (PK, lower-cased) · household_id · invited_by · created_at · accepted_at · accepted_parent_id. A partner is invited by address alone: there is no link and no mail. Their first Clerk sign-in with that email creates their parent row in the household and marks the invite accepted. A pending invite holds a seat, so it counts against the free tier's two parents.
-- **parent_devices**: id · parent_id · expo_push_token · platform · last_seen_at
+- **parent_devices**: id · parent_id · expo_push_token · locale · platform · last_seen_at. The locale is registered with the token, the way a kid device's is, so a digest arrives in the language that device reads.
 - **children**: id · household_id · first_name · ui_mode (little|big) · pet_name · reminder_time (local HH:MM, nullable) · read_only_after (nullable) · sort · created_at
 - **child_devices**: id · child_id · household_id · token_hash · analytics_anon_id · expo_push_token · platform · last_seen_at · revoked_at
 - **join_codes**: code (6 chars, unique while live) · household_id · child_id · created_by · expires_at · redeemed_at · redeemed_device_id
@@ -26,18 +26,18 @@ Postgres is the source of truth. Devices hold a scoped subset in expo-sqlite wit
 | bonus | uuid5('bonus', child_id, chore_date) | +20 |
 | streak | uuid5('streak', child_id, chore_date, n) | +30/+70/+150 |
 | clawback | uuid5('clawback', target_entry_id) | −target |
-| redeem | uuid5('redeem', redemption_id) | −cost |
+| redeem | uuid5('redeem', redemption_id) | −cost, written when the redemption is **requested** (ADR-0014) |
 | payout | client uuid | −coins, +money_amount |
 | adjust | client uuid | ± with note |
 
-Balance = `SUM(coins)` minus reserved open redemptions. Owed money = `SUM(money_amount)`.
+Balance = `SUM(coins)`, with nothing subtracted from it and nothing held aside: a requested redemption has already spent its coins, so there is nothing left to reserve. `ref_type` is one of `completion | chore_date | ledger_entry | redemption`. Owed money = `SUM(money_amount)`.
 
 - **xp_events**: id = uuid5('xp', ledger_entry_id) · child_id · xp (signed) · ref_entry_id · created_at. Mirrors earn/bonus/streak/clawback 1:1. Pet level = threshold table over `SUM(xp)`.
 - **day_summaries**: child_id · chore_date (PK) · due_count · done_count · complete · streak_after. Recomputed on every completion/rejection. Streak = walk back while `complete` or `due_count = 0`.
-- **growth_entries**: **id = uuid5('grow', child_id, chore_date)** · household_id · child_id · chore_date · created_at. Appended once when a day summary first becomes `complete`. Grove stage = `COUNT(*)` per child; never a stored column. Unlike `xp_events`, this table has **no** clawback counterpart — a rejection claws back coins and XP and breaks the streak, but never deletes or reverses a growth entry. Append-only, `ON CONFLICT DO NOTHING`. (ADR-0011)
+- **growth_entries**: **id = uuid5('grow', child_id, chore_date)** · household_id · child_id · chore_date · created_at. Appended once when a day summary first becomes `complete`. Grove stage = `COUNT(*)` per child; never a stored column. Unlike `xp_events`, this table has **no** clawback counterpart — a rejection claws back coins and XP and breaks the streak, but never deletes or reverses a growth entry. Append-only, `ON CONFLICT DO NOTHING`. A redo completed inside the Redo Window can make a **past** chore date day complete for the first time, so a growth entry may be appended for a date that is not today — every other path appends for today, and that is not an invariant. (ADR-0011)
 
 ## Rewards
-- **rewards**: id · household_id (null = built-in) · title · icon · cost_coins · is_builtin · active · sort · updated_at · deleted_at
+- **rewards**: id · household_id · builtin_key (nullable) · title · icon · cost_coins · is_builtin · active · sort · updated_at · deleted_at. Every reward belongs to a household, built-ins included: the catalog is **copied into a household when it is created**, so a global row with no household never has to reach a `change_log` that is scoped by one. A built-in carries a `builtin_key` (`snack`, `screen_time`, ...) and the device renders its title from i18n, so nothing is seeded in a language and a Hebrew parent and an English kid device each read their own. Hiding a built-in is `active = false` on the household's own row. A catalog entry added in a later app version reaches existing households only by backfill migration.
 - **redemptions**: id · reward_id · child_id · household_id · cost_coins (snapshot) · status (requested|approved|declined|cancelled) · requested_at · decided_at · decided_by
 
 ## Sync and ops plumbing
@@ -48,7 +48,7 @@ Balance = `SUM(coins)` minus reserved open redemptions. Owed money = `SUM(money_
 
 ## Timezone rules
 - `chore_date(now, tz, day_boundary_hour)` = calendar date in `tz` of `now − day_boundary_hour hours`.
-- Computed on device at tap time and sent with the completion. Server recomputes from `completed_at`; accepts if equal or ±1 day, else uses its own and flags `date_adjusted`.
+- Computed on device at tap time and sent with the completion. Server recomputes from `completed_at`; accepts if equal or ±1 day, else uses its own and flags `date_adjusted`. **The ±1 rule applies only when the instance would have to be created**: it exists so a device with a wrong clock cannot invent a day, and an instance the server already materialized was not invented by a device. A completion naming an existing instance is written on that instance's chore date however far back it is, which is what makes the Redo Window work.
 - Recurrence evaluated on local dates only. Weekday of `chore_date` decides weekday chores. No arithmetic on instants → DST cannot shift a day.
 - Changing household `tz` never rewrites materialized instances.
 
@@ -58,3 +58,6 @@ Balance = `SUM(coins)` minus reserved open redemptions. Owed money = `SUM(money_
 - day complete / freeze / break, streak walk-back, each streak bonus fires exactly once
 - ledger: earn → reject → clawback nets 0; reject that breaks day-complete claws back bonus and streak; re-applying any op is a no-op
 - entitlement gate matrix: free × premium × each gated action; 14-day read-only child
+- redemption: request writes `redeem` at request; decline and cancel produce the same clawback id; approve writes nothing; a request that would take the balance below zero is refused
+- redo inside the Redo Window restores the day bonus and the streak; outside it, nothing; re-running reconciliation on the same facts is a no-op
+- `verifyPin` accepts the right code and refuses every other, with the salt taken from the household

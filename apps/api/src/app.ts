@@ -6,8 +6,12 @@ import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
+import { parentDeviceRoutes } from './parent-devices.ts';
+import { pinRoutes } from './pin.ts';
 import type { RateLimit } from './rate-limit.ts';
+import { redemptionRoutes } from './redemptions.ts';
 import { rejectionRoutes } from './rejection.ts';
+import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
 import { todayRoutes } from './today.ts';
 
@@ -40,8 +44,12 @@ export function createApp(
   app.use('/households', requireClerkUser(verifyToken));
   app.route('/', householdRoutes(db, analytics));
   app.route('/', choreRoutes(db, analytics));
+  app.route('/', parentDeviceRoutes(db));
+  app.route('/', pinRoutes(db));
   app.route('/', todayRoutes(db));
   app.route('/', rejectionRoutes(db));
+  app.route('/', rewardRoutes(db));
+  app.route('/', redemptionRoutes(db, analytics));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
 

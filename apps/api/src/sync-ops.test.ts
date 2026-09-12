@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import {
+  addDays,
   bonusId,
   choreDate,
   COINS_PER_CHORE,
@@ -23,6 +24,7 @@ import {
   ledgerEntries,
   xpEvents,
 } from './db/schema.ts';
+import { writeHouseholdInstances } from './materialize.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 import { completeOp, setupHousehold, syncAs, testToday, TEST_TZ } from './test/household.ts';
@@ -433,5 +435,138 @@ describe('POST /sync register_push_token', () => {
     await sync(noa.session, [registerOp('ExponentPushToken[free]')]);
     expect(await balance(noa.id)).toBe(0);
     expect(await xpTotal(noa.id)).toBe(0);
+  });
+});
+
+/**
+ * docs/spec/02-data-model.md, timezone rules: "The ±1 rule applies only when the instance would
+ * have to be created" — the guard exists so a device with a wrong clock cannot invent a day, and
+ * an instance the server already materialized was not invented by a device. Without this the
+ * redo of a two-day-old chore would land on today's instance and stay a redo forever.
+ */
+describe('POST /sync complete on an instance the server already materialized', () => {
+  /** A past instance the parent rejected, exactly as a rejection leaves it: due again, `redo`. */
+  const pastRedo = async (clerkUserId: string, daysAgo: number) => {
+    const { noa, householdId, addChore } = await setup(clerkUserId);
+    const choreId = await addChore('Dishes', [noa.id]);
+    const date = addDays(today(), -daysAgo);
+    await writeHouseholdInstances(db, householdId, date);
+    await db
+      .update(choreInstances)
+      .set({ status: 'redo' })
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, date)));
+    return { noa, choreId, date };
+  };
+
+  it('writes a two-day-old redo on that instance’s own chore date, not today’s', async () => {
+    const { noa, choreId, date } = await pastRedo('user_redo_two', 2);
+    const op = completeOp(choreId, { chore_date: date });
+
+    const { body } = await sync(noa.session, [op]);
+    expect(body.rejected).toEqual([]);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, op.payload.completion_id));
+    expect(completion!.choreDate).toBe(date);
+    expect(completion!.instanceId).toBe(instanceId(choreId, noa.id, date));
+
+    const [instance] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, date)));
+    expect(instance!.status).toBe('done');
+    // Today's own instance was materialized by the pull and is untouched: the redo did not
+    // become a completion of today's chore.
+    const [todays] = await db
+      .select()
+      .from(choreInstances)
+      .where(and(eq(choreInstances.childId, noa.id), eq(choreInstances.choreDate, today())));
+    expect(todays!.status).toBe('due');
+
+    // That past day is complete for the first time, so its bonus and its tree land on its date.
+    expect(await balance(noa.id)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+    const trees = await db.select().from(growthEntries).where(eq(growthEntries.childId, noa.id));
+    expect(trees.map((t) => t.id)).toEqual([growthId(noa.id, date)]);
+  });
+
+  it('refuses a three-day-old redo: it is outside the Redo Window', async () => {
+    const { noa, choreId, date } = await pastRedo('user_redo_three', 3);
+    const op = completeOp(choreId, { chore_date: date });
+
+    const { body } = await sync(noa.session, [op]);
+    expect(body.acked).toEqual([]);
+    expect(body.rejected).toEqual([{ op_id: op.op_id, reason: 'too_late' }]);
+    expect(await balance(noa.id)).toBe(0);
+
+    const [instance] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, date)));
+    expect(instance!.status).toBe('redo');
+  });
+
+  it('accepts a long-offline device’s completion of a still-due day of its own', async () => {
+    // Not a redo: the instance was never rejected, so the Redo Window has nothing to say about
+    // it. Refusing this would have the device undo three days of honest work.
+    const { noa, householdId, addChore } = await setup('user_offline_due');
+    const choreId = await addChore('Dishes', [noa.id]);
+    const date = addDays(today(), -3);
+    await writeHouseholdInstances(db, householdId, date);
+    const op = completeOp(choreId, { chore_date: date });
+
+    const { body } = await sync(noa.session, [op]);
+    expect(body.rejected).toEqual([]);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, op.payload.completion_id));
+    expect(completion!.choreDate).toBe(date);
+
+    const [instance] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, date)));
+    expect(instance!.status).toBe('done');
+    expect(await balance(noa.id)).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+  });
+
+  it('still adjusts a wrong-clock completion when no such instance exists', async () => {
+    const { noa, addChore } = await setup('user_redo_no_instance');
+    const choreId = await addChore('Dishes', [noa.id]);
+    const claimed = addDays(today(), -5);
+    const op = completeOp(choreId, { chore_date: claimed });
+
+    const { body } = await sync(noa.session, [op]);
+    expect(body.acked).toEqual([{ op_id: op.op_id, date_adjusted: true }]);
+
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, op.payload.completion_id));
+    expect(completion!.choreDate).toBe(today());
+    const stray = await db
+      .select()
+      .from(choreInstances)
+      .where(and(eq(choreInstances.childId, noa.id), eq(choreInstances.choreDate, claimed)));
+    expect(stray).toEqual([]);
+  });
+
+  it('refuses the child’s undo of a redo completed today for an earlier date', async () => {
+    const { noa, choreId, date } = await pastRedo('user_redo_undo', 2);
+    const done = completeOp(choreId, { chore_date: date });
+    await sync(noa.session, [done]);
+
+    const undo = {
+      op_id: uuid7(),
+      type: 'uncomplete',
+      payload: { completion_id: done.payload.completion_id },
+    };
+    const { body } = await sync(noa.session, [undo]);
+    expect(body.rejected).toEqual([{ op_id: undo.op_id, reason: 'too_late' }]);
   });
 });

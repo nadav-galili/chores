@@ -3,15 +3,21 @@ import type {
   ChildInput,
   Chore,
   CreateHouseholdInput,
+  DecideRedemptionResult,
   Household,
   IssuedJoinCode,
   ChildSummary,
   HouseholdSummary,
   DeviceSession,
   Parent,
+  ParentDevice,
+  ParentDeviceInput,
   ParentInvite,
   ParentToday,
   RedeemJoinCodeInput,
+  RedemptionDecision,
+  RejectCompletionResult,
+  Reward,
   SyncRequest,
   SyncResponse,
   UpsertChoreOp,
@@ -66,6 +72,21 @@ export function createApi(getToken: GetToken) {
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
     today: (householdId: string) => call<ParentToday>(getToken, `/households/${householdId}/today`),
+    // Rejecting names a completion, never an instance: the id comes from the today payload.
+    rejectCompletion: (householdId: string, completionId: string) =>
+      call<{ status: RejectCompletionResult }>(
+        getToken,
+        `/households/${householdId}/completions/${completionId}/reject`,
+        { method: 'POST' },
+      ),
+    // Deciding names a redemption, never a reward: the id comes from the today payload. Approving
+    // moves no coins — they left when the child asked — and declining refunds (ADR-0014).
+    decideRedemption: (householdId: string, redemptionId: string, decision: RedemptionDecision) =>
+      call<{ status: DecideRedemptionResult }>(
+        getToken,
+        `/households/${householdId}/redemptions/${redemptionId}/decide`,
+        json('POST', { decision }),
+      ),
     listParents: (householdId: string) =>
       call<{ parents: Parent[]; invites: ParentInvite[] }>(
         getToken,
@@ -73,10 +94,23 @@ export function createApi(getToken: GetToken) {
       ),
     inviteParent: (householdId: string, email: string) =>
       call<ParentInvite>(getToken, `/households/${householdId}/parents`, json('POST', { email })),
+    setPin: (householdId: string, pin: string) =>
+      call<Household>(getToken, `/households/${householdId}/pin`, json('PUT', { pin })),
     issueJoinCode: (householdId: string, childId: string) =>
       call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',
       }),
+    listRewards: (householdId: string) =>
+      call<Reward[]>(getToken, `/households/${householdId}/rewards`),
+    // Hiding a built-in, and nothing more: a custom reward is M3's `custom_reward` gate.
+    setRewardActive: (householdId: string, rewardId: string, active: boolean) =>
+      call<Reward>(
+        getToken,
+        `/households/${householdId}/rewards/${rewardId}`,
+        json('PATCH', { active }),
+      ),
+    registerDevice: (householdId: string, input: ParentDeviceInput) =>
+      call<ParentDevice>(getToken, `/households/${householdId}/devices`, json('POST', input)),
     listChores: (householdId: string) =>
       call<Chore[]>(getToken, `/households/${householdId}/chores`),
     upsertChore: (householdId: string, choreId: string, op: UpsertChoreOp) =>

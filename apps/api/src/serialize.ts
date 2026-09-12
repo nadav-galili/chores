@@ -7,8 +7,18 @@ import type {
   ChildSummary,
   HouseholdSummary,
   Parent,
+  Reward,
+  ParentDevice,
 } from '@chores/shared';
-import type { children, chores, households, parentInvites, parents } from './db/schema.ts';
+import type {
+  children,
+  chores,
+  households,
+  parentDevices,
+  parentInvites,
+  parents,
+  rewards,
+} from './db/schema.ts';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
@@ -97,6 +107,41 @@ export function childSummaryToApi(row: typeof children.$inferSelect): ChildSumma
   return { id: row.id, first_name: row.firstName, ui_mode: row.uiMode, pet_name: row.petName };
 }
 
+/** The registration read back. The push token stays on the server; the phone already has it. */
+export function parentDeviceToApi(row: typeof parentDevices.$inferSelect): ParentDevice {
+  return {
+    id: row.id,
+    parent_id: row.parentId,
+    platform: row.platform,
+    locale: row.locale,
+    last_seen_at: row.lastSeenAt.toISOString(),
+  };
+}
+
+/** The Parent PIN crosses to the kid device on purpose, and only here (ADR-0013). */
 export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
-  return { id: row.id, tz: row.tz, day_boundary_hour: row.dayBoundaryHour };
+  return {
+    id: row.id,
+    tz: row.tz,
+    day_boundary_hour: row.dayBoundaryHour,
+    pin_hash: row.pinHash,
+    pin_salt: row.pinSalt,
+  };
+}
+
+/** A reward row on the wire. `title` stays null for a built-in; the reader's i18n names it. */
+export function rewardToApi(row: typeof rewards.$inferSelect): Reward {
+  return {
+    id: row.id,
+    household_id: row.householdId,
+    builtin_key: row.builtinKey,
+    title: row.title,
+    icon: row.icon,
+    cost_coins: row.costCoins,
+    is_builtin: row.isBuiltin,
+    active: row.active,
+    sort: row.sort,
+    updated_at: row.updatedAt.toISOString(),
+    deleted_at: iso(row.deletedAt),
+  };
 }

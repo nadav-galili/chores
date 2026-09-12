@@ -13,12 +13,20 @@ Exit: two kids, two devices, real chores, offline works, per-day opens visible i
 - EAS dev build, Android internal distribution
 
 ## M2 · Parent shell
-- Reject + clawback; "redo" on kid side
-- Built-in reward catalog, request → approve/decline, reservation
-- Expo push: tokens, four kinds, digest content, minute cron, push-triggered pull
-- Parent PIN
-- Devices per child, revoke, reconnect
-- Stats (7-day window), Hebrew RTL pass
+Exit: a parent can see a day, reject what did not happen, decide what a child asked for, and be told once each evening — and a child can redo, spend and stay out of parent mode.
+
+What M1 already landed, so M2 does not rebuild it: the rejection endpoint and its clawback; the Expo transport, receipts and the minute cron, for `kid_reminder` only; the revoke endpoint; the Hebrew and RTL pass. What M1 left as a shape with no middle: `redeem` in the ledger kinds, three notification kinds, `custom_reward` in the gate list, `redo` as an instance status, `pin_hash` as an unread column, and both reward tables on the kid device but in no migration.
+
+- **Reject, reachable.** A `completion_id` on the parent's surfaces — today and the 7-day grid — because the endpoint exists and nothing can name what to reject.
+- **Redo.** The server writes a completion on an existing instance's own chore date however far back it is; the kid side shows redos in their own section for two days; the ledger restores the day bonus and streak; the grove may grow for a past chore date.
+- **Rewards.** Both tables in Postgres, the catalog copied into each household at creation with a `builtin_key`, `request_redemption` / `cancel_redemption` as optimistic kid ops, a parent decision over REST, and the kid shop. Coins leave at request (ADR-0014); a refused op undoes its own rows.
+- **Push, the other three kinds.** Parent device registration with a locale, `digestsDue()`, digest content and suppression, and the two immediate kinds.
+- **Parent PIN.** On `households`, set before the first join code, verified on the kid device (ADR-0013).
+- **Devices per child.** A `GET` to go with the revoke that already exists; "reconnect" is issuing another join code, not un-revoking one.
+- **Stats.** The 7-day grid, per child, ungated — it is the free tier's history promise, and its `done` cells are how a parent reaches a past completion at all.
+- **Analytics.** `reward_requested` and `redemption_decided`, and nothing about a child.
+
+Not in M2: custom rewards, the money ledger and photo proof stay behind their M3 gates; crash reporting (#35) is its own issue, sequenced **before** the rejected-op rollback and the PIN check, because both fail silently on a device and both fail by making the balance look like a lie.
 
 ## M3 · Premium
 - RevenueCat products + entitlement + webhook, paywall at gates only

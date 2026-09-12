@@ -1,12 +1,13 @@
 import {
   materializeInstances,
+  redoWindowStart,
   type IsoDate,
   type InstanceStatus,
   type MaterializableChore,
   type SyncChange,
   type SyncResponse,
 } from '@chores/shared';
-import { and, asc, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, gte, isNull, lt, sql } from 'drizzle-orm';
 import { getTableConfig, type SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { choreAssignees, choreInstances, chores, syncState, syncedTables } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
@@ -112,6 +113,53 @@ export type TodayItem = {
   icon: string | null;
   status: InstanceStatus;
 };
+
+/**
+ * A chore a parent rejected, carrying the Chore Date it belongs to: a redo counts for that day,
+ * not for today, so the date travels with the row rather than being assumed by the writer.
+ */
+export type RedoItem = TodayItem & { chore_date: IsoDate };
+
+/**
+ * The redos waiting below today's list: this child's `redo` instances from earlier Chore Dates
+ * that are still inside the Redo Window (CONTEXT.md). The window is a bound in the query and its
+ * arithmetic is the shared rule's, so an instance that has aged out simply stops being offered —
+ * it never reaches a tap the server would refuse `too_late`.
+ *
+ * Today's own redos are not here: a rejection that lands during the day leaves the chore due on
+ * today's list, which is where the child is already looking.
+ */
+export async function redoList(db: DeviceDb, childId: string, today: IsoDate): Promise<RedoItem[]> {
+  const rows = await db
+    .select({
+      id: choreInstances.id,
+      chore_id: choreInstances.chore_id,
+      chore_date: choreInstances.chore_date,
+      title: chores.title,
+      icon: chores.icon,
+      status: choreInstances.status,
+    })
+    .from(choreInstances)
+    .innerJoin(chores, eq(chores.id, choreInstances.chore_id))
+    .innerJoin(
+      choreAssignees,
+      and(
+        eq(choreAssignees.chore_id, choreInstances.chore_id),
+        eq(choreAssignees.child_id, choreInstances.child_id),
+      ),
+    )
+    .where(
+      and(
+        eq(choreInstances.child_id, childId),
+        eq(choreInstances.status, 'redo'),
+        lt(choreInstances.chore_date, today),
+        gte(choreInstances.chore_date, redoWindowStart(today)),
+        isNull(chores.deleted_at),
+      ),
+    )
+    .orderBy(asc(choreInstances.chore_date), asc(chores.title));
+  return rows;
+}
 
 /** What the child sees today: this child's instances whose chore is still theirs, by title. */
 export async function todayList(

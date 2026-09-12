@@ -18,6 +18,8 @@ A derived value in a `SELECT` is fine. A derived value in a `CREATE TABLE`, an `
 
 The asymmetry is the point: the ledger corrects by appending a negative entry; the grove does not correct at all.
 
+**The rule governs rows the server accepted.** A device's optimistic rows for an op the server *refused* were never accepted, are the device's own, and that op deletes them — a refused `request_redemption` that leaves its `redemptions` row and its `redeem` entry behind leaves the balance wrong. Flagging that delete is a false positive. (ADR-0014, `docs/spec/03-sync.md`)
+
 ## Dates are household-local, never instants
 
 **Every date-keyed row stores a household-local `chore_date`.** Violation: date arithmetic on a timestamp or `Date` to derive a Chore Date — adding days to an instant, `toISOString().slice(0,10)`, comparing instants to decide which Chore Date a row belongs to. The Chore Date is computed once at the household boundary (ADR-0003) and carried; downstream code reads it, never recomputes it.
@@ -26,7 +28,7 @@ The asymmetry is the point: the ledger corrects by appending a negative entry; t
 
 **A Kid Device token scopes every query to one child**, enforced in the query, not in the UI. Violation: a handler that takes a `childId` from the request body or params on a kid-device route rather than deriving it from the token; a query missing the child scope with the filtering done after the fetch, or in a component.
 
-**The one exception is the grove.** `children` and `growth_entries` reach a Kid Device household-wide, because the grove belongs to the household. Flagging that as a leak is a false positive. (ADR-0011, `docs/spec/03-sync.md`)
+**There are two exceptions, the grove and the reward catalog.** `children` and `growth_entries` reach a Kid Device household-wide because the grove belongs to the household (ADR-0011); `rewards` does too, because it is a per-household catalog carrying no `child_id` at all. `redemptions` stays child-scoped. The three are named in `HOUSEHOLD_WIDE` in `apps/api/src/sync.ts`; flagging one of them as a leak is a false positive. (`docs/spec/03-sync.md`)
 
 ## Child privacy
 

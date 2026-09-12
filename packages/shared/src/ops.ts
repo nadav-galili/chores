@@ -38,6 +38,27 @@ export const registerPushTokenPayloadSchema = z.object({
 });
 export type RegisterPushTokenPayload = z.infer<typeof registerPushTokenPayloadSchema>;
 
+/**
+ * A child asking for a reward. The device has already written the Redemption row and the `redeem`
+ * entry at `−cost` (ADR-0014), so every id the server needs to write the same rows is here; the
+ * cost is not, because the price is the catalog's to state and the reward row on the server is
+ * the one that says it. The child comes from the device token, as always.
+ */
+export const requestRedemptionPayloadSchema = z.object({
+  redemption_id: z.string().uuid(),
+  reward_id: z.string().uuid(),
+  requested_at: z.string().datetime({ offset: true }),
+});
+export type RequestRedemptionPayload = z.infer<typeof requestRedemptionPayloadSchema>;
+
+/** The child changing their mind. The refund is a clawback of the redeem entry, so nothing else
+ * needs saying: a request a parent has already decided answers `already_decided` and moves no
+ * coins. */
+export const cancelRedemptionPayloadSchema = z.object({
+  redemption_id: z.string().uuid(),
+});
+export type CancelRedemptionPayload = z.infer<typeof cancelRedemptionPayloadSchema>;
+
 export const kidOpSchema = z.discriminatedUnion('type', [
   z.object({
     op_id: z.string().uuid(),
@@ -53,6 +74,16 @@ export const kidOpSchema = z.discriminatedUnion('type', [
     op_id: z.string().uuid(),
     type: z.literal('register_push_token'),
     payload: registerPushTokenPayloadSchema,
+  }),
+  z.object({
+    op_id: z.string().uuid(),
+    type: z.literal('request_redemption'),
+    payload: requestRedemptionPayloadSchema,
+  }),
+  z.object({
+    op_id: z.string().uuid(),
+    type: z.literal('cancel_redemption'),
+    payload: cancelRedemptionPayloadSchema,
   }),
 ]);
 export type KidOp = z.infer<typeof kidOpSchema>;
@@ -79,8 +110,29 @@ export const rejectReasonSchema = z.enum([
   'unknown_chore',
   /** No such completion, or not this child's. */
   'unknown_completion',
-  /** A parent already rejected the completion; only they can undo that. */
+  /** No such reward in this household, or one a parent has hidden or deleted. */
+  'unknown_reward',
+  /** No such redemption, or not this child's. */
+  'unknown_redemption',
+  /**
+   * A parent already decided: they rejected the completion, or they approved or declined the
+   * redemption the child is trying to cancel. Only they can undo either.
+   */
   'already_decided',
+  /**
+   * The child cancelled first. The refund has been written once under the id both paths share
+   * (ADR-0014), so the parent's decision moves no coins and is answered this instead.
+   *
+   * No kid op produces it: it is the answer the parent's decide-redemption endpoint gives, and it
+   * lives here because that endpoint answers in the same vocabulary a refused op does.
+   */
+  'already_cancelled',
+  /**
+   * `SUM(coins)` no longer covers the request. Reachable without any device misbehaving: a
+   * parent's Rejection can claw back coins the device has not pulled yet, so the optimistic rows
+   * this refuses must be undone locally rather than merely dropped from the outbox (ADR-0014).
+   */
+  'insufficient_coins',
   /** The chore date has passed: a child undoes their own tap only on the same day. */
   'too_late',
 ]);
@@ -92,3 +144,18 @@ export type RejectReason = z.infer<typeof rejectReasonSchema>;
  * completion the child already undid is `already_undone` and nothing moves.
  */
 export type RejectCompletionResult = 'rejected' | 'already_undone';
+
+/** What a parent decides about a Redemption. Approving moves no coins; declining refunds. */
+export const redemptionDecisionSchema = z.enum(['approve', 'decline']);
+export type RedemptionDecision = z.infer<typeof redemptionDecisionSchema>;
+
+export const decideRedemptionInputSchema = z.object({ decision: redemptionDecisionSchema });
+export type DecideRedemptionInput = z.infer<typeof decideRedemptionInputSchema>;
+
+/**
+ * The answer to a decision. A redemption already approved or declined answers `already_decided`
+ * however the second decision was meant; one the child cancelled first answers `already_cancelled`
+ * and moves nothing, because the refund is already written under the id both paths share.
+ */
+export type DecideRedemptionResult =
+  'approved' | 'declined' | 'already_decided' | 'already_cancelled';

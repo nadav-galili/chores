@@ -40,7 +40,11 @@ export const en = {
       greeting: 'Hi %{name}!',
       empty: '🎈 Nothing to do today!',
       dayComplete: 'Everything’s done! Amazing!',
+      // A rejected chore, back for a redo: the copy says what to do, never what went wrong.
+      redo: 'Do these again!',
+      redoEmpty: 'Nothing to do again. Great!',
       grove: 'Your grove is growing!',
+      shop: 'Spend your coins!',
       coins: 'Look how many coins you have!',
       doneMoment: 'Nice! Plus %{coins} coins',
       grew: 'Your tree grew! 🌱',
@@ -49,7 +53,10 @@ export const en = {
       greeting: 'Hi %{name}',
       empty: 'Nothing to do today.',
       dayComplete: 'Everything’s done.',
+      redo: 'Do again',
+      redoEmpty: 'Nothing to do again.',
       grove: 'Your grove',
+      shop: 'Reward shop',
       coins: 'Your coins',
       doneMoment: 'Plus %{coins} coins',
       grew: 'Your tree grew 🌱',
@@ -112,7 +119,15 @@ export const en = {
     },
   },
   exit: {
-    parentsOnly: 'Parents only',
+    pinTitle: 'Parent PIN',
+    pinBody: 'Enter the PIN to leave kid mode.',
+    pinLabel: 'PIN',
+    unlock: 'Continue',
+    wrongPin: 'That PIN is not right. Have another go.',
+    cooldown: 'That is enough tries for now. Try again in %{seconds}s.',
+    noPinTitle: 'Not yet',
+    noPin:
+      'The PIN has not reached this device yet. It arrives with the next sync, so this device needs to be online once — then kid mode ends here with the PIN.',
     title: 'Leave kid mode?',
     body: 'This device will forget %{name} and switch to parent mode. Show a new join code to connect it again.',
     theChild: 'the child',
@@ -139,10 +154,33 @@ export const en = {
     loadFailed: 'Could not load today.',
     nothingDue: 'Nothing due today.',
     noChildren: 'No children yet. Add the first one.',
+    reject: 'Reject',
+    rejecting: 'Rejecting…',
+    // What came back from the rejection, said in the parent's terms rather than the protocol's.
+    rejected: 'Rejected. %{title} is back for a redo.',
+    rejectAlreadyUndone: '%{title} was already undone. Nothing changed.',
+    rejectFailed: 'Could not reject %{title}.',
+    // The reward requests waiting on a parent. The coins are already gone by the time one of
+    // these appears (ADR-0014), so a decline gives them back and says so: to a child, that is
+    // the whole of what happened.
+    requests: {
+      title: plural({ one: 'One request', other: '%{count} requests' }),
+      asked: '%{name} asked for %{reward}',
+      approve: 'Approve',
+      decline: 'Decline',
+      deciding: 'Saving…',
+      approved: 'Approved %{reward} for %{name}.',
+      declined: 'Declined. %{name} has their coins back.',
+      alreadyDecided: 'That was already decided. Nothing changed.',
+      alreadyCancelled: '%{name} changed their mind first. Their coins are back.',
+      failed: 'Could not answer %{name}’s request.',
+    },
     nav: {
       children: 'Children',
       chores: 'Chores',
       partner: 'Add a partner',
+      rewards: 'Rewards',
+      pin: 'Parent PIN',
       signOut: 'Sign out',
     },
   },
@@ -210,6 +248,13 @@ export const en = {
     reminder: 'Reminder time (HH:MM, optional)',
     showJoinCode: 'Show join code',
   },
+  pin: {
+    title: 'Parent PIN',
+    hint: 'Four digits. Kid mode ends only with this PIN, so set one before a device joins.',
+    label: 'PIN',
+    save: 'Save PIN',
+    failed: 'Could not save the PIN',
+  },
   joinCode: {
     title: '%{name}’s join code',
     hint: 'On %{name}’s device, choose Kid and type this code.',
@@ -217,7 +262,42 @@ export const en = {
     expiresIn: 'Expires in %{time}',
     getting: 'Getting a code…',
     failed: 'Could not get a code',
+    pinRequired: 'Set a Parent PIN first: it is how kid mode ends.',
     newCode: 'New code',
+  },
+  // The reward shop. Flat rather than mode-voiced: what a button does and what a request is
+  // waiting for read the same to a 7-year-old and a 10-year-old; only the section's name changes,
+  // and that one lives under `kid.little` / `kid.big` with the rest of the voice.
+  shop: {
+    back: 'Today',
+    yours: 'Yours to spend',
+    ask: 'Ask',
+    cantAfford: 'Not enough coins yet',
+    waiting: 'Waiting for a parent',
+    cancel: 'Change my mind',
+    empty: 'Nothing to spend coins on yet.',
+    requests: 'What you asked for',
+    approved: 'Yes — go and get it',
+    declined: 'Not this time',
+  },
+  // Built-in reward titles, keyed by `builtin_key` verbatim (packages/shared/src/reward.ts): the
+  // seeded row carries the key and no title, so the shop renders its name in the reader's own
+  // language rather than the one the household happened to be created in.
+  rewards: {
+    builtin: {
+      snack: 'Pick a snack',
+      screen_time: '30 min screen time',
+      friday_dinner: 'Pick Friday dinner',
+    },
+    title: 'Rewards',
+    hint: 'Hide anything you are not willing to give. The shop follows on the next sync.',
+    shown: 'In the shop',
+    hidden: 'Hidden',
+    hide: 'Hide',
+    show: 'Show',
+    saving: 'Saving…',
+    saveFailed: 'Could not change %{title}.',
+    loadFailed: 'Could not load the rewards.',
   },
   notifications: {
     channel: 'Reminders',

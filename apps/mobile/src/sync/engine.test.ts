@@ -1,9 +1,23 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { instanceId, uuid7, type SyncChange, type SyncResponse } from '@chores/shared';
+import {
+  builtinRewardId,
+  BUILTIN_REWARDS,
+  instanceId,
+  uuid7,
+  type SyncChange,
+  type SyncResponse,
+} from '@chores/shared';
 import { openTestDb } from '@/db/test-db';
 import type { DeviceDb } from '@/db/types';
-import { children, choreAssignees, choreInstances, chores } from '@/db/schema';
+import {
+  children,
+  choreAssignees,
+  choreInstances,
+  chores,
+  redemptions,
+  rewards,
+} from '@/db/schema';
 import { applyPull, materializeToday, readCursor, todayList } from './engine';
 
 let db: DeviceDb;
@@ -270,6 +284,71 @@ describe('todayList', () => {
     expect(list).toEqual([
       { id: instanceId(b, childId, TODAY), chore_id: b, title: 'Apple', icon: '🍽️', status: 'due' },
       { id: instanceId(a, childId, TODAY), chore_id: a, title: 'Zebra', icon: '🦓', status: 'due' },
+    ]);
+  });
+});
+
+describe('the reward shop', () => {
+  const rewardRow = (key: 'snack' | 'screen_time' | 'friday_dinner', extra = {}) => {
+    const builtin = BUILTIN_REWARDS.find((r) => r.builtin_key === key)!;
+    return {
+      id: builtinRewardId(householdId, key),
+      household_id: householdId,
+      builtin_key: key,
+      title: null,
+      icon: builtin.icon,
+      cost_coins: builtin.cost_coins,
+      is_builtin: true,
+      active: true,
+      sort: builtin.sort,
+      updated_at: T,
+      deleted_at: null,
+      ...extra,
+    };
+  };
+
+  it('lands the household catalog with its keys and no titles', async () => {
+    await applyPull(
+      db,
+      page(BUILTIN_REWARDS.map((r) => change('rewards', 'insert', rewardRow(r.builtin_key)))),
+    );
+    const rows = (await db.select().from(rewards)).sort((a, b) => a.sort - b.sort);
+    expect(rows.map((r) => [r.builtin_key, r.cost_coins, r.title])).toEqual([
+      ['snack', 50, null],
+      ['screen_time', 150, null],
+      ['friday_dinner', 400, null],
+    ]);
+    expect(rows.every((r) => r.household_id === householdId)).toBe(true);
+  });
+
+  it('hides a built-in the parent turned off, without losing the row', async () => {
+    await applyPull(db, page([change('rewards', 'insert', rewardRow('snack'))]));
+    await applyPull(db, page([change('rewards', 'update', rewardRow('snack', { active: false }))]));
+    expect(await db.select().from(rewards)).toMatchObject([
+      { builtin_key: 'snack', active: false },
+    ]);
+  });
+
+  it('lands a redemption, which is this child’s own and carries its cost', async () => {
+    const id = uuid7();
+    await applyPull(
+      db,
+      page([
+        change('redemptions', 'insert', {
+          id,
+          reward_id: builtinRewardId(householdId, 'snack'),
+          child_id: childId,
+          household_id: householdId,
+          cost_coins: 50,
+          status: 'requested',
+          requested_at: T,
+          decided_at: null,
+          decided_by: null,
+        }),
+      ]),
+    );
+    expect(await db.select().from(redemptions)).toMatchObject([
+      { id, child_id: childId, cost_coins: 50, status: 'requested' },
     ]);
   });
 });

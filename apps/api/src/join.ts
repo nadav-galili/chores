@@ -70,6 +70,12 @@ export function joinRoutes(db: Db, redeemLimit: RateLimit, analytics: Analytics)
       where: and(eq(children.id, c.req.param('childId')), eq(children.householdId, householdId)),
     });
     if (!child) return c.json({ error: 'not_found' }, 404);
+    // A Kid Device with no way out is unreachable rather than handled: no PIN, no join code
+    // (ADR-0013). The app reads `pin_required` and sends the parent to the PIN screen.
+    const household = await db.query.households.findFirst({
+      where: eq(households.id, householdId),
+    });
+    if (!household?.pinHash) return c.json({ error: 'pin_required' }, 409);
 
     const expiresAt = new Date(Date.now() + JOIN_CODE_TTL_MS);
     for (let attempt = 0; attempt < 5; attempt++) {

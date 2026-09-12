@@ -57,6 +57,27 @@
       "when": 1789026382903,
       "tag": "0007_device_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789146566957,
+      "tag": "0008_rewards",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789201304055,
+      "tag": "0009_parent_device_locale",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789201783898,
+      "tag": "0010_household_pin",
+      "breakpoints": true
     }
   ]
 }

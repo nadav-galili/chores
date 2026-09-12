@@ -1,4 +1,5 @@
 import {
+  builtinRewardsFor,
   canDo,
   childInputSchema,
   createHouseholdInputSchema,
@@ -11,7 +12,7 @@ import { Hono } from 'hono';
 import type { Analytics } from './analytics.ts';
 import type { AuthVariables } from './auth.ts';
 import type { Db } from './db/client.ts';
-import { children, households, parentInvites, parents } from './db/schema.ts';
+import { children, households, parentInvites, parents, rewards } from './db/schema.ts';
 import { childToApi, householdToApi, parentInviteToApi, parentToApi } from './serialize.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -103,6 +104,28 @@ export function householdRoutes(db: Db, analytics: Analytics) {
           email,
         })
         .returning();
+      // The built-in catalog is copied in here rather than existing globally: a row with no
+      // household has no path into a `change_log` scoped by one (docs/spec/02-data-model.md).
+      // Each row carries its `builtin_key` and no title — the device renders that from i18n.
+      await tx
+        .insert(rewards)
+        .values(
+          builtinRewardsFor(household!.id, household!.createdAt.toISOString()).map((r) => ({
+            id: r.id,
+            householdId: r.household_id,
+            builtinKey: r.builtin_key,
+            title: r.title,
+            icon: r.icon,
+            costCoins: r.cost_coins,
+            isBuiltin: r.is_builtin,
+            active: r.active,
+            sort: r.sort,
+            updatedAt: new Date(r.updated_at),
+          })),
+        )
+        // Reward ids are deterministic (ADR-0010), so a retried creation seeds the same three rows
+        // rather than giving the household a second snack.
+        .onConflictDoNothing();
       return { household: household!, parent: parent! };
     });
     analytics.capture({

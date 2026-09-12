@@ -6,15 +6,20 @@ import {
   KID_OP_TYPES,
   kidOpSchema,
   reconcileLedger,
+  refundEntry,
+  requestRedemption,
   resolveChoreDate,
   summariesThatMoved,
+  withinRedoWindow,
   type IsoDate,
+  type KidOpType,
   type RejectReason,
   type SyncOp,
   type SyncResponse,
 } from '@chores/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
+import { ledgerRow } from './ledger-row.ts';
 import {
   appliedOps,
   childDevices,
@@ -26,6 +31,8 @@ import {
   growthEntries,
   households,
   ledgerEntries,
+  redemptions,
+  rewards,
   xpEvents,
 } from './db/schema.ts';
 
@@ -59,7 +66,15 @@ export type ApplyOpsResult = {
   changed: boolean;
 };
 
+/**
+ * The ops whose rows reconciliation reads. A push token is not one, and neither is a redemption:
+ * `reconcileLedger` works from completions and never reverses a `redeem` (ADR-0014), so running
+ * it over a request or a cancel would recompute the same numbers and touch neither entry.
+ */
+const RECONCILED_OP_TYPES: ReadonlySet<KidOpType> = new Set<KidOpType>(['complete', 'uncomplete']);
+
 const reject = (reason: RejectReason): StoredResult => ({ status: 'rejected', reason });
+
 const ack = (date_adjusted = false): StoredResult =>
   date_adjusted ? { status: 'acked', date_adjusted: true } : { status: 'acked' };
 
@@ -102,13 +117,14 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       .from(choreAssignees)
       .where(and(eq(choreAssignees.choreId, chore_id), eq(choreAssignees.childId, ctx.childId)));
 
-    const exists = async (date: IsoDate) => {
+    const statusAt = async (date: IsoDate) => {
       const [row] = await tx
-        .select({ id: choreInstances.id })
+        .select({ status: choreInstances.status })
         .from(choreInstances)
         .where(eq(choreInstances.id, instanceId(chore_id, ctx.childId, date)));
-      return row !== undefined;
+      return row?.status;
     };
+    const exists = async (date: IsoDate) => (await statusAt(date)) !== undefined;
     /**
      * A day the chore can honestly belong to: one that already has an instance, or one the
      * recurrence puts it on. Deletion is ignored here — a deleted chore still pays — but the
@@ -135,13 +151,31 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
     const completedAt = new Date(completed_at);
     const computed = choreDate(completedAt, ctx.household.tz, ctx.household.dayBoundaryHour);
     const resolved = resolveChoreDate(claimed, computed);
-    const chore_date =
-      !resolved.date_adjusted && (await plausible(resolved.chore_date))
+    /**
+     * The ±1 day clock guard applies only when the instance would have to be created
+     * (docs/spec/02-data-model.md, timezone rules): it exists so a device with a wrong clock
+     * cannot invent a day, and an instance the server already materialized was not invented by a
+     * device. A completion naming one is written on that instance's chore date however far back
+     * it is, which is what makes the Redo Window work at all.
+     */
+    const chore_date = (await exists(claimed))
+      ? claimed
+      : !resolved.date_adjusted && (await plausible(resolved.chore_date))
         ? resolved.chore_date
         : computed;
     const date_adjusted = chore_date !== claimed;
+    /**
+     * The Redo Window bounds a redo and nothing else (docs/spec/03-sync.md): past it, a chore the
+     * parent sent back is theirs to change again, not the child's. A `due` instance is a first
+     * completion of a day that was genuinely the child's, so a device back from three days offline
+     * is written on its own Chore Date rather than refused and undone. Creating an instance is
+     * bounded by the ±1 clock guard above, not by this.
+     */
+    const today = choreDate(ctx.now, ctx.household.tz, ctx.household.dayBoundaryHour);
+    const status = await statusAt(chore_date);
+    if (status === 'redo' && !withinRedoWindow(chore_date, today)) return reject('too_late');
     const instance_id = instanceId(chore_id, ctx.childId, chore_date);
-    if (!assigned && !(await exists(chore_date))) {
+    if (!assigned && status === undefined) {
       // Unassigned mid-day: the instance the child is looking at still counts, nothing else does.
       return reject('unknown_chore');
     }
@@ -181,6 +215,89 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       })
       .onConflictDoNothing();
     return ack(date_adjusted);
+  }
+
+  if (op.type === 'request_redemption') {
+    const { redemption_id, reward_id, requested_at } = op.payload;
+    // The row already being here is the device asking twice under a new op id — its optimistic
+    // write reached us once already, and the coins have gone. Writing anything now would spend
+    // them twice, so this answers yes and moves nothing.
+    const [existing] = await tx.select().from(redemptions).where(eq(redemptions.id, redemption_id));
+    if (existing) return existing.childId === ctx.childId ? ack() : reject('unknown_redemption');
+
+    // What a reward costs is the catalog's to say, not the device's; a hidden or deleted reward
+    // is not in the shop at all.
+    const [reward] = await tx
+      .select()
+      .from(rewards)
+      .where(and(eq(rewards.id, reward_id), eq(rewards.householdId, ctx.householdId)));
+    if (!reward || !reward.active || reward.deletedAt) return reject('unknown_reward');
+
+    // Balance is `SUM(coins)`, read here and held aside nowhere (ADR-0014). The device asked the
+    // same question before it wrote, but a parent's Rejection can have clawed back coins it has
+    // not pulled yet, so this refusal is ordinary rather than a sign of a bad device.
+    const [held] = await tx
+      .select({ coins: sql<number>`coalesce(sum(${ledgerEntries.coins}), 0)::int` })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.childId, ctx.childId));
+    const decided = requestRedemption({
+      household_id: ctx.householdId,
+      child_id: ctx.childId,
+      redemption_id,
+      cost_coins: reward.costCoins,
+      created_at: ctx.now.toISOString(),
+      created_by: ctx.childId,
+      balance: held?.coins ?? 0,
+    });
+    if (!decided.ok) return reject(decided.reason);
+
+    await tx
+      .insert(redemptions)
+      .values({
+        id: redemption_id,
+        rewardId: reward.id,
+        childId: ctx.childId,
+        householdId: ctx.householdId,
+        // A snapshot: a parent re-pricing the reward later does not rewrite what was asked for.
+        costCoins: reward.costCoins,
+        status: 'requested',
+        requestedAt: new Date(requested_at),
+      })
+      .onConflictDoNothing();
+    await tx.insert(ledgerEntries).values(ledgerRow(decided.entry, ctx.now)).onConflictDoNothing();
+    return ack();
+  }
+
+  if (op.type === 'cancel_redemption') {
+    const { redemption_id } = op.payload;
+    // Locked: a parent deciding at this moment holds or waits for the same row, so the status
+    // read below is the one that decided, and only one of the two writes a refund.
+    const [row] = await tx
+      .select()
+      .from(redemptions)
+      .where(and(eq(redemptions.id, redemption_id), eq(redemptions.childId, ctx.childId)))
+      .for('update');
+    if (!row) return reject('unknown_redemption');
+    // Approved or declined, the parent got there first and the coins are theirs to move.
+    if (row.status === 'approved' || row.status === 'declined') return reject('already_decided');
+    // Already cancelled: the refund was written under the id both paths share, so this is the
+    // same intent arriving twice and there is nothing left to do.
+    if (row.status === 'requested') {
+      await tx
+        .update(redemptions)
+        .set({ status: 'cancelled', decidedAt: ctx.now })
+        .where(and(eq(redemptions.id, redemption_id), eq(redemptions.status, 'requested')));
+      const refund = refundEntry({
+        household_id: ctx.householdId,
+        child_id: ctx.childId,
+        redemption_id,
+        cost_coins: row.costCoins,
+        created_at: ctx.now.toISOString(),
+        created_by: ctx.childId,
+      });
+      await tx.insert(ledgerEntries).values(ledgerRow(refund, ctx.now)).onConflictDoNothing();
+    }
+    return ack();
   }
 
   const [completion] = await tx
@@ -346,8 +463,10 @@ export async function applyOps(tx: Tx, ctx: OpContext, ops: SyncOp[]): Promise<A
         .insert(appliedOps)
         .values({ opId: raw.op_id, deviceId: ctx.deviceId, result, at: ctx.now })
         .onConflictDoNothing();
-      // Only a completion changes what a child has earned; a push token does not.
-      if (result.status === 'acked' && raw.type !== 'register_push_token') changed = true;
+      // `raw.type` is unvalidated wire input, widened here the way `KID_OP_TYPES` is above; the
+      // set itself stays typed so a renamed op type fails to compile rather than going quiet.
+      const reconciled = (RECONCILED_OP_TYPES as ReadonlySet<string>).has(raw.type);
+      if (result.status === 'acked' && reconciled) changed = true;
     }
     if (result.status === 'acked') {
       acked.push(

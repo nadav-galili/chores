@@ -4,6 +4,8 @@ import {
   notificationId,
   notificationKindSchema,
   notificationTargetSchema,
+  parentDeviceId,
+  parentDeviceInputSchema,
 } from './notification.ts';
 import { uuid5 } from './uuid5.ts';
 
@@ -52,5 +54,44 @@ describe('expoPushTokenSchema', () => {
     for (const bad of ['', 'nope', 'ExponentPushToken[]', 'fcm-token-1234']) {
       expect(expoPushTokenSchema.safeParse(bad).success).toBe(false);
     }
+  });
+});
+
+describe('parentDeviceId', () => {
+  const token = 'ExponentPushToken[parent-phone]';
+
+  it('is the same id every time a parent re-registers the same token', () => {
+    expect(parentDeviceId(noa, token)).toBe(uuid5('parent_device', noa, token));
+  });
+
+  it('scopes a token to its parent: the same token under two parents is two devices', () => {
+    expect(parentDeviceId(noa, token)).not.toBe(parentDeviceId(ori, token));
+  });
+
+  it('is a new device when the token rotates', () => {
+    expect(parentDeviceId(noa, token)).not.toBe(
+      parentDeviceId(noa, 'ExponentPushToken[parent-phone-2]'),
+    );
+  });
+});
+
+describe('parentDeviceInputSchema', () => {
+  it('takes a token, a platform and the language the parent reads', () => {
+    const input = {
+      expo_push_token: 'ExponentPushToken[parent-phone]',
+      platform: 'ios',
+      locale: 'he',
+    };
+    expect(parentDeviceInputSchema.parse(input)).toEqual(input);
+  });
+
+  it('refuses anything that is not one of ours', () => {
+    const bad = [
+      { expo_push_token: 'not-a-token', platform: 'ios', locale: 'he' },
+      { expo_push_token: 'ExponentPushToken[a]', platform: 'web', locale: 'he' },
+      { expo_push_token: 'ExponentPushToken[a]', platform: 'ios', locale: 'fr' },
+      { expo_push_token: 'ExponentPushToken[a]', platform: 'ios' },
+    ];
+    for (const input of bad) expect(parentDeviceInputSchema.safeParse(input).success).toBe(false);
   });
 });

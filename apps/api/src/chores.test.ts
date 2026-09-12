@@ -247,6 +247,11 @@ describe('change_log', () => {
     }>(sql`select "table", op, child_id, row_id, household_id from change_log
            where household_id = ${s.household.id} order by seq`);
     expect(rows.map((r) => [r.table, r.op, r.child_id])).toEqual([
+      // The built-in catalog is copied in when the household is created, before anything else
+      // exists. A reward belongs to a household and to no child, so it carries no child id.
+      ['rewards', 'insert', null],
+      ['rewards', 'insert', null],
+      ['rewards', 'insert', null],
       // A child's own row is scoped to that child, so its kid device can pull it.
       ['children', 'insert', s.childIds[0]],
       ['children', 'insert', s.childIds[1]],
@@ -257,7 +262,8 @@ describe('change_log', () => {
       ['chore_assignees', 'insert', s.childIds[1]],
       ['chores', 'update', null],
     ]);
-    expect(new Set(rows.map((r) => r.row_id))).toEqual(new Set([id, ...s.childIds]));
+    const rewardIds = rows.filter((r) => r.table === 'rewards').map((r) => r.row_id);
+    expect(new Set(rows.map((r) => r.row_id))).toEqual(new Set([id, ...s.childIds, ...rewardIds]));
   });
 });
 

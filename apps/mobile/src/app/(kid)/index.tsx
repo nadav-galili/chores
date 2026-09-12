@@ -1,6 +1,6 @@
 import { COINS_PER_CHORE } from '@chores/shared';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
@@ -99,9 +99,13 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
         )}
         ListEmptyComponent={today.status === 'ready' ? <EmptyDay today={today} /> : null}
         ListFooterComponent={
-          today.grove.enabled ? (
-            <GroveStrip today={today} onPress={() => router.push('/(kid)/grove')} />
-          ) : null
+          <View style={styles.footer}>
+            {today.status === 'ready' && <RedoSection today={today} />}
+            <ShopStrip today={today} onPress={() => router.push('/(kid)/shop')} />
+            {today.grove.enabled && (
+              <GroveStrip today={today} onPress={() => router.push('/(kid)/grove')} />
+            )}
+          </View>
         }
       />
       {today.reaction && (
@@ -126,6 +130,48 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
         />
       )}
     </View>
+  );
+}
+
+/**
+ * The chores a parent rejected, in their own labelled section below today's list and above the
+ * grove. Never merged into today: today is what today asks for, and a redo belongs to a day that
+ * has passed — which is also why tapping one never offers an undo. A past day is the parent's to
+ * change, so a redo goes done and leaves the section.
+ *
+ * The section appears only once there is something in it, and then stays for the rest of the
+ * screen's life so that finishing the last redo lands on the empty state rather than on the row
+ * vanishing under the child's finger.
+ */
+function RedoSection({ today }: { today: Today }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  const [everHad, setEverHad] = useState(false);
+  useEffect(() => {
+    if (today.redos.length > 0) setEverHad(true);
+  }, [today.redos.length]);
+
+  if (today.redos.length === 0 && !everHad) return null;
+  return (
+    <Card>
+      <Text style={styles.sectionTitle}>{t(`kid.${mode}.redo`)}</Text>
+      {today.redos.length === 0 ? (
+        <Text style={styles.redoEmpty}>{t(`kid.${mode}.redoEmpty`)}</Text>
+      ) : (
+        <View style={styles.redoRows}>
+          {today.redos.map((item) => (
+            <ChoreRow
+              key={item.id}
+              title={item.title}
+              icon={item.icon}
+              done={false}
+              coins={COINS_PER_CHORE}
+              onPress={() => today.redo(item)}
+            />
+          ))}
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -264,6 +310,27 @@ function Head({ today, onPet }: { today: Today; onPet: () => void }) {
 }
 
 /**
+ * The way into the reward shop, and the answer to what the coins in the header are for. It sits
+ * below the chores and above the grove because that is the order of the loop: do the thing, spend
+ * what it paid, watch what it grew.
+ *
+ * It shows the balance again rather than a count of what is affordable: what a child can buy is
+ * the shop's own question, and asking it here would put the same list on two screens.
+ */
+function ShopStrip({ today, onPress }: { today: Today; onPress: () => void }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  return (
+    <Card onPress={onPress} accessibilityLabel={t(`kid.${mode}.shop`)}>
+      <Text style={styles.sectionTitle}>{t(`kid.${mode}.shop`)}</Text>
+      <View style={styles.hero}>
+        <Coins amount={today.coins} step="heading" />
+      </View>
+    </Card>
+  );
+}
+
+/**
  * The end of the scroll: the household's trees at a glance, and the way into the full grove.
  *
  * The whole strip is one target, so it is as easy to hit in `little` as anything else here, and
@@ -307,6 +374,14 @@ const homeStyles = (theme: Theme) => ({
   },
   secretCorner: { position: 'absolute' as const, top: 0, end: 0, width: 72, height: 72, zIndex: 1 },
   head: { gap: theme.space.md },
+  footer: { gap: theme.space.md },
+  redoRows: { gap: theme.space.sm, marginTop: theme.space.sm },
+  redoEmpty: {
+    ...theme.type.body,
+    color: theme.colors.muted,
+    textAlign: 'center' as const,
+    marginTop: theme.space.sm,
+  },
   headRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: theme.space.md },
   headRowText: { flex: 1 },
   petAbove: { alignItems: 'center' as const },

@@ -18,8 +18,14 @@ import { AppState } from 'react-native';
 import { openDeviceDb } from '@/db/client';
 import { children, daySummaries } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
-import { materializeToday, todayList, type TodayItem } from '@/sync/engine';
-import { balanceOf, tapContext, tapToggle, type ChildContext } from '@/sync/local';
+import {
+  materializeToday,
+  redoList,
+  todayList,
+  type RedoItem,
+  type TodayItem,
+} from '@/sync/engine';
+import { balanceOf, tapContext, tapRedo, tapToggle, type ChildContext } from '@/sync/local';
 import { serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { showGrove, type GroveView } from '@/sync/grove';
@@ -36,6 +42,11 @@ export type TodayState = {
   /** From the local child row once pulled, else what the join code told us. */
   firstName: string;
   items: TodayItem[];
+  /**
+   * Chores a parent rejected, from earlier Chore Dates still inside the Redo Window. Their own
+   * list, never merged into `items`: today is what today asks for, and a redo is not that.
+   */
+  redos: RedoItem[];
   streak: number;
   /** Balance, always the sum of the local ledger. */
   coins: number;
@@ -78,6 +89,11 @@ export type DoneReaction = {
 export type Today = TodayState & {
   /** Tap a chore: done, or undone if it was already done. Counts locally before any network. */
   toggle: (item: TodayItem) => void;
+  /**
+   * Tap a redo: it counts for the Chore Date it belongs to. There is no undo — a past day is the
+   * parent's to change — so the row leaves the section and does not come back on a second tap.
+   */
+  redo: (item: RedoItem) => void;
   /** The child has seen the refusals; stop showing them. */
   dismissRefused: () => void;
   /** The done moment to play, or null. Set in the same tick as the tap. */
@@ -131,6 +147,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     status: 'loading',
     firstName: session.child.first_name,
     items: [],
+    redos: [],
     streak: 0,
     coins: 0,
     offline: false,
@@ -167,9 +184,10 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     async (db: DeviceDb, offline: boolean) => {
       const date = choreDate(new Date(), tz, boundary);
       await materializeToday(db, childId, date);
-      const [items, rows, summaries, coins, refused, pet, grove, pushRegistered] =
+      const [items, redos, rows, summaries, coins, refused, pet, grove, pushRegistered] =
         await Promise.all([
           todayList(db, childId, date),
+          redoList(db, childId, date),
           db.select().from(children).where(eq(children.id, childId)),
           db.select().from(daySummaries).where(eq(daySummaries.child_id, childId)),
           balanceOf(db, childId),
@@ -184,6 +202,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
         items,
+        redos,
         streak,
         coins,
         offline,
@@ -218,16 +237,20 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     }
   }, [readLocal, child, session.device_token]);
 
-  const toggle = useCallback(
-    (item: TodayItem) => {
+  /**
+   * One tap, whatever it writes: the done moment starts in this very tick, the write runs after,
+   * and its result corrects the moment already on screen. Shared by today's list and the redos,
+   * because a redo earns the same moment — the pet reacts to the work, not to the date.
+   */
+  const runTap = useCallback(
+    (
+      moment: { completed: boolean; dayComplete: boolean },
+      write: (db: DeviceDb) => Promise<number>,
+    ) => {
       // Start the done moment in this very tick: the pet must react to the tap, not to SQLite.
       // Undoing is not a celebration, so only a chore going done gets one.
-      const completed = item.status !== 'done';
-      // Whether this is the tap that finished the day, read off the list the child is looking at
-      // — the same answer the ledger reaches a moment later, but available now, which is what the
-      // phone needs to answer the stronger way at the instant of the tap rather than after a
-      // write. The tree still waits for the row the write plants; the buzz does not.
-      playDoneHaptic({ completed, dayComplete: tapCompletesTheDay(state.items, item.id) });
+      const completed = moment.completed;
+      playDoneHaptic({ completed, dayComplete: moment.dayComplete });
       if (completed) {
         setReaction({
           key: (taps.current += 1),
@@ -248,7 +271,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         const grown = stage.current;
         try {
           const db = await openDeviceDb();
-          const paid = await tapToggle(db, tapContext(child), item);
+          const paid = await write(db);
           // The tap has counted, in SQLite, whether or not there is a network — which is the whole
           // offline promise, and why the event carries whether there was one.
           if (completed) capture(choreCompleted({ offline: state.offline }));
@@ -270,7 +293,31 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         }
       })();
     },
-    [child, readLocal, refresh, state.items, state.offline],
+    [readLocal, refresh, state.offline],
+  );
+
+  const toggle = useCallback(
+    (item: TodayItem) => {
+      // Whether this is the tap that finished the day, read off the list the child is looking at
+      // — the same answer the ledger reaches a moment later, but available now, which is what the
+      // phone needs to answer the stronger way at the instant of the tap rather than after a
+      // write. The tree still waits for the row the write plants; the buzz does not.
+      const dayComplete = tapCompletesTheDay(state.items, item.id);
+      runTap({ completed: item.status !== 'done', dayComplete }, (db) =>
+        tapToggle(db, tapContext(child), item),
+      );
+    },
+    [child, runTap, state.items],
+  );
+
+  const redo = useCallback(
+    (item: RedoItem) => {
+      // Whether the redo finishes its own Chore Date is a question about a day this screen does
+      // not hold, so the tap buzzes as a plain completion; the ledger still pays the bonus a
+      // moment later, and the moment's coins are corrected to it when the write reports.
+      runTap({ completed: true, dayComplete: false }, (db) => tapRedo(db, tapContext(child), item));
+    },
+    [child, runTap],
   );
 
   // How long the child waited for the pet: the reaction is created in the tap's own tick, so the
@@ -318,5 +365,5 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     })();
   }, [tz, state.reminderTime, state.pushRegistered]);
 
-  return { ...state, toggle, dismissRefused, reaction, clearReaction };
+  return { ...state, toggle, redo, dismissRefused, reaction, clearReaction };
 }

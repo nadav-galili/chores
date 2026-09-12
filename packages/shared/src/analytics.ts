@@ -1,6 +1,7 @@
 import type { UiMode } from './child.ts';
 import type { DevicePlatform } from './join-code.ts';
 import type { ChoreKind } from './materialize.ts';
+import type { BuiltinRewardKey } from './reward.ts';
 import { uuid5 } from './uuid5.ts';
 
 /**
@@ -136,4 +137,29 @@ export function kidDayComplete(day: { streak: number }): AnalyticsEvent {
 /** A tree was planted; the stage is the child's own `COUNT(*)` after it (ADR-0011). */
 export function groveGrew(grove: { stage: number }): AnalyticsEvent {
   return { event: 'grove_grew', properties: { stage: grove.stage } };
+}
+
+/**
+ * The child spent coins on something. Whether the reward loop is used at all is the question M2
+ * asks of it, and a `builtin_key` is a catalog constant — it names a snack, never a child — so it
+ * is the one thing about a Redemption allowed to cross (ADR-0009). A custom reward, when M3 has
+ * them, has no key and sends no event rather than sending a parent's own words.
+ */
+export function rewardRequested(reward: {
+  builtin_key: BuiltinRewardKey;
+  cost_coins: number;
+}): AnalyticsEvent {
+  return {
+    event: 'reward_requested',
+    properties: { builtin_key: reward.builtin_key, cost_coins: reward.cost_coins },
+  };
+}
+
+/**
+ * A parent decided a Redemption: the one number the reward loop turns on. Sent server-side under
+ * the parent's Clerk id — the decision, and nothing about the child who asked or what they asked
+ * for (ADR-0009).
+ */
+export function redemptionDecided(decision: { decision: 'approved' | 'declined' }): AnalyticsEvent {
+  return { event: 'redemption_decided', properties: { decision: decision.decision } };
 }
