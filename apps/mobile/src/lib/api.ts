@@ -156,8 +156,57 @@ export function createApi(getToken: GetToken, onGate?: OnGate) {
         `/households/${householdId}/chores/${choreId}`,
         json('DELETE', { updated_at: new Date().toISOString() }),
       ),
+    // The allowance screen reads the server's balance/owed view and appends payouts and
+    // adjustments. A 402 carries gate `money_ledger`; the shared onGate routes to the paywall.
+    getMoneyLedger: (householdId: string) =>
+      request<MoneyLedgerView>(`/households/${householdId}/money-ledger`),
+    setCoinsPerUnit: (householdId: string, coinsPerUnit: number) =>
+      request<MoneyLedgerSettings>(
+        `/households/${householdId}/money-ledger`,
+        json('PATCH', { coins_per_unit: coinsPerUnit }),
+      ),
+    recordPayout: (householdId: string, input: { id: string; child_id: string; coins: number }) =>
+      request<MoneyLedgerEntry>(
+        `/households/${householdId}/money-ledger/payout`,
+        json('POST', input),
+      ),
+    recordAdjustment: (
+      householdId: string,
+      input: { id: string; child_id: string; coins: number; note: string },
+    ) =>
+      request<MoneyLedgerEntry>(
+        `/households/${householdId}/money-ledger/adjust`,
+        json('POST', input),
+      ),
   };
 }
+
+export type MoneyLedgerEntry = {
+  id: string;
+  household_id: string;
+  child_id: string;
+  kind: string;
+  coins: number;
+  money_amount: number | null;
+  note: string | null;
+  created_at: string;
+  created_by: string | null;
+};
+
+export type MoneyLedgerChildView = {
+  child_id: string;
+  balance: number;
+  owed: number;
+  entries: MoneyLedgerEntry[];
+};
+
+export type MoneyLedgerView = {
+  currency: string;
+  coins_per_unit: number;
+  children: MoneyLedgerChildView[];
+};
+
+export type MoneyLedgerSettings = { currency: string; coins_per_unit: number };
 
 export type Api = ReturnType<typeof createApi>;
 
