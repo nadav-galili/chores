@@ -9,6 +9,8 @@ import type {
   HouseholdSummary,
   DeviceSession,
   Parent,
+  ParentDevice,
+  ParentDeviceInput,
   ParentInvite,
   ParentToday,
   RedeemJoinCodeInput,
@@ -95,6 +97,8 @@ export function createApi(getToken: GetToken) {
         `/households/${householdId}/rewards/${rewardId}`,
         json('PATCH', { active }),
       ),
+    registerDevice: (householdId: string, input: ParentDeviceInput) =>
+      call<ParentDevice>(getToken, `/households/${householdId}/devices`, json('POST', input)),
     listChores: (householdId: string) =>
       call<Chore[]>(getToken, `/households/${householdId}/chores`),
     upsertChore: (householdId: string, choreId: string, op: UpsertChoreOp) =>

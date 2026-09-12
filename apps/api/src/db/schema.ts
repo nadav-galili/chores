@@ -93,6 +93,8 @@ export const parentDevices = pgTable('parent_devices', {
     .notNull()
     .references(() => parents.id),
   expoPushToken: text('expo_push_token'),
+  /** The language this parent reads, so a digest arrives in it. Registered with the push token. */
+  locale: localeEnum('locale').notNull().default(DEFAULT_LOCALE),
   platform: platformEnum('platform').notNull(),
   lastSeenAt: timestamptz('last_seen_at').notNull().defaultNow(),
 });

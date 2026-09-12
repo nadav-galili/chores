@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import type { Locale } from './locale.ts';
+import { platformSchema } from './join-code.ts';
+import { localeSchema, type Locale } from './locale.ts';
 import { uuid5 } from './uuid5.ts';
 
 /**
@@ -35,6 +36,36 @@ export function notificationId(kind: NotificationKind, subjectId: string, key: s
 export const expoPushTokenSchema = z
   .string()
   .regex(/^Expo(nent)?PushToken\[[^\]\s]+\]$/, 'expected an Expo push token');
+
+/**
+ * A parent device's id = `uuid5('parent_device', parent_id, expo_push_token)` (ADR-0010). The app
+ * re-registers on every open, so the id has to be the same each time or one phone would become a
+ * row per open; the token is what identifies the install, and the parent is what scopes it.
+ */
+export function parentDeviceId(parentId: string, expoPushToken: string): string {
+  return uuid5('parent_device', parentId, expoPushToken);
+}
+
+/**
+ * What a parent's phone registers for push: the token Expo issued it, what it runs on, and the
+ * language it reads, so a digest arrives in that language rather than the household's.
+ */
+export const parentDeviceInputSchema = z.object({
+  expo_push_token: expoPushTokenSchema,
+  platform: platformSchema,
+  locale: localeSchema,
+});
+export type ParentDeviceInput = z.infer<typeof parentDeviceInputSchema>;
+
+/** The registration read back. The token is a credential and is not echoed. */
+export const parentDeviceSchema = z.object({
+  id: z.string().uuid(),
+  parent_id: z.string().uuid(),
+  platform: platformSchema,
+  locale: localeSchema,
+  last_seen_at: z.string().datetime(),
+});
+export type ParentDevice = z.infer<typeof parentDeviceSchema>;
 
 /**
  * The kid reminder's words, in one place: the server sends them as a push and the device schedules

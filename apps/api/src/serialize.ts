@@ -8,8 +8,17 @@ import type {
   HouseholdSummary,
   Parent,
   Reward,
+  ParentDevice,
 } from '@chores/shared';
-import type { children, chores, households, parentInvites, parents, rewards } from './db/schema.ts';
+import type {
+  children,
+  chores,
+  households,
+  parentDevices,
+  parentInvites,
+  parents,
+  rewards,
+} from './db/schema.ts';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
@@ -96,6 +105,17 @@ export function choreToApi(row: typeof chores.$inferSelect, assignees: string[])
 /** First name only: the kid device never learns anything else about the child. */
 export function childSummaryToApi(row: typeof children.$inferSelect): ChildSummary {
   return { id: row.id, first_name: row.firstName, ui_mode: row.uiMode, pet_name: row.petName };
+}
+
+/** The registration read back. The push token stays on the server; the phone already has it. */
+export function parentDeviceToApi(row: typeof parentDevices.$inferSelect): ParentDevice {
+  return {
+    id: row.id,
+    parent_id: row.parentId,
+    platform: row.platform,
+    locale: row.locale,
+    last_seen_at: row.lastSeenAt.toISOString(),
+  };
 }
 
 export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
