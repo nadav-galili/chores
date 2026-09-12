@@ -3,6 +3,8 @@ import {
   addDays,
   choreDate,
   daysBetween,
+  HISTORY_WINDOW_DAYS,
+  historyWindow,
   REDO_WINDOW_DAYS,
   resolveChoreDate,
   withinRedoWindow,
@@ -159,5 +161,36 @@ describe('withinRedoWindow', () => {
 
   it('does not close on a date that has not arrived yet', () => {
     expect(withinRedoWindow('2026-09-12', '2026-09-09')).toBe(true);
+  });
+});
+
+describe('historyWindow', () => {
+  it('is seven chore dates, oldest first, ending today', () => {
+    expect(HISTORY_WINDOW_DAYS).toBe(7);
+    expect(historyWindow('2026-09-12')).toEqual([
+      '2026-09-06',
+      '2026-09-07',
+      '2026-09-08',
+      '2026-09-09',
+      '2026-09-10',
+      '2026-09-11',
+      '2026-09-12',
+    ]);
+  });
+
+  it('crosses a month, a year and a DST change on the calendar, not the clock', () => {
+    expect(historyWindow('2026-03-01')[0]).toBe('2026-02-23');
+    expect(historyWindow('2026-01-02')[0]).toBe('2025-12-27');
+    // Israel's clocks go forward on 2026-03-27; the window is still seven calendar days.
+    const spring = historyWindow('2026-03-29');
+    expect(spring[0]).toBe('2026-03-23');
+    expect(daysBetween(spring[0]!, spring[6]!)).toBe(6);
+  });
+
+  it('ends on the household-local chore date, not the UTC one', () => {
+    // 2026-06-15T00:30Z is still 2026-06-14 for a household whose day ends at 06:00 local.
+    const today = choreDate(at('2026-06-15T00:30:00Z'), 'Asia/Jerusalem', 6);
+    expect(today).toBe('2026-06-14');
+    expect(historyWindow(today).at(-1)).toBe('2026-06-14');
   });
 });

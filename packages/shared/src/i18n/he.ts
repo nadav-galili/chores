@@ -168,6 +168,19 @@ export const he: Catalog = {
       alreadyCancelled: '%{name} התחרט/ה קודם. המטבעות כבר חזרו.',
       failed: 'לא הצלחנו לענות לבקשה של %{name}.',
     },
+    week: {
+      open: 'שבעת הימים האחרונים',
+      title: 'שבעת הימים האחרונים · %{name}',
+      empty: 'לא נרשם דבר בשבעת הימים האחרונים.',
+      loadFailed: 'לא הצלחנו לטעון את שבעת הימים האחרונים.',
+      cell: '%{title}, %{date}: %{state}',
+      state: {
+        due: 'לא בוצעה',
+        done: 'בוצעה',
+        redo: 'הוחזרה לביצוע חוזר',
+        pending_photo: 'ממתינה לתמונה',
+      },
+    },
     nav: {
       children: 'ילדים',
       chores: 'מטלות',

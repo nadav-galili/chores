@@ -14,6 +14,7 @@ import { rejectionRoutes } from './rejection.ts';
 import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
 import { todayRoutes } from './today.ts';
+import { weekRoutes } from './week.ts';
 
 export type AppOptions = {
   verifyToken: VerifyToken;
@@ -47,6 +48,7 @@ export function createApp(
   app.route('/', parentDeviceRoutes(db));
   app.route('/', pinRoutes(db));
   app.route('/', todayRoutes(db));
+  app.route('/', weekRoutes(db));
   app.route('/', rejectionRoutes(db));
   app.route('/', rewardRoutes(db));
   app.route('/', redemptionRoutes(db, analytics));
