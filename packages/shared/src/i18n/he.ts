@@ -387,6 +387,8 @@ export const he: Catalog = {
     owed: 'מגיע %{amount}',
     history: 'תשלומים והתאמות',
     historyEmpty: 'אין עדיין תשלומים או התאמות.',
+    kindPayout: 'תשלום',
+    kindAdjust: 'התאמה',
     payoutCoins: 'מטבעות לתשלום',
     payout: 'רישום תשלום',
     payoutFailed: 'לא הצלחנו לרשום את התשלום.',

@@ -1,6 +1,6 @@
 import { uuid7 } from '@chores/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import {
   Body,
@@ -39,13 +39,14 @@ function EntryLine({
   tz: string;
 }) {
   const styles = useThemedStyles(allowanceStyles);
+  const kindLabel = entry.kind === 'payout' ? t('allowance.kindPayout') : t('allowance.kindAdjust');
   const detail =
     entry.kind === 'payout' && entry.money_amount !== null
       ? `${formatNumber(-entry.coins)} → ${formatMoney(entry.money_amount, currency)}`
       : `${formatNumber(entry.coins)}${entry.note ? ` · ${entry.note}` : ''}`;
   return (
     <View style={styles.entry}>
-      <Text style={styles.entryKind}>{entry.kind}</Text>
+      <Text style={styles.entryKind}>{kindLabel}</Text>
       <Text style={styles.entryDetail}>{detail}</Text>
       <Text style={styles.entryWhen}>{formatWallClock(entry.created_at, tz)}</Text>
     </View>
@@ -217,6 +218,11 @@ export default function Allowance() {
       void reload();
     }, [reload]),
   );
+
+  // A mid-session purchase flips entitlement without refocusing, so reload on change too.
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   async function saveRate() {
     if (!householdId || rate === null) return;

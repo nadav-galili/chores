@@ -47,16 +47,26 @@ export function photoApprovalRoutes(db: Db) {
       if (completion.status === 'accepted') return 'already_accepted' as const;
       // Only a photo-waiting completion can be approved: a rejected or undone one stopped
       // counting, and approving it would pay work a parent already refused or a child withdrew.
-      if (completion.status !== 'pending_photo') return 'not_pending' as const;
+      // A keyless pending row carries no proof, so it waits rather than pays.
+      if (completion.status !== 'pending_photo' || !completion.photoKey) {
+        return 'not_pending' as const;
+      }
 
       await tx
         .update(completions)
         .set({ status: 'accepted' })
         .where(eq(completions.id, completion.id));
+      // Guarded to the photo-waiting row in this household: never clobbers a redo or done row.
       await tx
         .update(choreInstances)
         .set({ status: 'done' })
-        .where(eq(choreInstances.id, completion.instanceId));
+        .where(
+          and(
+            eq(choreInstances.id, completion.instanceId),
+            eq(choreInstances.status, 'pending_photo'),
+            eq(choreInstances.householdId, householdId),
+          ),
+        );
       await reconcileChild(tx, {
         childId: completion.childId,
         householdId,
@@ -73,6 +83,8 @@ export function photoApprovalRoutes(db: Db) {
 
   // Declining a photo is rejecting it: the same transaction as `POST .../reject`, so there is
   // one way to say no. A pending completion never paid, so this writes no clawback.
+  // Delegation is intentional (spec #72): decline accepts whatever the shared rejection path
+  // accepts, so decline and reject stay one path with one meaning.
   app.post('/households/:householdId/completions/:completionId/decline', async (c) => {
     const householdId = c.get('householdId');
     const parentId = c.get('parentId');

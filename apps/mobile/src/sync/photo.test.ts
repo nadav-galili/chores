@@ -15,7 +15,7 @@ import {
   xpEvents,
 } from '@/db/schema';
 import { materializeToday } from './engine';
-import { tapContext, tapPhotoDone, balanceOf, type ChildContext } from './local';
+import { tapContext, tapDone, tapPhotoDone, balanceOf, type ChildContext } from './local';
 import { pendingOps, rejectedOps } from './outbox';
 import { retakePhoto, uploadPendingPhotos, type PhotoTransfer } from './photo';
 
@@ -108,6 +108,20 @@ describe('tapPhotoDone', () => {
       .where(eq(daySummaries.child_id, childId));
     expect(summary?.done_count ?? 0).toBe(0);
     expect(summary?.complete ?? false).toBe(false);
+  });
+
+  it('does not clobber an instance that is already done', async () => {
+    const instance = await seedPhotoChore();
+    await tapDone(db, ctx(), instance);
+    const [done] = await db.select().from(choreInstances).where(eq(choreInstances.id, instance.id));
+    expect(done!.status).toBe('done');
+
+    await tapPhotoDone(db, ctx(), instance, photo);
+    const [after] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instance.id));
+    expect(after!.status).toBe('done');
   });
 });
 

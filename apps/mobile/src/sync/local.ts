@@ -262,10 +262,14 @@ async function completePhotoInstance(
         created_at: completed_at,
       })
       .onConflictDoNothing();
+    // Like the server path, only a due or redo instance moves: a pending_photo row is waiting on
+    // a parent and is not the child's to flip again.
     await db
       .update(choreInstances)
       .set({ status: 'pending_photo' })
-      .where(eq(choreInstances.id, instance.id));
+      .where(
+        and(eq(choreInstances.id, instance.id), inArray(choreInstances.status, ['due', 'redo'])),
+      );
     // Reconciled like any tap, and moves nothing: `pending_photo` is not a Completion yet, so
     // the shared rules pay no earn, no bonus, no streak and no XP for it.
     const paid = await reconcileLocal(db, ctx);

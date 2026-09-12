@@ -29,9 +29,16 @@ export async function takePhoto(): Promise<TakenPhoto | null> {
   });
   if (result.canceled || result.assets.length === 0) return null;
   const asset = result.assets[0]!;
+  // Aligned with the presign route's accepted types (uploads.ts): png and webp pass through,
+  // anything else is jpeg.
   return {
     local_uri: asset.uri,
-    content_type: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
+    content_type:
+      asset.mimeType === 'image/png'
+        ? 'image/png'
+        : asset.mimeType === 'image/webp'
+          ? 'image/webp'
+          : 'image/jpeg',
   };
 }
 

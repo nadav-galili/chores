@@ -189,6 +189,8 @@ export type MoneyLedgerEntry = {
   coins: number;
   money_amount: number | null;
   note: string | null;
+  ref_type: string | null;
+  ref_id: string | null;
   created_at: string;
   created_by: string | null;
 };
