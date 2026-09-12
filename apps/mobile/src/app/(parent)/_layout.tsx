@@ -4,12 +4,16 @@ import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
 import { INSTANT_SCREENS } from '@/lib/navigation';
+import { useNotificationTapRouting } from '@/lib/notifications';
 import { ThemeProvider } from '@/theme';
 
 /** Signed in → needs a household → create-household; has one → the children list. */
 function HouseholdGate() {
   const state = useHousehold();
   const pathname = usePathname();
+  // A tapped notification lands here rather than at the root, where `/`'s redirect to the role's
+  // home would carry it straight back off its destination.
+  useNotificationTapRouting('parent');
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') {
     return (

@@ -90,7 +90,14 @@ const ALLOWED_EVENT_KEYS = [
  * concrete reason: the navigation integration writes the current route names there.
  */
 const ALLOWED_CONTEXTS = {
-  app: ['app_identifier', 'app_name', 'app_version', 'app_build', 'app_start_time', 'in_foreground'],
+  app: [
+    'app_identifier',
+    'app_name',
+    'app_version',
+    'app_build',
+    'app_start_time',
+    'in_foreground',
+  ],
   os: ['name', 'version', 'build', 'kernel_version', 'rooted'],
   runtime: ['name', 'version'],
   device: [

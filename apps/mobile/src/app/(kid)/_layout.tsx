@@ -2,12 +2,15 @@ import { Redirect, Stack, usePathname } from 'expo-router';
 import { Loading } from '@/components/ui';
 import { DeviceSessionProvider, useDeviceSession } from '@/lib/device-session';
 import { INSTANT_SCREENS } from '@/lib/navigation';
+import { useNotificationTapRouting } from '@/lib/notifications';
 import { ThemeProvider } from '@/theme';
 
 /** No session → the join screen; a session → kid mode, and nothing routes back out but /exit. */
 function KidGate() {
   const device = useDeviceSession();
   const pathname = usePathname();
+  // As in the parent group: after `/`'s redirect has already happened, so a tap survives it.
+  useNotificationTapRouting('kid');
   if (device.status === 'loading') return <Loading />;
   const onJoin = pathname === '/join';
   if (!device.session && !onJoin) return <Redirect href="/(kid)/join" />;

@@ -5,7 +5,11 @@ import { errorReportingTags, scrubBreadcrumb, scrubErrorEvent } from './error-re
 describe('scrubBreadcrumb', () => {
   it('drops console breadcrumbs, which is where a chore title or a first name leaks', () => {
     expect(
-      scrubBreadcrumb({ category: 'console', level: 'log', message: 'saving chore "Bins" for Noa' }),
+      scrubBreadcrumb({
+        category: 'console',
+        level: 'log',
+        message: 'saving chore "Bins" for Noa',
+      }),
     ).toBeNull();
   });
 });

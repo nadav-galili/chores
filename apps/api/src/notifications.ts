@@ -10,6 +10,7 @@ import {
   type DueReminder,
   type IsoDate,
   type NotificationKind,
+  type NotificationPath,
   type NotificationTarget,
 } from '@chores/shared';
 import { and, asc, desc, eq, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
@@ -285,11 +286,15 @@ async function sendRequests(db: Db, push: Push, now: Date) {
         ...redemptionRequestedCopy(device.locale),
         // A kind, ids and a destination. A payload may carry copy and must never carry state:
         // a device that got this and then failed to sync would otherwise show a lie.
+        //
+        // The destination is the parent's day with this redemption named, which is where a
+        // request is decided; the id beside it is what makes the tap land on the request rather
+        // than on the screen in general (#51).
         data: {
           kind: 'redemption_requested',
           household_id: row.householdId,
           redemption_id: row.redemptionId,
-          path: '/(parent)',
+          path: '/(parent)' satisfies NotificationPath,
         },
       })),
     );
@@ -348,7 +353,7 @@ async function sendApprovals(db: Db, push: Push, now: Date) {
           kind: 'reward_approved',
           child_id: row.childId,
           redemption_id: row.redemptionId,
-          path: '/(kid)/shop',
+          path: '/(kid)/shop' satisfies NotificationPath,
         },
       },
     ]);
@@ -486,7 +491,14 @@ export async function sendDigest(
         to: device.token,
         ...digestCopy(device.locale, summary),
         // A payload carries ids, never state: the app opens the day and pulls the truth (#37).
-        data: { chore_date: due.chore_date },
+        // The kind is what a tap reports to analytics (#54) and the path is where it lands: the
+        // parent's own day, which is the Chore Date this digest is about and the only one that
+        // screen ever shows.
+        data: {
+          kind: 'parent_digest',
+          chore_date: due.chore_date,
+          path: '/(parent)' satisfies NotificationPath,
+        },
       },
     ]);
     forgotten += await recordSends(db, id, 'parent_device', [{ device, result: results[0] }], now);
