@@ -25,6 +25,9 @@ import type {
   UpsertChoreOp,
   CustomRewardInput,
   Gate,
+  MoneyLedgerEntry,
+  ApprovePhotoResult,
+  RejectCompletionResult as DeclinePhotoResult,
 } from '@chores/shared';
 import { gateSchema } from '@chores/shared';
 import { requireArrays } from '@/lib/payload';
@@ -170,6 +173,23 @@ export function createApi(getToken: GetToken, onGate?: OnGate) {
         `/households/${householdId}/money-ledger/payout`,
         json('POST', input),
       ),
+    // Photo proof (#72, ADR-0017). The read URL is presigned and lives five minutes, so it is
+    // fetched when the parent opens the photo rather than carried on the today payload; a
+    // completion whose photo never arrived answers 404 and the screen says so.
+    completionPhoto: (householdId: string, completionId: string) =>
+      request<PresignedRead>(`/households/${householdId}/completions/${completionId}/photo`),
+    // Approving pays the completion's own Chore Date through the same reconciliation a redo
+    // uses; declining is the shared rejection path, so decline and reject mean one thing.
+    approvePhoto: (householdId: string, completionId: string) =>
+      request<{ status: ApprovePhotoResult }>(
+        `/households/${householdId}/completions/${completionId}/approve`,
+        { method: 'POST' },
+      ),
+    declinePhoto: (householdId: string, completionId: string) =>
+      request<{ status: DeclinePhotoResult }>(
+        `/households/${householdId}/completions/${completionId}/decline`,
+        { method: 'POST' },
+      ),
     recordAdjustment: (
       householdId: string,
       input: { id: string; child_id: string; coins: number; note: string },
@@ -181,19 +201,7 @@ export function createApi(getToken: GetToken, onGate?: OnGate) {
   };
 }
 
-export type MoneyLedgerEntry = {
-  id: string;
-  household_id: string;
-  child_id: string;
-  kind: string;
-  coins: number;
-  money_amount: number | null;
-  note: string | null;
-  ref_type: string | null;
-  ref_id: string | null;
-  created_at: string;
-  created_by: string | null;
-};
+export type { MoneyLedgerEntry };
 
 export type MoneyLedgerChildView = {
   child_id: string;
@@ -219,6 +227,9 @@ export const redeemJoinCode = (input: RedeemJoinCodeInput) =>
   call<DeviceSession>(noToken, '/join-codes/redeem', json('POST', input));
 
 export type DeviceMe = { child: ChildSummary; household: HouseholdSummary };
+
+/** What the parent photo route answers: a presigned GET and the five minutes it lasts. */
+export type PresignedRead = { read_url: string; expires_in: number };
 
 /** What the kid presign route answers: the server-chosen key and five minutes to use it. */
 export type PresignResponse = { key: string; upload_url: string; expires_in: number };

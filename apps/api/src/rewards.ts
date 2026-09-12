@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Db } from './db/client.ts';
 import { rewards } from './db/schema.ts';
-import { gate } from './gate.ts';
+import { gateFeature } from './gate.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
 import { rewardToApi } from './serialize.ts';
@@ -48,12 +48,7 @@ export function rewardRoutes(db: Db) {
       .where(and(eq(rewards.id, rewardId), eq(rewards.householdId, c.get('householdId'))));
     if (!existing || existing.deletedAt) return c.json({ error: 'not_found' }, 404);
     if (!existing.isBuiltin) {
-      const answer = await gate(db, 'custom_reward', {
-        householdId: c.get('householdId'),
-        now: new Date().toISOString(),
-        child_count: 0,
-        parent_count: 0,
-      });
+      const answer = await gateFeature(db, 'custom_reward', c.get('householdId'));
       if (answer instanceof Response) return answer;
     }
     // The household in the WHERE makes another household's row unreachable by construction.
@@ -69,12 +64,7 @@ export function rewardRoutes(db: Db) {
   /** Create or replace one parent-authored catalog row. A built-in can never enter this path. */
   app.put('/households/:householdId/rewards/:rewardId', async (c) => {
     const householdId = c.get('householdId');
-    const answer = await gate(db, 'custom_reward', {
-      householdId,
-      now: new Date().toISOString(),
-      child_count: 0,
-      parent_count: 0,
-    });
+    const answer = await gateFeature(db, 'custom_reward', householdId);
     if (answer instanceof Response) return answer;
     const body = await parseBody(c, customRewardInputSchema);
     if (!body.ok) return body.response;
@@ -133,12 +123,7 @@ export function rewardRoutes(db: Db) {
   /** Soft-delete only: a Redemption keeps its foreign key and snapshotted cost indefinitely. */
   app.delete('/households/:householdId/rewards/:rewardId', async (c) => {
     const householdId = c.get('householdId');
-    const answer = await gate(db, 'custom_reward', {
-      householdId,
-      now: new Date().toISOString(),
-      child_count: 0,
-      parent_count: 0,
-    });
+    const answer = await gateFeature(db, 'custom_reward', householdId);
     if (answer instanceof Response) return answer;
     const body = await parseBody(c, deleteCustomRewardSchema);
     if (!body.ok) return body.response;

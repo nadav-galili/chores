@@ -61,6 +61,34 @@ export function gateFor(action: GatedAction): Gate {
 }
 
 /**
+ * The gates the Entitlement alone decides: there is no quota to count and no grace to date, so
+ * `canDo` reads none of the context for them. One shared context therefore says what the call
+ * sites used to say with a fresh pair of zeros each — that these actions have nothing to weigh.
+ */
+export type FeatureAction = Extract<
+  GatedAction,
+  'custom_reward' | 'money_ledger' | 'full_history' | 'photo_proof'
+>;
+
+const FEATURE_CONTEXT: GateContext = {
+  now: new Date(0).toISOString(),
+  child_count: 0,
+  parent_count: 0,
+};
+
+/**
+ * Whether the household's Entitlement covers a feature gate. It goes through `canDo` rather than
+ * reading `entitlement` itself, so the gate matrix stays the one place a tier is decided — a
+ * route that answers something other than 402 (the history clamp) still follows the same matrix.
+ */
+export function hasFeature(
+  household: Pick<Household, 'entitlement'>,
+  action: FeatureAction,
+): boolean {
+  return canDo(household, action, FEATURE_CONTEXT).ok;
+}
+
+/**
  * Whether a parent in `household` may perform `action`. Premium may do everything; the free
  * tier hits gates. `edit_child` narrowly covers the child's own row and adding or removing that
  * child as a chore assignee. It does not cover a chore's title, icon or recurrence: a shared chore

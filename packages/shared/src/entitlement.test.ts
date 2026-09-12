@@ -4,8 +4,10 @@ import {
   canDo,
   gateFor,
   graceEndsAt,
+  hasFeature,
   type GatedAction,
   type Gate,
+  type FeatureAction,
 } from './entitlement.ts';
 
 const free = { entitlement: 'free' as const };
@@ -62,5 +64,29 @@ describe('graceEndsAt', () => {
   it('is 14 days after the child was added', () => {
     expect(GRACE_DAYS).toBe(14);
     expect(graceEndsAt('2026-09-09T12:00:00.000Z')).toBe('2026-09-23T12:00:00.000Z');
+  });
+});
+
+describe('hasFeature', () => {
+  const features: FeatureAction[] = [
+    'custom_reward',
+    'money_ledger',
+    'full_history',
+    'photo_proof',
+  ];
+
+  it('is the Entitlement alone: free has none of them, premium has all of them', () => {
+    for (const action of features) {
+      expect(hasFeature(free, action)).toBe(false);
+      expect(hasFeature(premium, action)).toBe(true);
+    }
+  });
+
+  it('agrees with `canDo`, so a route that clamps follows the same matrix as one that 402s', () => {
+    const ctx = { now, ...counts };
+    for (const action of features) {
+      expect(hasFeature(free, action)).toBe(canDo(free, action, ctx).ok);
+      expect(hasFeature(premium, action)).toBe(canDo(premium, action, ctx).ok);
+    }
   });
 });

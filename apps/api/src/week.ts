@@ -2,6 +2,7 @@ import {
   addDays,
   choreDate,
   daysBetween,
+  hasFeature,
   historyWindow,
   isoDateSchema,
   type IsoDate,
@@ -56,9 +57,12 @@ export function weekRoutes(db: Db) {
     }
 
     const freeFrom = freeDates[0]!;
+    // The clamp is the gate matrix's answer, not a second reading of the column: `full_history`
+    // is the one gate that answers inside a 200 rather than with a 402, and going through
+    // `hasFeature` keeps it following the matrix if the matrix changes.
     const clamped =
       requestedFrom.data !== undefined &&
-      household.entitlement === 'free' &&
+      !hasFeature(household, 'full_history') &&
       requestedFrom.data < freeFrom;
     const from: IsoDate = clamped ? freeFrom : (requestedFrom.data ?? freeFrom);
     const dates = requestedFrom.data

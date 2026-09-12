@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Db } from './db/client.ts';
 import { children, households, ledgerEntries } from './db/schema.ts';
-import { gate } from './gate.ts';
+import { gateFeature } from './gate.ts';
 import { ledgerRow } from './ledger-row.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -46,12 +46,7 @@ const toApi = (row: LedgerRow) => ({
 });
 
 const gateMoneyLedger = (db: Db, householdId: string) =>
-  gate(db, 'money_ledger', {
-    householdId,
-    now: new Date().toISOString(),
-    child_count: 0,
-    parent_count: 0,
-  });
+  gateFeature(db, 'money_ledger', householdId);
 
 /** Parent-only allowance settings, per-child balances, and append-only money ledger writes. */
 export function moneyLedgerRoutes(db: Db) {

@@ -171,7 +171,7 @@ describe('POST /households/:id/completions/:id/approve', () => {
     expect(await res.json()).toEqual({ error: 'not_pending' });
   });
 
-  it('refuses a keyless pending row instead of paying it', async () => {
+  it('lets a parent approve a keyless pending row rather than stranding it', async () => {
     const home = await setupHousehold(app, 'user_approve_keyless');
     const choreId = await home.addChore('Tidy room', [home.noa.id]);
     const key = instanceId(choreId, home.noa.id, testToday());
@@ -197,10 +197,20 @@ describe('POST /households/:id/completions/:id/approve', () => {
       status: 'pending_photo',
     });
 
+    // The photo never reached R2, so there is nothing for the parent to look at — but the
+    // decision is still theirs, and refusing here left the child waiting forever with only
+    // decline reachable. Approving pays the chore date the way an approval with a photo does.
     const res = await approve('user_approve_keyless', home.householdId, completionId);
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'not_pending' });
-    expect(await balance(home.noa.id)).toBe(0);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: 'approved' });
+    expect(await balance(home.noa.id)).toBeGreaterThan(0);
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, completionId));
+    expect(completion?.status).toBe('accepted');
+    const [instance] = await db.select().from(choreInstances).where(eq(choreInstances.id, key));
+    expect(instance?.status).toBe('done');
   });
 
   it('does not reach another household’s completion', async () => {
@@ -227,7 +237,12 @@ describe('POST /households/:id/completions/:id/approve', () => {
     const item = before.children
       .find((c) => c.child_id === noa.id)!
       .items.find((i) => i.instance_id === instanceKey)!;
-    expect(item).toMatchObject({ status: 'pending_photo', completion_id: completionId });
+    // `has_photo` is what lets the screen show the photo rather than offer one that is not there.
+    expect(item).toMatchObject({
+      status: 'pending_photo',
+      completion_id: completionId,
+      has_photo: true,
+    });
     expect(item.completed_at).not.toBeNull();
 
     await approve('user_approve_today', householdId, item.completion_id!);

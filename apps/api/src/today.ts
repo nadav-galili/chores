@@ -115,6 +115,7 @@ export function todayRoutes(db: Db) {
           instanceId: completions.instanceId,
           completedAt: completions.completedAt,
           status: completions.status,
+          photoKey: completions.photoKey,
         })
         .from(completions)
         .where(
@@ -186,6 +187,9 @@ export function todayRoutes(db: Db) {
             status: i.status,
             completed_at: doneBy.get(i.id)?.completedAt.toISOString() ?? null,
             completion_id: doneBy.get(i.id)?.id ?? null,
+            // A photo the child took but whose bytes never reached R2 leaves a waiting row with
+            // no key. The parent still decides it; the screen just has nothing to show them.
+            has_photo: doneBy.get(i.id)?.photoKey != null,
           }));
         return {
           child_id: child.id,

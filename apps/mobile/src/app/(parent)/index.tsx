@@ -1,14 +1,16 @@
 import { useAuth } from '@clerk/expo';
 import type {
+  ApprovePhotoResult,
   DecideRedemptionResult,
   ParentTodayChild,
   ParentTodayItem,
   ParentTodayRedemption,
   RedemptionDecision,
+  RejectCompletionResult,
 } from '@chores/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
 import {
   Card,
@@ -24,6 +26,7 @@ import {
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
+import type { Api } from '@/lib/api';
 import { rewardTitle } from '@/lib/reward-title';
 import { useParentToday } from '@/lib/use-parent-today';
 import { useThemedStyles, type Theme } from '@/theme';
@@ -52,6 +55,7 @@ function ChoreLine({
 }) {
   const styles = useThemedStyles(todayStyles);
   const done = item.status === 'done' && item.completed_at !== null;
+  const waiting = item.status === 'pending_photo';
   return (
     <View style={styles.row}>
       <Text style={[styles.rowTitle, done && styles.rowTitleDone]}>
@@ -59,9 +63,11 @@ function ChoreLine({
         {item.title}
       </Text>
       <Text style={[styles.rowState, done && styles.rowStateDone]}>
-        {done
-          ? t('parent.doneAt', { time: formatWallClock(item.completed_at!, tz) })
-          : t('parent.notYet')}
+        {waiting
+          ? t('parent.photo.waiting')
+          : done
+            ? t('parent.doneAt', { time: formatWallClock(item.completed_at!, tz) })
+            : t('parent.notYet')}
       </Text>
       {done && item.completion_id !== null && (
         <Pressable
@@ -78,6 +84,148 @@ function ChoreLine({
   );
 }
 
+/**
+ * The waiting photo itself (#72). The read URL is presigned for five minutes, so it is fetched
+ * when the row appears rather than carried on the today payload — and re-fetched whenever the
+ * completion the row names changes.
+ *
+ * A completion whose bytes never reached R2 has `has_photo: false`: the parent is told there is
+ * nothing to look at rather than shown a broken frame, and both decisions stay reachable, which
+ * is the whole reason a keyless row is approvable at all.
+ */
+function WaitingPhoto({
+  api,
+  householdId,
+  completionId,
+  hasPhoto,
+}: {
+  api: Api;
+  householdId: string;
+  completionId: string;
+  hasPhoto: boolean;
+}) {
+  const styles = useThemedStyles(todayStyles);
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!hasPhoto) return;
+    // `live` drops the answer of a request whose row has already moved on, so a slow presign
+    // for one completion can never paint itself over the next one.
+    let live = true;
+    setUrl(null);
+    setFailed(false);
+    api
+      .completionPhoto(householdId, completionId)
+      .then((answer) => live && setUrl(answer.read_url))
+      // The cause is logged rather than shown: a parent can do nothing with a presign failure,
+      // and the line below already says the photo cannot be opened (ADR-0009 — the id is a
+      // random UUID, never a name or a title).
+      .catch((e: unknown) => {
+        console.error('photo read url failed', completionId, e);
+        if (live) setFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [api, householdId, completionId, hasPhoto]);
+
+  if (!hasPhoto) return <Text style={styles.photoNote}>{t('parent.photo.missing')}</Text>;
+  if (failed) return <Text style={styles.photoNote}>{t('parent.photo.loadFailed')}</Text>;
+  if (url === null) return <Text style={styles.photoNote}>{t('parent.photo.loading')}</Text>;
+  return (
+    <Image
+      source={{ uri: url }}
+      style={styles.photo}
+      resizeMode="cover"
+      accessibilityLabel={t('parent.photo.alt')}
+    />
+  );
+}
+
+/**
+ * What is waiting on a parent, with the photo (#72). It sits above the day's list rather than
+ * inside it: a photo is a decision, and a decision is not something to find by scrolling a scan
+ * of chores. Approve pays the completion's own Chore Date; decline is the same rejection the
+ * rest of the parent surface writes, so there is one way to say no.
+ *
+ * The two controls borrow the chip pill the Reject control borrows. Neither takes the one green:
+ * it means "act" on the child's side (ADR-0012).
+ */
+function PhotoCard({
+  api,
+  householdId,
+  waiting,
+  onDecide,
+  deciding,
+}: {
+  api: Api;
+  householdId: string;
+  waiting: { child: ParentTodayChild; item: ParentTodayItem }[];
+  onDecide: (item: ParentTodayItem, decision: 'approve' | 'decline') => void;
+  deciding: string | null;
+}) {
+  const styles = useThemedStyles(todayStyles);
+  return (
+    <Card>
+      <Text style={styles.name}>{t('parent.photo.title', { count: waiting.length })}</Text>
+      <View style={styles.rows}>
+        {waiting.map(({ child, item }) => {
+          const completionId = item.completion_id!;
+          const busy = deciding === completionId;
+          return (
+            <View key={item.instance_id} style={styles.request}>
+              <Text style={styles.rowTitle}>
+                {t('parent.photo.asked', {
+                  name: child.first_name,
+                  chore: `${item.icon ? `${item.icon} ` : ''}${item.title}`,
+                })}
+              </Text>
+              <WaitingPhoto
+                api={api}
+                householdId={householdId}
+                completionId={completionId}
+                hasPhoto={item.has_photo}
+              />
+              <View style={styles.decisions}>
+                <Pressable
+                  style={[styles.reject, busy && styles.rejectBusy]}
+                  onPress={() => onDecide(item, 'approve')}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('parent.photo.approve')}
+                >
+                  <Text style={styles.approveText}>
+                    {busy ? t('parent.photo.deciding') : t('parent.photo.approve')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.reject, busy && styles.rejectBusy]}
+                  onPress={() => onDecide(item, 'decline')}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('parent.photo.decline')}
+                >
+                  <Text style={styles.rejectText}>{t('parent.photo.decline')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </Card>
+  );
+}
+
+/** Every completion waiting on a photo decision, in the order the children are read in. */
+function waitingOnAPhoto(children: ParentTodayChild[]) {
+  return children.flatMap((child) =>
+    child.items
+      .filter((item) => item.status === 'pending_photo' && item.completion_id !== null)
+      .map((item) => ({ child, item })),
+  );
+}
+
 /** What each answer reads as. Neither `already_` answer is a failure: it is news, and the
  * refresh behind it puts the screen back in step with what actually happened. */
 const DECIDED_NOTICE: Record<DecideRedemptionResult, TranslationKey> = {
@@ -85,6 +233,17 @@ const DECIDED_NOTICE: Record<DecideRedemptionResult, TranslationKey> = {
   declined: 'parent.requests.declined',
   already_decided: 'parent.requests.alreadyDecided',
   already_cancelled: 'parent.requests.alreadyCancelled',
+};
+
+/**
+ * What each photo answer reads as. Neither "already" answer is a failure: the other parent
+ * decided first, or the child undid their own tap, and the refresh behind it says so.
+ */
+const PHOTO_NOTICE: Record<ApprovePhotoResult | RejectCompletionResult, TranslationKey> = {
+  approved: 'parent.photo.approved',
+  already_accepted: 'parent.photo.alreadyDecided',
+  rejected: 'parent.photo.declined',
+  already_undone: 'parent.photo.alreadyUndone',
 };
 
 /**
@@ -236,6 +395,7 @@ export default function ParentToday() {
   const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
+  const [decidingPhoto, setDecidingPhoto] = useState<string | null>(null);
   const { api } = state;
   const householdId = household?.id ?? null;
 
@@ -305,7 +465,46 @@ export default function ParentToday() {
     [api, householdId, today],
   );
 
+  /**
+   * Approve or decline one waiting photo (#72). `already_accepted` and `already_undone` are news
+   * rather than failures — the other parent decided first, or the child undid the tap — and the
+   * refresh behind either is what puts the screen back in step with what actually happened.
+   */
+  const decidePhoto = useCallback(
+    async (item: ParentTodayItem, decision: 'approve' | 'decline') => {
+      const completionId = item.completion_id;
+      if (!householdId || completionId === null) return;
+      setDecidingPhoto(completionId);
+      setNotice(null);
+      try {
+        const { status } =
+          decision === 'approve'
+            ? await api.approvePhoto(householdId, completionId)
+            : await api.declinePhoto(householdId, completionId);
+        setNotice({ text: t(PHOTO_NOTICE[status], { title: item.title }), bad: false });
+        await today.refresh();
+      } catch (e) {
+        setNotice({
+          text: withCause(
+            t(
+              decision === 'approve' ? 'parent.photo.approveFailed' : 'parent.photo.declineFailed',
+              {
+                title: item.title,
+              },
+            ),
+            e,
+          ),
+          bad: true,
+        });
+      } finally {
+        setDecidingPhoto(null);
+      }
+    },
+    [api, householdId, today],
+  );
+
   if (!household) return null;
+  const waiting = waitingOnAPhoto(today.today?.children ?? []);
 
   return (
     <Screen list>
@@ -328,6 +527,15 @@ export default function ParentToday() {
               title={t('parent.noChildren')}
               actionTitle={t('children.add')}
               onAction={() => router.push('/(parent)/children/new')}
+            />
+          )}
+          {householdId !== null && waiting.length > 0 && (
+            <PhotoCard
+              api={api}
+              householdId={householdId}
+              waiting={waiting}
+              onDecide={(item, decision) => void decidePhoto(item, decision)}
+              deciding={decidingPhoto}
             />
           )}
           {today.today !== null && today.today.redemptions.length > 0 && (
@@ -403,4 +611,12 @@ const todayStyles = (theme: Theme) => ({
   notice: { ...theme.type.label, color: theme.colors.text },
   noticeBad: { color: theme.colors.danger },
   nothingDue: { ...theme.type.label, color: theme.colors.muted },
+  // Wide and short: a proof photo is looked at, not admired, and the card holds several of them.
+  photo: {
+    width: '100%' as const,
+    height: 180,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+  },
+  photoNote: { ...theme.type.label, color: theme.colors.muted },
 });

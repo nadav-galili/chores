@@ -149,6 +149,13 @@ export type RejectReason = z.infer<typeof rejectReasonSchema>;
  */
 export type RejectCompletionResult = 'rejected' | 'already_undone';
 
+/**
+ * The answer to approving a waiting Photo Proof (#72). Two parents approving at once both read
+ * `approved` and `already_accepted` respectively, and the chore is paid once. Declining is the
+ * rejection path above, so it answers `RejectCompletionResult` rather than a second vocabulary.
+ */
+export type ApprovePhotoResult = 'approved' | 'already_accepted';
+
 /** What a parent decides about a Redemption. Approving moves no coins; declining refunds. */
 export const redemptionDecisionSchema = z.enum(['approve', 'decline']);
 export type RedemptionDecision = z.infer<typeof redemptionDecisionSchema>;

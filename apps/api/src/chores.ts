@@ -12,7 +12,7 @@ import { z } from 'zod';
 import type { Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import { children, choreAssignees, chores } from './db/schema.ts';
-import { gate } from './gate.ts';
+import { gate, gateFeature } from './gate.ts';
 import { parseBody } from './parse-body.ts';
 import { choreFieldsFromRow, choreToApi } from './serialize.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -128,12 +128,7 @@ export function choreRoutes(db: Db, analytics: Analytics) {
       }
 
       if (before?.fields.requires_photo !== true && merged.fields.requires_photo) {
-        const answer = await gate(tx, 'photo_proof', {
-          householdId,
-          now: new Date().toISOString(),
-          child_count: 0,
-          parent_count: 0,
-        });
+        const answer = await gateFeature(tx, 'photo_proof', householdId);
         if (answer instanceof Response) return answer;
       }
 

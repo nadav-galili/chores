@@ -111,7 +111,8 @@ export async function uploadPendingPhotos(
     }
     // The key fills in the waiting completion the tap wrote, and the op that carries it is
     // enqueued in the same transaction — the three can never come apart. (Filling `photo_key`
-    // is the pending write completing, the way a status move is; docs/spec/02-data-model.md.)
+    // is the pending write completing, the way a status move is — the one exception
+    // docs/spec/02-data-model.md names to the append-only rule, and it happens once.)
     await inTransaction(db, async () => {
       await db
         .update(completions)

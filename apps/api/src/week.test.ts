@@ -305,6 +305,26 @@ describe('GET /households/:id/children/:id/week', () => {
     expect(body).not.toHaveProperty('clamped');
   });
 
+  it('is unchanged for a household that asks for nothing, premium included', async () => {
+    // #68: `from` is what asks for more history. A household that sends none gets the seven days
+    // it always got and no `clamped` flag — on either tier — so premium does not silently turn
+    // the grid into something else and free does not read every load as a refusal.
+    const owner = 'user_week_premium_default_at_example.com';
+    const { householdId, noa, putChore, today } = await setup(owner);
+    await putChore({ title: 'Dishes', kind: 'daily', assignees: [noa.id] });
+    await writeHouseholdInstances(db, householdId, addDays(today(), -10));
+    await writeHouseholdInstances(db, householdId, today());
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+
+    const { status, body } = await getWeek(owner, householdId, noa.id);
+    expect(status).toBe(200);
+    expect(body.chore_dates).toEqual(historyWindow(today()));
+    expect(body).not.toHaveProperty('clamped');
+  });
+
   it('clamps a free household asking for older history to seven days and flags the answer', async () => {
     const owner = 'user_week_free_clamped_at_example.com';
     const { householdId, noa, putChore, today } = await setup(owner);
@@ -323,7 +343,10 @@ describe('GET /households/:id/children/:id/week', () => {
   it('returns the full requested range to a premium household without materializing it', async () => {
     const owner = 'user_week_premium_full_at_example.com';
     const { householdId, noa, putChore, today } = await setup(owner);
-    await db.update(households).set({ entitlement: 'premium' }).where(eq(households.id, householdId));
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
     const dishes = await putChore({ title: 'Dishes', kind: 'daily', assignees: [noa.id] });
     const tenAgo = addDays(today(), -10);
     await writeHouseholdInstances(db, householdId, tenAgo);

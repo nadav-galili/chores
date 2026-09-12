@@ -98,6 +98,18 @@ export function ChoreForm({
   );
   const openChildGate = () =>
     router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } });
+  /**
+   * Photo Proof is premium (#70). A control a parent cannot use looks unavailable rather than
+   * failing: turning it on on the free tier opens the paywall instead of submitting a form that
+   * the server answers 402 to. A chore that already asks for a photo keeps it — turning one off
+   * is not a gated change — which is why this only guards the switch on.
+   */
+  const photoIsGated =
+    household.status === 'ready' &&
+    household.me.household?.entitlement === 'free' &&
+    !initial.requires_photo;
+  const openPhotoGate = () =>
+    router.push({ pathname: '/(parent)/paywall', params: { gate: 'photo_proof' } });
 
   const submit = async () => {
     const parsed = choreFieldsSchema.safeParse({
@@ -187,17 +199,26 @@ export function ChoreForm({
           keyboardType="numbers-and-punctuation"
         />
       )}
-      <View style={styles.photoField}>
+      <Pressable
+        style={styles.photoField}
+        onPress={photoIsGated ? openPhotoGate : undefined}
+        disabled={!photoIsGated}
+        accessibilityRole={photoIsGated ? 'button' : undefined}
+        accessibilityLabel={photoIsGated ? t('paywall.lockedPhotoProof') : undefined}
+      >
         <View style={styles.photoCopy}>
           <Text style={styles.photoLabel}>{t('choreForm.photoProof')}</Text>
-          <Text style={styles.photoHint}>{t('choreForm.photoProofHint')}</Text>
+          <Text style={styles.photoHint}>
+            {photoIsGated ? t('paywall.lockedPrice') : t('choreForm.photoProofHint')}
+          </Text>
         </View>
         <Switch
           value={requiresPhoto}
-          onValueChange={setRequiresPhoto}
+          onValueChange={photoIsGated ? openPhotoGate : setRequiresPhoto}
+          disabled={photoIsGated}
           accessibilityLabel={t('choreForm.photoProof')}
         />
-      </View>
+      </Pressable>
       <ChipGroup label={t('choreForm.who')}>
         <Chip
           title={

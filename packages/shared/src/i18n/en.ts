@@ -181,6 +181,27 @@ export const en = {
       alreadyCancelled: '%{name} changed their mind first. Their coins are back.',
       failed: 'Could not answer %{name}’s request.',
     },
+    // The photo decisions (#72). Approve and decline are the only two words a parent needs here;
+    // declining is the same rejection the rest of the parent surface writes, so it reads the
+    // same way a rejection does.
+    photo: {
+      title: plural({ one: 'One photo to check', other: '%{count} photos to check' }),
+      asked: '%{name} · %{chore}',
+      waiting: 'waiting on you',
+      alt: 'The photo the child took',
+      loading: 'Opening the photo…',
+      loadFailed: 'Could not open the photo. Pull to refresh and try again.',
+      missing: 'The photo never arrived. You can still approve or decline.',
+      approve: 'Approve',
+      decline: 'Decline',
+      deciding: 'Saving…',
+      approved: 'Approved %{title}. The coins are on their way.',
+      declined: 'Sent %{title} back for another go.',
+      alreadyDecided: 'That was already decided. Nothing changed.',
+      alreadyUndone: 'They undid %{title} first. Nothing changed.',
+      approveFailed: 'Could not approve %{title}.',
+      declineFailed: 'Could not decline %{title}.',
+    },
     // The seven-day grid. It reuses the today screen's reject copy verbatim, because it is the
     // same endpoint and the same decision — only the day is older.
     week: {
@@ -265,6 +286,7 @@ export const en = {
     retry: 'Load plans again',
     lockedPrice: 'Premium · from $6.99/month',
     lockedChild: '%{name} · Premium · from $6.99/month',
+    lockedPhotoProof: 'Require a photo · Premium · from $6.99/month',
     childLocked: 'Editing this child is unavailable on the free plan.',
     close: 'Not now',
   },

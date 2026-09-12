@@ -18,6 +18,13 @@ export const parentTodayItemSchema = z.object({
    * on a parent surface that can name a completion, so it is what makes a rejection reachable.
    */
   completion_id: z.string().uuid().nullable(),
+  /**
+   * Whether the waiting completion actually carries a photo. A `pending_photo` instance whose
+   * photo never arrived — the chore started asking for one after the tap was already queued —
+   * is still a parent's to decide, so the screen says there is nothing to look at rather than
+   * offering a photo that does not exist. Always false when nothing is waiting.
+   */
+  has_photo: z.boolean(),
 });
 export type ParentTodayItem = z.infer<typeof parentTodayItemSchema>;
 

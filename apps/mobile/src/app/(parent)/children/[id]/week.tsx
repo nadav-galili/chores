@@ -113,8 +113,17 @@ export default function ChildWeek() {
   const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
   const household = state.status === 'ready' ? state.me.household : null;
   const householdId = household?.id ?? null;
+  /**
+   * A free household asks for nothing and gets the seven days it has always got (#68): asking
+   * anyway would answer `clamped` on every load and make the free tier's own screen read as a
+   * refusal. Premium asks from the child's first day, which is the whole of `full_history`.
+   *
+   * The Entitlement here only decides what to ask for — the server's gate matrix still decides
+   * what to answer, and a mirrored value that is stale costs a clamp, never access.
+   */
+  const premium = household?.entitlement === 'premium';
   const historyFrom =
-    child && household
+    premium && child && household
       ? choreDate(new Date(child.created_at), household.tz, household.day_boundary_hour)
       : undefined;
   const week = useChildWeek(child?.id ?? null, historyFrom);
@@ -159,9 +168,7 @@ export default function ChildWeek() {
   return (
     <Screen list>
       <Title>
-        {t(week.week?.clamped === false ? 'parent.week.fullTitle' : 'parent.week.title', {
-          name: child.first_name,
-        })}
+        {t(premium ? 'parent.week.fullTitle' : 'parent.week.title', { name: child.first_name })}
       </Title>
       {notice && <Text style={[styles.notice, notice.bad && styles.noticeBad]}>{notice.text}</Text>}
       {week.status === 'error' && (
@@ -175,9 +182,7 @@ export default function ChildWeek() {
       {week.status === 'loading' && week.week === null ? (
         <Loading />
       ) : week.week !== null && week.week.chores.length === 0 ? (
-        <EmptyState
-          title={t(week.week.clamped === false ? 'parent.week.fullEmpty' : 'parent.week.empty')}
-        />
+        <EmptyState title={t(premium ? 'parent.week.fullEmpty' : 'parent.week.empty')} />
       ) : (
         // Two scrolls, vertical outside: a household with more chores than the phone is tall
         // scrolls down, and a grid wider than the phone scrolls across with its day headers
@@ -205,7 +210,8 @@ export default function ChildWeek() {
           </ScrollView>
         </ScrollView>
       )}
-      {week.week?.clamped === true && (
+      {/* The way past the seven days, for the tier that does not have them. */}
+      {!premium && (
         <Button
           title={t('parent.week.seeMore')}
           onPress={() =>

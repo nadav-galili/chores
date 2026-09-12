@@ -1,3 +1,4 @@
+import type { ApprovePhotoResult } from '@chores/shared';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -7,13 +8,11 @@ import { choreInstances, completions } from './db/schema.ts';
 import { applyRejection } from './rejection.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
 
-export type ApprovePhotoResult = 'approved' | 'already_accepted';
-
 /**
  * M3.13 photo proof decision (spec #59, photo-proof section).
  *
  * Contract assumed from M3.12, which is built in parallel: a photo-waiting completion is a
- * `completions` row with `status = 'pending_photo'` and `photo_key` set, beside a
+ * `completions` row with `status = 'pending_photo'` — usually with `photo_key` set — beside a
  * `chore_instances` row with `status = 'pending_photo'`. No new pay path: approval flips the
  * completion to `accepted`, marks the instance `done`, and runs the same `reconcileChild` the
  * Redo Window uses — so a late approval of a past chore date pays that date's coins, bonus and
@@ -47,8 +46,14 @@ export function photoApprovalRoutes(db: Db) {
       if (completion.status === 'accepted') return 'already_accepted' as const;
       // Only a photo-waiting completion can be approved: a rejected or undone one stopped
       // counting, and approving it would pay work a parent already refused or a child withdrew.
-      // A keyless pending row carries no proof, so it waits rather than pays.
-      if (completion.status !== 'pending_photo' || !completion.photoKey) {
+      //
+      // A keyless pending row is approvable. It carries no proof, but refusing it left the child
+      // waiting forever with only decline reachable: the chore started asking for a photo after
+      // the tap was already queued, or the bytes never reached R2. Approving is a parent's own
+      // act on their own household, never a child's bypass — the child cannot reach this route,
+      // and `apply-ops` still refuses to pay a keyless tap by itself. The today screen says the
+      // photo is missing (`has_photo`), so the parent decides knowing there is nothing to see.
+      if (completion.status !== 'pending_photo') {
         return 'not_pending' as const;
       }
 

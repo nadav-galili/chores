@@ -25,6 +25,9 @@ function formatMoney(minor: number, currency: string): string {
   try {
     return new Intl.NumberFormat(tag, { style: 'currency', currency }).format(minor / 100);
   } catch {
+    // The only way `Intl` throws here is a currency tag it does not know, and the cause adds
+    // nothing to that: the number and the tag are already the fallback, and a parent reading an
+    // allowance can do nothing with the exception. Nothing is swallowed that anyone could act on.
     return `${formatNumber(minor / 100)} ${currency}`;
   }
 }
