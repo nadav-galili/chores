@@ -93,3 +93,28 @@ const KID_REMINDER_COPY: Readonly<Record<Locale, { title: string; body: string }
 export function kidReminderCopy(locale: Locale): { title: string; body: string } {
   return KID_REMINDER_COPY[locale];
 }
+
+/**
+ * The two immediate kinds' words. A redemption request is the one interrupt this app sends a
+ * parent, because it is the only thing that leaves a child waiting on them; an approval is told
+ * to the child straight away. Neither names the child or the reward: a push goes through Expo,
+ * and nothing about a child crosses to a third party (ADR-0009). Which child it was is in the
+ * push's data, as an id the app resolves after it pulls.
+ */
+const REDEMPTION_REQUESTED_COPY: Readonly<Record<Locale, { title: string; body: string }>> = {
+  en: { title: 'A reward was asked for', body: 'Tap to decide.' },
+  he: { title: 'ביקשו פרס', body: 'הקישו כדי להחליט.' },
+};
+
+const REWARD_APPROVED_COPY: Readonly<Record<Locale, { title: string; body: string }>> = {
+  en: { title: 'Your reward is approved!', body: 'Tap to see it.' },
+  he: { title: 'הפרס אושר!', body: 'הקישו כדי לראות אותו.' },
+};
+
+export function redemptionRequestedCopy(locale: Locale): { title: string; body: string } {
+  return REDEMPTION_REQUESTED_COPY[locale];
+}
+
+export function rewardApprovedCopy(locale: Locale): { title: string; body: string } {
+  return REWARD_APPROVED_COPY[locale];
+}

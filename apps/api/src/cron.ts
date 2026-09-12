@@ -3,7 +3,7 @@ import { eq, isNotNull } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
 import { children, households } from './db/schema.ts';
 import { writeHouseholdInstances } from './materialize.ts';
-import { readReceipts, sendReminder } from './notifications.ts';
+import { readReceipts, sendImmediates, sendReminder, type DueImmediate } from './notifications.ts';
 import type { Push } from './push.ts';
 
 /**
@@ -20,6 +20,8 @@ export type TickResult = {
   rolled: DueRollover[];
   /** The reminders this tick claimed; a reminder another tick already handled is not one. */
   reminded: DueReminder[];
+  /** The immediate kinds this tick claimed: a request waiting on a parent, an approval on a child. */
+  announced: DueImmediate[];
   /** Tokens forgotten this tick because Expo said the device is gone. */
   forgotten: number;
 };
@@ -53,9 +55,12 @@ export async function runTick(db: Db, push: Push, now = new Date()): Promise<Tic
     if (sent.forgotten) forgotten++;
     if (sent.claimed) reminded.push(due);
   }
+  // Nothing on a clock asks for these two; the tick is only where the claim row lives.
+  const immediate = await sendImmediates(db, push, now);
+  forgotten += immediate.forgotten;
   forgotten += await readReceipts(db, push, now);
 
-  return { rolled, reminded, forgotten };
+  return { rolled, reminded, announced: immediate.announced, forgotten };
 }
 
 /** Starts the minute cron; returns the stop the process never calls but a test might. */

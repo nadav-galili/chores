@@ -1,13 +1,16 @@
 import {
   kidReminderCopy,
   notificationId,
+  redemptionRequestedCopy,
+  rewardApprovedCopy,
   type DueReminder,
+  type NotificationKind,
   type NotificationTarget,
 } from '@chores/shared';
-import { and, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
-import { childDevices, notifications, parentDevices } from './db/schema.ts';
-import type { Push, PushError, PushMessage } from './push.ts';
+import { childDevices, notifications, parentDevices, parents, redemptions } from './db/schema.ts';
+import type { Push, PushError, PushMessage, PushSend } from './push.ts';
 
 /**
  * Sending a notification, and living with what Expo says about it (docs/spec/01-product.md,
@@ -68,23 +71,48 @@ async function pushableDevice(db: Db, childId: string) {
 }
 
 /**
- * Claims one reminder, and answers whether this tick is the one that has to send it. The id is
- * deterministic, so the insert is the lock: a second tick, or the tick after a restart, finds the
- * row taken. The one exception is a row a previous tick recorded a transient failure on — that
- * one is known not to have been delivered, so it is tried again while the reminder is still worth
- * delivering.
+ * Claims one notification, and answers whether this tick is the one that has to send it. The id
+ * is deterministic, so the insert is the lock: a second tick, or the tick after a restart, finds
+ * the row taken. The one exception is a row a previous tick recorded a transient failure on —
+ * that one is known not to have been delivered, so it is tried again while it is still worth
+ * delivering. `DeviceNotRegistered` is not transient: the token is already forgotten.
  */
-async function claimReminder(
+async function claimNotification(
+  db: Db,
+  row: {
+    id: string;
+    target: NotificationTarget;
+    targetId: string | null;
+    kind: NotificationKind;
+    payload: Record<string, unknown>;
+  },
+  now: Date,
+): Promise<boolean> {
+  const claimed = await db
+    .insert(notifications)
+    .values({ ...row, scheduledFor: now })
+    .onConflictDoNothing()
+    .returning({ id: notifications.id });
+  if (claimed.length) return true;
+
+  const [held] = await db
+    .select({ sentAt: notifications.sentAt, payload: notifications.payload })
+    .from(notifications)
+    .where(eq(notifications.id, row.id));
+  const failure = held?.payload['error'];
+  return held?.sentAt === null && typeof failure === 'string' && failure !== 'DeviceNotRegistered';
+}
+
+const claimReminder = (
   db: Db,
   due: DueReminder,
   now: Date,
   device: { id: string } | undefined,
-): Promise<boolean> {
-  const id = reminderIdOf(due);
-  const claimed = await db
-    .insert(notifications)
-    .values({
-      id,
+): Promise<boolean> =>
+  claimNotification(
+    db,
+    {
+      id: reminderIdOf(due),
       target: 'child_device',
       targetId: device?.id ?? null,
       kind: 'kid_reminder',
@@ -93,19 +121,9 @@ async function claimReminder(
         chore_date: due.chore_date,
         reminder_time: due.reminder_time,
       },
-      scheduledFor: now,
-    })
-    .onConflictDoNothing()
-    .returning({ id: notifications.id });
-  if (claimed.length) return true;
-
-  const [held] = await db
-    .select({ sentAt: notifications.sentAt, payload: notifications.payload })
-    .from(notifications)
-    .where(eq(notifications.id, id));
-  const failure = held?.payload['error'];
-  return held?.sentAt === null && typeof failure === 'string' && failure !== 'DeviceNotRegistered';
-}
+    },
+    now,
+  );
 
 /**
  * Pushes one due reminder, if the child's device has a token. Without one the row is still
@@ -122,26 +140,223 @@ export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Da
     ...kidReminderCopy(device.locale),
     data: { child_id: due.child_id, chore_date: due.chore_date },
   };
-  const id = reminderIdOf(due);
-  const [result] = await push.send([message]);
-  if (result?.ok) {
+  const results = await push.send([message]);
+  const forgotten = await recordSends(
+    db,
+    reminderIdOf(due),
+    'child_device',
+    [{ device, result: results[0] }],
+    now,
+  );
+  return { claimed: true, forgotten: forgotten > 0 };
+}
+
+/**
+ * Writes down what Expo said about one claim row's sends, and answers how many tokens that cost.
+ * A notification can go to more than one device — a parent has a phone and a tablet, and one
+ * claim row is what makes it one notification — so the row records the first device that took it,
+ * which is the one a receipt can later be traded against. A device Expo refuses is forgotten
+ * whatever the others answered, and a row nothing got through to keeps the failure in its payload
+ * so the next tick knows whether to try again.
+ */
+async function recordSends(
+  db: Db,
+  id: string,
+  target: NotificationTarget,
+  attempts: readonly { device: { id: string }; result: PushSend | undefined }[],
+  now: Date,
+): Promise<number> {
+  const delivered = attempts.find((a) => a.result?.ok);
+  if (delivered?.result?.ok) {
     await db
       .update(notifications)
-      .set({ sentAt: now, ticket: result.ticket, targetId: device.id })
+      .set({ sentAt: now, ticket: delivered.result.ticket, targetId: delivered.device.id })
       .where(eq(notifications.id, id));
-    return { claimed: true, forgotten: false };
+  } else {
+    const first = attempts[0]?.result;
+    const error: PushError = first && !first.ok ? first.error : 'other';
+    await db
+      .update(notifications)
+      .set({ payload: sql`${notifications.payload} || ${JSON.stringify({ error })}::jsonb` })
+      .where(eq(notifications.id, id));
   }
 
-  const error: PushError = result?.error ?? 'other';
-  await db
-    .update(notifications)
-    .set({ payload: sql`${notifications.payload} || ${JSON.stringify({ error })}::jsonb` })
-    .where(eq(notifications.id, id));
-  if (error === 'DeviceNotRegistered') {
-    await forgetToken(db, 'child_device', device.id);
-    return { claimed: true, forgotten: true };
+  let forgotten = 0;
+  for (const attempt of attempts) {
+    if (attempt.result?.ok === false && attempt.result.error === 'DeviceNotRegistered') {
+      await forgetToken(db, target, attempt.device.id);
+      forgotten++;
+    }
   }
-  return { claimed: true, forgotten: false };
+  return forgotten;
+}
+
+/**
+ * The two kinds nothing on a clock asks for: a child asked for a reward, or a parent decided one
+ * (docs/spec/01-product.md, notifications). The tick is still what sends them — the claim row is
+ * the exactly-once mechanism and a route has no business owning one — so each tick asks which
+ * redemptions are waiting on a notification rather than being told.
+ */
+export type DueImmediate = {
+  kind: 'redemption_requested' | 'reward_approved';
+  redemption_id: string;
+  /** The parent or child the notification is for: the key half of its deterministic id. */
+  subject_id: string;
+};
+
+/**
+ * How far back a decided redemption is looked at. An undecided one bounds its own scan — there
+ * are only ever a few, and the digest counts them — but an approved one stays approved forever,
+ * and an approval nobody heard about within the hour is not news any more.
+ */
+export const IMMEDIATE_CATCHUP_MS = 60 * 60_000;
+
+/** Every device of this parent's that has a token, newest first. A phone and a tablet both count. */
+async function pushableParentDevices(db: Db, parentId: string) {
+  return db
+    .select({
+      id: parentDevices.id,
+      token: parentDevices.expoPushToken,
+      locale: parentDevices.locale,
+    })
+    .from(parentDevices)
+    .where(and(eq(parentDevices.parentId, parentId), isNotNull(parentDevices.expoPushToken)))
+    .orderBy(desc(parentDevices.lastSeenAt));
+}
+
+/**
+ * A redemption request is the one interrupt this app sends a parent: it is the only thing that
+ * leaves a child waiting on them, so it goes to every device each parent of the household has.
+ * One claim row per parent — the id the spec fixes is `(redemption, parent)` — which is what
+ * makes a phone and a tablet one notification rather than two.
+ */
+async function sendRequests(db: Db, push: Push, now: Date) {
+  const waiting = await db
+    .select({
+      redemptionId: redemptions.id,
+      householdId: redemptions.householdId,
+      parentId: parents.id,
+    })
+    .from(redemptions)
+    .innerJoin(parents, eq(parents.householdId, redemptions.householdId))
+    .where(eq(redemptions.status, 'requested'));
+
+  const announced: DueImmediate[] = [];
+  let forgotten = 0;
+  for (const row of waiting) {
+    const id = notificationId('redemption_requested', row.redemptionId, row.parentId);
+    const devices = await pushableParentDevices(db, row.parentId);
+    const claimed = await claimNotification(
+      db,
+      {
+        id,
+        target: 'parent_device',
+        targetId: devices[0]?.id ?? null,
+        kind: 'redemption_requested',
+        payload: { redemption_id: row.redemptionId, parent_id: row.parentId },
+      },
+      now,
+    );
+    if (!claimed) continue;
+    announced.push({
+      kind: 'redemption_requested',
+      redemption_id: row.redemptionId,
+      subject_id: row.parentId,
+    });
+    // A parent with no device is not an error: the row stands unsent, and the request is still
+    // there on the today screen whenever they next open the app.
+    if (!devices.length) continue;
+
+    const results = await push.send(
+      devices.map((device): PushMessage => ({
+        to: device.token!,
+        ...redemptionRequestedCopy(device.locale),
+        // A kind, ids and a destination. A payload may carry copy and must never carry state:
+        // a device that got this and then failed to sync would otherwise show a lie.
+        data: {
+          kind: 'redemption_requested',
+          household_id: row.householdId,
+          redemption_id: row.redemptionId,
+          path: '/(parent)',
+        },
+      })),
+    );
+    forgotten += await recordSends(
+      db,
+      id,
+      'parent_device',
+      devices.map((device, i) => ({ device, result: results[i] })),
+      now,
+    );
+  }
+  return { announced, forgotten };
+}
+
+/** An approval is told to the child straight away, on their newest live device with a token. */
+async function sendApprovals(db: Db, push: Push, now: Date) {
+  const decided = await db
+    .select({ redemptionId: redemptions.id, childId: redemptions.childId })
+    .from(redemptions)
+    .where(
+      and(
+        eq(redemptions.status, 'approved'),
+        gte(redemptions.decidedAt, new Date(now.getTime() - IMMEDIATE_CATCHUP_MS)),
+      ),
+    );
+
+  const announced: DueImmediate[] = [];
+  let forgotten = 0;
+  for (const row of decided) {
+    const id = notificationId('reward_approved', row.redemptionId, row.childId);
+    const device = await pushableDevice(db, row.childId);
+    const claimed = await claimNotification(
+      db,
+      {
+        id,
+        target: 'child_device',
+        targetId: device?.id ?? null,
+        kind: 'reward_approved',
+        payload: { redemption_id: row.redemptionId, child_id: row.childId },
+      },
+      now,
+    );
+    if (!claimed) continue;
+    announced.push({
+      kind: 'reward_approved',
+      redemption_id: row.redemptionId,
+      subject_id: row.childId,
+    });
+    if (!device?.token) continue;
+
+    const results = await push.send([
+      {
+        to: device.token,
+        ...rewardApprovedCopy(device.locale),
+        data: {
+          kind: 'reward_approved',
+          child_id: row.childId,
+          redemption_id: row.redemptionId,
+          path: '/(kid)/shop',
+        },
+      },
+    ]);
+    forgotten += await recordSends(db, id, 'child_device', [{ device, result: results[0] }], now);
+  }
+  return { announced, forgotten };
+}
+
+/** Both immediate kinds, for one tick. */
+export async function sendImmediates(
+  db: Db,
+  push: Push,
+  now: Date,
+): Promise<{ announced: DueImmediate[]; forgotten: number }> {
+  const requests = await sendRequests(db, push, now);
+  const approvals = await sendApprovals(db, push, now);
+  return {
+    announced: [...requests.announced, ...approvals.announced],
+    forgotten: requests.forgotten + approvals.forgotten,
+  };
 }
 
 /**
