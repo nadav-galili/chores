@@ -1,4 +1,4 @@
-import { hashPin } from '@chores/shared';
+import { hashPin, verifyPin, type DeviceSession } from '@chores/shared';
 import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
@@ -100,5 +100,59 @@ describe('a join code needs a PIN first', () => {
 
     await setPin('user_pin_gate', householdId, '1234');
     expect((await issue()).status).toBe(201);
+  });
+});
+
+describe('the pin reaches the kid device', () => {
+  const redeem = async (householdId: string, childId: string, clerkUserId: string) => {
+    const issued = (await (
+      await app.request(
+        `/households/${householdId}/children/${childId}/join-code`,
+        asParent(clerkUserId, { method: 'POST' }),
+      )
+    ).json()) as { code: string };
+    const res = await app.request('/join-codes/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: issued.code, platform: 'android' }),
+    });
+    return (await res.json()) as DeviceSession;
+  };
+
+  const me = async (session: DeviceSession) => {
+    const res = await app.request('/device/me', {
+      headers: { authorization: `Bearer ${session.device_token}` },
+    });
+    return (await res.json()) as {
+      household: { pin_hash?: string | null; pin_salt?: string | null };
+    };
+  };
+
+  it('rides the session and /device/me as a hash and a salt, never as the pin', async () => {
+    const { householdId, childId } = await household('user_pin_device');
+    await setPin('user_pin_device', householdId, '4271');
+    const session = await redeem(householdId, childId, 'user_pin_device');
+
+    expect(verifyPin(session.household.pin_hash, session.household.pin_salt, '4271')).toBe(true);
+    expect(verifyPin(session.household.pin_hash, session.household.pin_salt, '1234')).toBe(false);
+    expect(JSON.stringify(session)).not.toContain('4271');
+
+    const refreshed = await me(session);
+    expect(refreshed.household.pin_hash).toBe(session.household.pin_hash);
+    expect(refreshed.household.pin_salt).toBe(session.household.pin_salt);
+  });
+
+  it('changes on the parent side reach the device on its next refresh', async () => {
+    const { householdId, childId } = await household('user_pin_changed');
+    await setPin('user_pin_changed', householdId, '1111');
+    const session = await redeem(householdId, childId, 'user_pin_changed');
+
+    await setPin('user_pin_changed', householdId, '2222');
+    // The device still holds the old one until it asks — offline, that is the pin that opens.
+    expect(verifyPin(session.household.pin_hash, session.household.pin_salt, '1111')).toBe(true);
+
+    const { household: fresh } = await me(session);
+    expect(verifyPin(fresh.pin_hash, fresh.pin_salt, '2222')).toBe(true);
+    expect(verifyPin(fresh.pin_hash, fresh.pin_salt, '1111')).toBe(false);
   });
 });

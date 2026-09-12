@@ -118,8 +118,15 @@ export function parentDeviceToApi(row: typeof parentDevices.$inferSelect): Paren
   };
 }
 
+/** The Parent PIN crosses to the kid device on purpose, and only here (ADR-0013). */
 export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
-  return { id: row.id, tz: row.tz, day_boundary_hour: row.dayBoundaryHour };
+  return {
+    id: row.id,
+    tz: row.tz,
+    day_boundary_hour: row.dayBoundaryHour,
+    pin_hash: row.pinHash,
+    pin_salt: row.pinSalt,
+  };
 }
 
 /** A reward row on the wire. `title` stays null for a built-in; the reader's i18n names it. */

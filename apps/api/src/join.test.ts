@@ -102,7 +102,7 @@ describe('redeeming a join code', () => {
       ui_mode: 'little',
       pet_name: "Noa's pet",
     });
-    expect(session.household).toEqual({
+    expect(session.household).toMatchObject({
       id: householdId,
       tz: 'Asia/Jerusalem',
       day_boundary_hour: 0,

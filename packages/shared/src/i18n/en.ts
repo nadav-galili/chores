@@ -119,7 +119,14 @@ export const en = {
     },
   },
   exit: {
-    parentsOnly: 'Parents only',
+    pinTitle: 'Parent PIN',
+    pinBody: 'Enter the PIN to leave kid mode.',
+    pinLabel: 'PIN',
+    unlock: 'Continue',
+    wrongPin: 'That PIN is not right. Have another go.',
+    cooldown: 'That is enough tries for now. Try again in %{seconds}s.',
+    noPin:
+      'This device has not got the PIN yet. Connect it to the internet and open the app again.',
     title: 'Leave kid mode?',
     body: 'This device will forget %{name} and switch to parent mode. Show a new join code to connect it again.',
     theChild: 'the child',

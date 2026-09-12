@@ -64,10 +64,18 @@ export const childSummarySchema = z.object({
 });
 export type ChildSummary = z.infer<typeof childSummarySchema>;
 
+/**
+ * The household as the kid device sees it. `tz` and `day_boundary_hour` never ride the change log,
+ * and neither does the Parent PIN: all three arrive with the session and are refreshed from
+ * `GET /device/me` on every open (ADR-0013). The two pin fields are optional so a session stored
+ * before they existed still parses.
+ */
 export const householdSummarySchema = z.object({
   id: z.string().uuid(),
   tz: z.string(),
   day_boundary_hour: z.number().int().min(0).max(6),
+  pin_hash: z.string().nullish(),
+  pin_salt: z.string().nullish(),
 });
 export type HouseholdSummary = z.infer<typeof householdSummarySchema>;
 
