@@ -190,6 +190,21 @@ TOTAL_STAGES=6
 # already covers `.env.*`. The auth token is never written here.
 ENV_FILE="apps/mobile/.env.local"
 
+# ask_valid KEY "Prompt" REGEX "what it should look like" — `ask`, but it will
+# not take an answer that cannot be the thing it asked for. The two values here
+# are easy to hand each other: Sentry shows the DSN on the page you read the
+# slug off, and a DSN ends in the project *id*, which looks like an answer to
+# "project slug". Both mistakes are silent — an invalid DSN just means the SDK
+# never starts — so they are caught at the prompt instead.
+ask_valid() {
+  local key="$1" prompt="$2" pattern="$3" shape="$4"
+  while true; do
+    ask "$key" "$prompt"
+    [[ "${!key}" =~ $pattern ]] && return 0
+    warn "that does not look like $shape — try again"
+  done
+}
+
 banner "Sentry for the Mibo mobile app"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
@@ -203,8 +218,9 @@ step "  first part of your Sentry URL, <slug>.sentry.io."
 step "Create a project: platform 'React Native', and name it something you will"
 step "  recognise (the Android and iOS builds share it)."
 pause "Project created?"
-ask SENTRY_ORG "Organization slug:"
-ask SENTRY_PROJECT "Project slug:"
+note "a slug is a short name, like 'mibo' — not a URL and not a number"
+ask_valid SENTRY_ORG "Organization slug:" '^[a-z0-9][a-z0-9_-]*$' "an organization slug"
+ask_valid SENTRY_PROJECT "Project slug:" '^[a-z0-9][a-z0-9._-]*$' "a project slug"
 write_env SENTRY_ORG "$SENTRY_ORG"
 write_env SENTRY_PROJECT "$SENTRY_PROJECT"
 
@@ -215,7 +231,8 @@ say "public by design — but it still does not go in the repo."
 open_url "https://sentry.io/orgredirect/organizations/$SENTRY_ORG/settings/projects/$SENTRY_PROJECT/keys/"
 step "Settings → Projects → $SENTRY_PROJECT → Client Keys (DSN)."
 step "Copy the DSN. It looks like https://<hash>@o<number>.ingest.sentry.io/<id>."
-ask EXPO_PUBLIC_SENTRY_DSN "Paste the DSN:"
+ask_valid EXPO_PUBLIC_SENTRY_DSN "Paste the DSN:" \
+  '^https://[0-9a-f]+@o[0-9]+\.ingest\.([a-z]+\.)?sentry\.io/[0-9]+$' "a DSN"
 write_env EXPO_PUBLIC_SENTRY_DSN "$EXPO_PUBLIC_SENTRY_DSN"
 
 # ── 3 ─────────────────────────────────────────────────────────────────────
