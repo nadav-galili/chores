@@ -7,8 +7,9 @@ import type {
   ChildSummary,
   HouseholdSummary,
   Parent,
+  Reward,
 } from '@chores/shared';
-import type { children, chores, households, parentInvites, parents } from './db/schema.ts';
+import type { children, chores, households, parentInvites, parents, rewards } from './db/schema.ts';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
@@ -99,4 +100,21 @@ export function childSummaryToApi(row: typeof children.$inferSelect): ChildSumma
 
 export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
   return { id: row.id, tz: row.tz, day_boundary_hour: row.dayBoundaryHour };
+}
+
+/** A reward row on the wire. `title` stays null for a built-in; the reader's i18n names it. */
+export function rewardToApi(row: typeof rewards.$inferSelect): Reward {
+  return {
+    id: row.id,
+    household_id: row.householdId,
+    builtin_key: row.builtinKey,
+    title: row.title,
+    icon: row.icon,
+    cost_coins: row.costCoins,
+    is_builtin: row.isBuiltin,
+    active: row.active,
+    sort: row.sort,
+    updated_at: row.updatedAt.toISOString(),
+    deleted_at: iso(row.deletedAt),
+  };
 }
