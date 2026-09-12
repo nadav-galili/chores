@@ -283,6 +283,7 @@ export function ScrollScreen({ children }: { children: React.ReactNode }) {
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={[styles.screen, styles.scrollContent]}
+      contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
     >
       {children}
@@ -419,12 +420,21 @@ export function ChoreRow({
   icon,
   done,
   coins,
+  waiting,
+  waitingLabel,
   onPress,
 }: {
   title: string;
   icon?: string | null;
   done: boolean;
   coins?: number;
+  /**
+   * A photo chore whose proof is still with a grown-up: the title is not struck through — the
+   * work is done, only the coins are waiting — and the camera glyph says where it stands. The
+   * glyph is symmetric, so it reads the same in Hebrew.
+   */
+  waiting?: boolean;
+  waitingLabel?: string;
   onPress: () => void;
 }) {
   const styles = useThemedStyles(choreRowStyles);
@@ -438,10 +448,10 @@ export function ChoreRow({
         onPress={onPress}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: done }}
-        accessibilityLabel={title}
+        accessibilityLabel={waiting && waitingLabel ? `${title}, ${waitingLabel}` : title}
       >
         <Animated.Text style={[styles.icon, { transform: [{ scale: tickScale }] }]}>
-          {done ? DONE_GLYPH : (icon ?? CHORE_GLYPH)}
+          {done ? DONE_GLYPH : waiting ? WAITING_GLYPH : (icon ?? CHORE_GLYPH)}
         </Animated.Text>
         <Text style={[styles.title, done && styles.titleDone]} numberOfLines={2}>
           {title}
@@ -463,6 +473,7 @@ export const FILL = { flex: 1 } as const;
 /** Placeholder art, swapped for drawn assets with the rest of it. */
 const DONE_GLYPH = '✅';
 const CHORE_GLYPH = '⭐';
+const WAITING_GLYPH = '📷';
 
 const screenStyles = (theme: Theme) => ({
   screen: {

@@ -138,7 +138,11 @@ describe('the pin reaches the kid device', () => {
       headers: { authorization: `Bearer ${session.device_token}` },
     });
     return (await res.json()) as {
-      household: { pin_hash?: string | null; pin_salt?: string | null };
+      household: {
+        entitlement: 'free' | 'premium';
+        pin_hash?: string | null;
+        pin_salt?: string | null;
+      };
     };
   };
 
@@ -172,5 +176,18 @@ describe('the pin reaches the kid device', () => {
     const { household: fresh } = await me(session);
     expect(verifyPin(fresh.pin_hash, fresh.pin_salt, '2222')).toBe(true);
     expect(verifyPin(fresh.pin_hash, fresh.pin_salt, '1111')).toBe(false);
+  });
+
+  it('mirrors the household entitlement in the session and on every refresh', async () => {
+    const { householdId, childId } = await household('user_entitlement_device');
+    await setPin('user_entitlement_device', householdId, '4271');
+    const session = await redeem(householdId, childId, 'user_entitlement_device');
+    expect(session.household.entitlement).toBe('free');
+
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+    expect((await me(session)).household.entitlement).toBe('premium');
   });
 });

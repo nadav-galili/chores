@@ -7,8 +7,9 @@ import {
   type ChoreKind,
   type UpsertChoreOp,
 } from '@chores/shared';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 import {
   Button,
   Chip,
@@ -20,6 +21,7 @@ import {
   Title,
 } from '@/components/ui';
 import { withCause } from '@/lib/errors';
+import { useHousehold } from '@/lib/household-context';
 import { fieldError, t, weekdayLabels } from '@/lib/i18n';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -70,10 +72,13 @@ export function ChoreForm({
   onDelete?: () => Promise<void>;
 }) {
   const styles = useThemedStyles(choreFormStyles);
+  const household = useHousehold();
+  const router = useRouter();
   const [choreTitle, setChoreTitle] = useState(initial.title);
   const [kind, setKind] = useState<ChoreKind>(initial.kind);
   const [mask, setMask] = useState(initial.weekday_mask ?? 0);
   const [dueDate, setDueDate] = useState(initial.due_date ?? '');
+  const [requiresPhoto, setRequiresPhoto] = useState(initial.requires_photo);
   const [assignees, setAssignees] = useState<string[]>(initial.assignees);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +87,29 @@ export function ChoreForm({
   const toggleAssignee = (id: string) =>
     setAssignees((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
   const toggleDay = (i: number) => setMask((m) => m ^ (1 << i));
+  const childIsLocked = (child: Child) =>
+    household.status === 'ready' &&
+    household.me.household?.entitlement === 'free' &&
+    child.read_only_after !== null &&
+    Date.parse(child.read_only_after) <= Date.now();
+  const allNext = allAssigned ? [] : children.map((child) => child.id);
+  const allChangesLockedChild = children.some(
+    (child) => childIsLocked(child) && assignees.includes(child.id) !== allNext.includes(child.id),
+  );
+  const openChildGate = () =>
+    router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } });
+  /**
+   * Photo Proof is premium (#70). A control a parent cannot use looks unavailable rather than
+   * failing: turning it on on the free tier opens the paywall instead of submitting a form that
+   * the server answers 402 to. A chore that already asks for a photo keeps it — turning one off
+   * is not a gated change — which is why this only guards the switch on.
+   */
+  const photoIsGated =
+    household.status === 'ready' &&
+    household.me.household?.entitlement === 'free' &&
+    !initial.requires_photo;
+  const openPhotoGate = () =>
+    router.push({ pathname: '/(parent)/paywall', params: { gate: 'photo_proof' } });
 
   const submit = async () => {
     const parsed = choreFieldsSchema.safeParse({
@@ -90,6 +118,7 @@ export function ChoreForm({
       kind,
       weekday_mask: kind === 'weekdays' ? mask : null,
       due_date: kind === 'once' ? dueDate.trim() || null : null,
+      requires_photo: requiresPhoto,
       assignees,
     });
     if (!parsed.success) {
@@ -170,18 +199,44 @@ export function ChoreForm({
           keyboardType="numbers-and-punctuation"
         />
       )}
+      <Pressable
+        style={styles.photoField}
+        onPress={photoIsGated ? openPhotoGate : undefined}
+        disabled={!photoIsGated}
+        accessibilityRole={photoIsGated ? 'button' : undefined}
+        accessibilityLabel={photoIsGated ? t('paywall.lockedPhotoProof') : undefined}
+      >
+        <View style={styles.photoCopy}>
+          <Text style={styles.photoLabel}>{t('choreForm.photoProof')}</Text>
+          <Text style={styles.photoHint}>
+            {photoIsGated ? t('paywall.lockedPrice') : t('choreForm.photoProofHint')}
+          </Text>
+        </View>
+        <Switch
+          value={requiresPhoto}
+          onValueChange={photoIsGated ? openPhotoGate : setRequiresPhoto}
+          disabled={photoIsGated}
+          accessibilityLabel={t('choreForm.photoProof')}
+        />
+      </Pressable>
       <ChipGroup label={t('choreForm.who')}>
         <Chip
-          title={t('common.all')}
+          title={
+            allChangesLockedChild
+              ? t('paywall.lockedChild', { name: t('common.all') })
+              : t('common.all')
+          }
           active={allAssigned}
-          onPress={() => setAssignees(allAssigned ? [] : children.map((c) => c.id))}
+          onPress={() => (allChangesLockedChild ? openChildGate() : setAssignees(allNext))}
         />
         {children.map((c) => (
           <Chip
             key={c.id}
-            title={c.first_name}
+            title={
+              childIsLocked(c) ? t('paywall.lockedChild', { name: c.first_name }) : c.first_name
+            }
             active={assignees.includes(c.id)}
-            onPress={() => toggleAssignee(c.id)}
+            onPress={() => (childIsLocked(c) ? openChildGate() : toggleAssignee(c.id))}
           />
         ))}
       </ChipGroup>
@@ -204,5 +259,13 @@ const choreFormStyles = (theme: Theme) => ({
   // as tappable as a button is.
   linkTarget: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
   link: { ...theme.type.label, color: theme.colors.action },
+  photoField: {
+    minHeight: theme.touchTarget,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: theme.space.md,
+  },
+  photoCopy: { flex: 1, gap: theme.space.xs },
+  photoLabel: { ...theme.type.label, color: theme.colors.text },
+  photoHint: { ...theme.type.label, color: theme.colors.muted },
 });
-

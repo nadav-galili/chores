@@ -12,7 +12,9 @@ import {
   kidDayComplete,
   kidProperties,
   parentIdentity,
+  paywallShown,
   petReacted,
+  purchaseCompleted,
   pushOpened,
   redemptionDecided,
   rewardRequested,
@@ -108,6 +110,22 @@ describe('the events', () => {
     });
   });
 
+  it('reports a completed purchase by catalog product and purchase kind only', () => {
+    expect(purchaseCompleted({ product_id: 'mibo_yearly', purchase_kind: 'subscription' })).toEqual(
+      {
+        event: 'purchase_completed',
+        properties: { product_id: 'mibo_yearly', purchase_kind: 'subscription' },
+      },
+    );
+  });
+
+  it('reports why the paywall had to open', () => {
+    expect(paywallShown({ gate: 'child_quota' })).toEqual({
+      event: 'paywall_shown',
+      properties: { gate: 'child_quota' },
+    });
+  });
+
   it('reports a tapped notification as its kind alone, whichever kind it was', () => {
     expect(pushOpened({ kind: 'parent_digest' })).toEqual({
       event: 'push_opened',
@@ -136,6 +154,8 @@ describe('what an event may carry', () => {
     groveGrew({ stage: 4 }),
     rewardRequested({ builtin_key: 'snack', cost_coins: 50 }),
     redemptionDecided({ decision: 'approved' }),
+    purchaseCompleted({ product_id: 'mibo_yearly', purchase_kind: 'subscription' }),
+    paywallShown({ gate: 'photo_proof' }),
     ...notificationKindSchema.options.map((kind) => pushOpened({ kind })),
   ];
 

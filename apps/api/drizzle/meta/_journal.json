@@ -78,6 +78,20 @@
       "when": 1789201783898,
       "tag": "0010_household_pin",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789231799023,
+      "tag": "0011_revenuecat_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789232313389,
+      "tag": "0012_yellow_starfox",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@ import {
 } from '@chores/shared';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
-import { choreInstances } from './db/schema.ts';
+import { children, choreInstances } from './db/schema.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 import { setTestPin } from './test/household.ts';
@@ -162,6 +162,21 @@ describe('POST /sync pull', () => {
     expect(new Set(children.map((c) => c.row_id))).toEqual(new Set([noa.id, ori.id]));
     const sibling = children.find((c) => c.row_id === ori.id)!;
     expect(sibling.row).toMatchObject({ id: ori.id, first_name: 'Ori' });
+  });
+
+  it('sends read_only_after on every household child, including a sibling', async () => {
+    const { noa, ori } = await setup('user_read_only_mirror');
+    const readOnlyAfter = new Date('2026-09-23T12:00:00.000Z');
+    await db.update(children).set({ readOnlyAfter }).where(eq(children.id, ori.id));
+
+    const { changes } = await pullAll(noa.session);
+    const sibling = ofTable(changes, 'children')
+      .filter((change) => change.row_id === ori.id)
+      .at(-1);
+    expect(sibling?.row.id).toBe(ori.id);
+    expect(new Date(sibling?.row.read_only_after as string).toISOString()).toBe(
+      readOnlyAfter.toISOString(),
+    );
   });
 
   it('sends a sibling’s growth entries, because the grove is the household’s', async () => {

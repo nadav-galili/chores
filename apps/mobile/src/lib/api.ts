@@ -23,7 +23,13 @@ import type {
   SyncRequest,
   SyncResponse,
   UpsertChoreOp,
+  CustomRewardInput,
+  Gate,
+  MoneyLedgerEntry,
+  ApprovePhotoResult,
+  RejectCompletionResult as DeclinePhotoResult,
 } from '@chores/shared';
+import { gateSchema } from '@chores/shared';
 import { requireArrays } from '@/lib/payload';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
@@ -34,14 +40,21 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public code: string,
+    public gate: Gate | null = null,
   ) {
     super(`${status} ${code}`);
   }
 }
 
 type GetToken = () => Promise<string | null>;
+type OnGate = (gate: Gate) => void;
 
-async function call<T>(getToken: GetToken, path: string, init: RequestInit = {}): Promise<T> {
+async function call<T>(
+  getToken: GetToken,
+  path: string,
+  init: RequestInit = {},
+  onGate?: OnGate,
+): Promise<T> {
   const token = await getToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -53,8 +66,12 @@ async function call<T>(getToken: GetToken, path: string, init: RequestInit = {})
   if (!res.ok) {
     // A body that is not JSON is the meaning: the status and 'unknown' are what the error then
     // carries, and the parse failure itself says nothing the status does not.
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new ApiError(res.status, body.error ?? 'unknown');
+    const body = (await res.json().catch(() => ({}))) as { error?: string; gate?: unknown };
+    const parsedGate =
+      res.status === 402 && body.error === 'gated' ? gateSchema.safeParse(body.gate) : null;
+    const gate = parsedGate?.success ? parsedGate.data : null;
+    if (gate) onGate?.(gate);
+    throw new ApiError(res.status, body.error ?? 'unknown', gate);
   }
   return (await res.json()) as T;
 }
@@ -65,88 +82,141 @@ const json = (method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: unknown): Reque
 });
 
 /** The parent-side REST surface; every call carries the Clerk session token. */
-export function createApi(getToken: GetToken) {
+export function createApi(getToken: GetToken, onGate?: OnGate) {
+  const request = <T>(path: string, init?: RequestInit) => call<T>(getToken, path, init, onGate);
   return {
-    me: () => call<Me>(getToken, '/me'),
+    me: () => request<Me>('/me'),
     createHousehold: (input: CreateHouseholdInput) =>
-      call<{ household: Household; parent: Parent }>(getToken, '/households', json('POST', input)),
+      request<{ household: Household; parent: Parent }>('/households', json('POST', input)),
     createChild: (householdId: string, input: ChildInput) =>
-      call<Child>(getToken, `/households/${householdId}/children`, json('POST', input)),
+      request<Child>(`/households/${householdId}/children`, json('POST', input)),
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
-      call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
+      request<Child>(`/households/${householdId}/children/${childId}`, json('PATCH', input)),
     // The two lists the today screen walks are checked on arrival rather than trusted: a server
     // older than the app returns neither, and the screen indexing them takes the process down.
     today: async (householdId: string) =>
       requireArrays(
-        await call<ParentToday>(getToken, `/households/${householdId}/today`),
+        await request<ParentToday>(`/households/${householdId}/today`),
         ['children', 'redemptions'],
         'today',
       ),
-    // The child's last seven Chore Dates. Ungated — seven days is the free tier's promise — so
-    // there is nothing here to catch a paywall answer.
-    childWeek: (householdId: string, childId: string) =>
-      call<ParentWeek>(getToken, `/households/${householdId}/children/${childId}/week`),
+    // History is clamped in a successful response rather than answering 402. The screen alone
+    // turns that flag into an explicit path to the paywall.
+    childWeek: (householdId: string, childId: string, from?: string) =>
+      request<ParentWeek>(
+        `/households/${householdId}/children/${childId}/week${from ? `?from=${encodeURIComponent(from)}` : ''}`,
+      ),
     // Rejecting names a completion, never an instance: the id comes from the today payload.
     rejectCompletion: (householdId: string, completionId: string) =>
-      call<{ status: RejectCompletionResult }>(
-        getToken,
+      request<{ status: RejectCompletionResult }>(
         `/households/${householdId}/completions/${completionId}/reject`,
         { method: 'POST' },
       ),
     // Deciding names a redemption, never a reward: the id comes from the today payload. Approving
     // moves no coins — they left when the child asked — and declining refunds (ADR-0014).
     decideRedemption: (householdId: string, redemptionId: string, decision: RedemptionDecision) =>
-      call<{ status: DecideRedemptionResult }>(
-        getToken,
+      request<{ status: DecideRedemptionResult }>(
         `/households/${householdId}/redemptions/${redemptionId}/decide`,
         json('POST', { decision }),
       ),
     listParents: (householdId: string) =>
-      call<{ parents: Parent[]; invites: ParentInvite[] }>(
-        getToken,
-        `/households/${householdId}/parents`,
-      ),
+      request<{ parents: Parent[]; invites: ParentInvite[] }>(`/households/${householdId}/parents`),
     inviteParent: (householdId: string, email: string) =>
-      call<ParentInvite>(getToken, `/households/${householdId}/parents`, json('POST', { email })),
+      request<ParentInvite>(`/households/${householdId}/parents`, json('POST', { email })),
     setPin: (householdId: string, pin: string) =>
-      call<Household>(getToken, `/households/${householdId}/pin`, json('PUT', { pin })),
+      request<Household>(`/households/${householdId}/pin`, json('PUT', { pin })),
     issueJoinCode: (householdId: string, childId: string) =>
-      call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
+      request<IssuedJoinCode>(`/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',
       }),
     listChildDevices: (householdId: string, childId: string) =>
-      call<ChildDevice[]>(getToken, `/households/${householdId}/children/${childId}/devices`),
+      request<ChildDevice[]>(`/households/${householdId}/children/${childId}/devices`),
     // Revoking is idempotent server-side, so a second tap answers with the first revocation's
     // timestamp rather than an error. There is no un-revoke: reconnecting is a new join code.
     revokeChildDevice: (householdId: string, childId: string, deviceId: string) =>
-      call<{ id: string; revoked_at: string }>(
-        getToken,
+      request<{ id: string; revoked_at: string }>(
         `/households/${householdId}/children/${childId}/devices/${deviceId}`,
         { method: 'DELETE' },
       ),
-    listRewards: (householdId: string) =>
-      call<Reward[]>(getToken, `/households/${householdId}/rewards`),
+    listRewards: (householdId: string) => request<Reward[]>(`/households/${householdId}/rewards`),
     // Hiding a built-in, and nothing more: a custom reward is M3's `custom_reward` gate.
     setRewardActive: (householdId: string, rewardId: string, active: boolean) =>
-      call<Reward>(
-        getToken,
+      request<Reward>(`/households/${householdId}/rewards/${rewardId}`, json('PATCH', { active })),
+    upsertCustomReward: (householdId: string, rewardId: string, input: CustomRewardInput) =>
+      request<Reward>(`/households/${householdId}/rewards/${rewardId}`, json('PUT', input)),
+    deleteCustomReward: (householdId: string, rewardId: string) =>
+      request<Reward>(
         `/households/${householdId}/rewards/${rewardId}`,
-        json('PATCH', { active }),
+        json('DELETE', { updated_at: new Date().toISOString() }),
       ),
     registerDevice: (householdId: string, input: ParentDeviceInput) =>
-      call<ParentDevice>(getToken, `/households/${householdId}/devices`, json('POST', input)),
-    listChores: (householdId: string) =>
-      call<Chore[]>(getToken, `/households/${householdId}/chores`),
+      request<ParentDevice>(`/households/${householdId}/devices`, json('POST', input)),
+    listChores: (householdId: string) => request<Chore[]>(`/households/${householdId}/chores`),
     upsertChore: (householdId: string, choreId: string, op: UpsertChoreOp) =>
-      call<Chore>(getToken, `/households/${householdId}/chores/${choreId}`, json('PUT', op)),
+      request<Chore>(`/households/${householdId}/chores/${choreId}`, json('PUT', op)),
     deleteChore: (householdId: string, choreId: string) =>
-      call<Chore>(
-        getToken,
+      request<Chore>(
         `/households/${householdId}/chores/${choreId}`,
         json('DELETE', { updated_at: new Date().toISOString() }),
       ),
+    // The allowance screen reads the server's balance/owed view and appends payouts and
+    // adjustments. A 402 carries gate `money_ledger`; the shared onGate routes to the paywall.
+    getMoneyLedger: (householdId: string) =>
+      request<MoneyLedgerView>(`/households/${householdId}/money-ledger`),
+    setCoinsPerUnit: (householdId: string, coinsPerUnit: number) =>
+      request<MoneyLedgerSettings>(
+        `/households/${householdId}/money-ledger`,
+        json('PATCH', { coins_per_unit: coinsPerUnit }),
+      ),
+    recordPayout: (householdId: string, input: { id: string; child_id: string; coins: number }) =>
+      request<MoneyLedgerEntry>(
+        `/households/${householdId}/money-ledger/payout`,
+        json('POST', input),
+      ),
+    // Photo proof (#72, ADR-0017). The read URL is presigned and lives five minutes, so it is
+    // fetched when the parent opens the photo rather than carried on the today payload; a
+    // completion whose photo never arrived answers 404 and the screen says so.
+    completionPhoto: (householdId: string, completionId: string) =>
+      request<PresignedRead>(`/households/${householdId}/completions/${completionId}/photo`),
+    // Approving pays the completion's own Chore Date through the same reconciliation a redo
+    // uses; declining is the shared rejection path, so decline and reject mean one thing.
+    approvePhoto: (householdId: string, completionId: string) =>
+      request<{ status: ApprovePhotoResult }>(
+        `/households/${householdId}/completions/${completionId}/approve`,
+        { method: 'POST' },
+      ),
+    declinePhoto: (householdId: string, completionId: string) =>
+      request<{ status: DeclinePhotoResult }>(
+        `/households/${householdId}/completions/${completionId}/decline`,
+        { method: 'POST' },
+      ),
+    recordAdjustment: (
+      householdId: string,
+      input: { id: string; child_id: string; coins: number; note: string },
+    ) =>
+      request<MoneyLedgerEntry>(
+        `/households/${householdId}/money-ledger/adjust`,
+        json('POST', input),
+      ),
   };
 }
+
+export type { MoneyLedgerEntry };
+
+export type MoneyLedgerChildView = {
+  child_id: string;
+  balance: number;
+  owed: number;
+  entries: MoneyLedgerEntry[];
+};
+
+export type MoneyLedgerView = {
+  currency: string;
+  coins_per_unit: number;
+  children: MoneyLedgerChildView[];
+};
+
+export type MoneyLedgerSettings = { currency: string; coins_per_unit: number };
 
 export type Api = ReturnType<typeof createApi>;
 
@@ -158,11 +228,25 @@ export const redeemJoinCode = (input: RedeemJoinCodeInput) =>
 
 export type DeviceMe = { child: ChildSummary; household: HouseholdSummary };
 
+/** What the parent photo route answers: a presigned GET and the five minutes it lasts. */
+export type PresignedRead = { read_url: string; expires_in: number };
+
+/** What the kid presign route answers: the server-chosen key and five minutes to use it. */
+export type PresignResponse = { key: string; upload_url: string; expires_in: number };
+
 /** The kid-side surface; every call carries the device token, which alone decides the child. */
 export function createDeviceApi(deviceToken: string) {
   const getToken: GetToken = () => Promise.resolve(deviceToken);
   return {
     me: () => call<DeviceMe>(getToken, '/device/me'),
     sync: (body: SyncRequest) => call<SyncResponse>(getToken, '/sync', json('POST', body)),
+    // Photo proof (ADR-0017): the device names only the completion, and the key in the answer
+    // is what the later `complete` op carries. The bytes go to R2, never through this client.
+    presign: (completion_id: string, content_type: 'image/jpeg' | 'image/png' | 'image/webp') =>
+      call<PresignResponse>(
+        getToken,
+        '/uploads/presign',
+        json('POST', { completion_id, content_type }),
+      ),
   };
 }

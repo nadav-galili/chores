@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { uiModeSchema } from './child.ts';
+import { entitlementSchema } from './household.ts';
 
 /** Upper-case letters and digits minus the look-alikes (0/O, 1/I/L), so a child can read it off a screen. */
 export const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -68,12 +69,14 @@ export type ChildSummary = z.infer<typeof childSummarySchema>;
  * The household as the kid device sees it. `tz` and `day_boundary_hour` never ride the change log,
  * and neither does the Parent PIN: all three arrive with the session and are refreshed from
  * `GET /device/me` on every open (ADR-0013). The two pin fields are optional so a session stored
- * before they existed still parses.
+ * before they existed still parses. Entitlement is a display-only mirror; its default lets an
+ * older stored session load as free until the next refresh.
  */
 export const householdSummarySchema = z.object({
   id: z.string().uuid(),
   tz: z.string(),
   day_boundary_hour: z.number().int().min(0).max(6),
+  entitlement: entitlementSchema.default('free'),
   pin_hash: z.string().nullish(),
   pin_salt: z.string().nullish(),
 });

@@ -3,6 +3,7 @@ import type { DevicePlatform } from './join-code.ts';
 import type { ChoreKind } from './materialize.ts';
 import type { NotificationKind } from './notification.ts';
 import type { BuiltinRewardKey } from './reward.ts';
+import type { Gate } from './entitlement.ts';
 import { uuid5 } from './uuid5.ts';
 
 /**
@@ -163,6 +164,25 @@ export function rewardRequested(reward: {
  */
 export function redemptionDecided(decision: { decision: 'approved' | 'declined' }): AnalyticsEvent {
   return { event: 'redemption_decided', properties: { decision: decision.decision } };
+}
+
+/** A verified store purchase, reported by the server without anything about a child (ADR-0009). */
+export function purchaseCompleted(purchase: {
+  product_id: string;
+  purchase_kind: 'subscription' | 'lifetime';
+}): AnalyticsEvent {
+  return {
+    event: 'purchase_completed',
+    properties: {
+      product_id: purchase.product_id,
+      purchase_kind: purchase.purchase_kind,
+    },
+  };
+}
+
+/** The premium prompt is attributable to the capability that opened it, never to a browse. */
+export function paywallShown(shown: { gate: Gate }): AnalyticsEvent {
+  return { event: 'paywall_shown', properties: { gate: shown.gate } };
 }
 
 /**

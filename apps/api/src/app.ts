@@ -6,14 +6,18 @@ import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
+import { moneyLedgerRoutes } from './money-ledger.ts';
 import { parentDeviceRoutes } from './parent-devices.ts';
 import { pinRoutes } from './pin.ts';
+import { photoApprovalRoutes } from './photo-approval.ts';
 import type { RateLimit } from './rate-limit.ts';
 import { redemptionRoutes } from './redemptions.ts';
+import { revenuecatRoutes } from './revenuecat.ts';
 import { rejectionRoutes } from './rejection.ts';
 import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
 import { todayRoutes } from './today.ts';
+import { uploadRoutes, type R2Config } from './uploads.ts';
 import { weekRoutes } from './week.ts';
 
 export type AppOptions = {
@@ -24,6 +28,10 @@ export type AppOptions = {
   syncPageSize?: number;
   /** Where server events go; nothing is sent when this is left out (ADR-0009). */
   analytics?: Analytics;
+  /** Private R2 bucket used for 30-day Photo Proof objects. */
+  r2?: R2Config;
+  /** HMAC secret RevenueCat uses to sign the exact webhook request body (ADR-0016). */
+  revenuecatWebhookSigningSecret?: string;
 };
 
 const DEFAULT_SYNC_PAGE_SIZE = 500;
@@ -31,7 +39,14 @@ const DEFAULT_REDEEM_LIMIT: RateLimit = { max: 10, windowMs: 15 * 60 * 1000 };
 
 export function createApp(
   db: Db,
-  { verifyToken, redeemLimit, syncPageSize, analytics = noAnalytics }: AppOptions,
+  {
+    verifyToken,
+    redeemLimit,
+    syncPageSize,
+    analytics = noAnalytics,
+    r2,
+    revenuecatWebhookSigningSecret,
+  }: AppOptions,
 ) {
   const app = new Hono();
 
@@ -50,10 +65,14 @@ export function createApp(
   app.route('/', todayRoutes(db));
   app.route('/', weekRoutes(db));
   app.route('/', rejectionRoutes(db));
+  app.route('/', photoApprovalRoutes(db));
   app.route('/', rewardRoutes(db));
   app.route('/', redemptionRoutes(db, analytics));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
+  app.route('/', moneyLedgerRoutes(db));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
+  app.route('/', uploadRoutes(db, r2));
+  app.route('/', revenuecatRoutes(db, analytics, revenuecatWebhookSigningSecret));
 
   return app;
 }
