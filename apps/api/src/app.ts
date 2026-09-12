@@ -6,6 +6,7 @@ import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
+import { moneyLedgerRoutes } from './money-ledger.ts';
 import { parentDeviceRoutes } from './parent-devices.ts';
 import { pinRoutes } from './pin.ts';
 import type { RateLimit } from './rate-limit.ts';
@@ -66,6 +67,7 @@ export function createApp(
   app.route('/', rewardRoutes(db));
   app.route('/', redemptionRoutes(db, analytics));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
+  app.route('/', moneyLedgerRoutes(db));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
   app.route('/', uploadRoutes(db, r2));
   app.route('/', revenuecatRoutes(db, analytics, revenuecatWebhookSigningSecret));

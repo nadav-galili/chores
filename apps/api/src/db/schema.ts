@@ -313,6 +313,8 @@ export const ledgerEntries = pgTable(
     coins: integer('coins').notNull(),
     /** Minor units of the household currency; only payouts carry one. */
     moneyAmount: integer('money_amount'),
+    /** First-class explanation for an adjustment; it is not a ledger reference. */
+    note: text('note'),
     refType: ledgerRefTypeEnum('ref_type'),
     refId: text('ref_id'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
