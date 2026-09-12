@@ -19,6 +19,19 @@ export const notificationKindSchema = z.enum([
 ]);
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
+/**
+ * The kind a tapped notification reports, read back off its own payload as an allowlist rather
+ * than a scrub list (CODING_STANDARDS): a push also carries the ids a tap needs to land on the
+ * right screen, and only the kind — one of the four constants above, naming what the push was
+ * about and never who it was about — may reach analytics (ADR-0009). A payload naming no kind of
+ * ours, from an older or newer build, reports nothing.
+ */
+export function openedNotificationKind(data: unknown): NotificationKind | null {
+  const kind = (data as { kind?: unknown } | null | undefined)?.kind;
+  const parsed = notificationKindSchema.safeParse(kind);
+  return parsed.success ? parsed.data : null;
+}
+
 export const notificationTargetSchema = z.enum(['parent_device', 'child_device']);
 export type NotificationTarget = z.infer<typeof notificationTargetSchema>;
 

@@ -1,7 +1,13 @@
-import { kidReminderCopy, localTimeFor, type ParentDeviceInput } from '@chores/shared';
+import {
+  kidReminderCopy,
+  localTimeFor,
+  openedNotificationKind,
+  type ParentDeviceInput,
+} from '@chores/shared';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { capturePushOpened } from '@/lib/analytics';
 import { locale, t } from '@/lib/i18n';
 import type { DeviceDb } from '@/db/types';
 import {
@@ -125,4 +131,23 @@ export async function registerParentPush(
     // error goes to the console, never the token.
     console.error('parent push registration failed', e);
   }
+}
+
+/**
+ * Reports every notification this device opens, and only that one was opened: the kind is taken
+ * off the payload as an allowlist, so the ids travelling beside it so a tap can land on the right
+ * screen never reach analytics (ADR-0009). One kind-agnostic event answers the open-rate question
+ * for all four kinds (docs/spec/01-product.md), so a milestone that adds a notification adds
+ * nothing here.
+ *
+ * Mounted once, at the root — a tap arrives whatever screen is up, and on a cold start it arrives
+ * before either mode has a client, which is what `capturePushOpened` covers. The subscription is
+ * returned rather than left running: a second listener would count every tap twice.
+ */
+export function watchOpenedNotifications(): () => void {
+  const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const kind = openedNotificationKind(response.notification.request.content.data);
+    if (kind) capturePushOpened(kind);
+  });
+  return () => subscription.remove();
 }

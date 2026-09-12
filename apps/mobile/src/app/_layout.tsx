@@ -6,8 +6,10 @@ import * as Sentry from '@sentry/react-native';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { startErrorReporting } from '@/lib/error-reporting';
 import { INSTANT_SCREENS } from '@/lib/navigation';
+import { watchOpenedNotifications } from '@/lib/notifications';
 import { useDisplayFont } from '@/theme';
 
 // At module load, before any screen mounts and before the line below can throw: a crash during
@@ -21,6 +23,9 @@ function RootLayout() {
   // Registers Rubik so the type scale can name it. Nothing renders it yet, and
   // text before it lands falls back to the system font, so this never blocks.
   useDisplayFont();
+  // One listener for the whole app: a notification is tapped from wherever the app was, or from
+  // nowhere at all on a cold start (docs/spec/01-product.md, digest open rate).
+  useEffect(watchOpenedNotifications, []);
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <StatusBar style="auto" />

@@ -13,10 +13,12 @@ import {
   kidProperties,
   parentIdentity,
   petReacted,
+  pushOpened,
   redemptionDecided,
   rewardRequested,
   type AnalyticsEvent,
 } from './analytics.ts';
+import { notificationKindSchema } from './notification.ts';
 
 const child = {
   id: '018f0c2e-1111-7000-8000-000000000001',
@@ -25,6 +27,8 @@ const child = {
   pet_name: 'Pip',
 };
 const householdId = '018f0c2e-2222-7000-8000-000000000002';
+/** What a reward is called is a parent's own words; only its catalog key may cross (ADR-0009). */
+const rewardTitle = 'Ice cream after swimming';
 
 describe('the host', () => {
   it('is the EU one, because that is where this project lives (ADR-0009)', () => {
@@ -104,6 +108,16 @@ describe('the events', () => {
     });
   });
 
+  it('reports a tapped notification as its kind alone, whichever kind it was', () => {
+    expect(pushOpened({ kind: 'parent_digest' })).toEqual({
+      event: 'push_opened',
+      properties: { kind: 'parent_digest' },
+    });
+    for (const kind of notificationKindSchema.options) {
+      expect(pushOpened({ kind }).properties).toEqual({ kind });
+    }
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -122,10 +136,11 @@ describe('what an event may carry', () => {
     groveGrew({ stage: 4 }),
     rewardRequested({ builtin_key: 'snack', cost_coins: 50 }),
     redemptionDecided({ decision: 'approved' }),
+    ...notificationKindSchema.options.map((kind) => pushOpened({ kind })),
   ];
 
-  it('is never the child id, their first name or their pet name (ADR-0009)', () => {
-    const forbidden = [child.id, child.first_name, child.pet_name, householdId];
+  it('is never the child id, their first name, their pet name or a reward title (ADR-0009)', () => {
+    const forbidden = [child.id, child.first_name, child.pet_name, householdId, rewardTitle];
     for (const event of everyEvent()) {
       const wire = JSON.stringify(event);
       for (const secret of forbidden) expect(wire).not.toContain(secret);
