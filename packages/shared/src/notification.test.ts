@@ -6,6 +6,8 @@ import {
   notificationTargetSchema,
   parentDeviceId,
   parentDeviceInputSchema,
+  redemptionRequestedCopy,
+  rewardApprovedCopy,
 } from './notification.ts';
 import { uuid5 } from './uuid5.ts';
 
@@ -93,5 +95,29 @@ describe('parentDeviceInputSchema', () => {
       { expo_push_token: 'ExponentPushToken[a]', platform: 'ios' },
     ];
     for (const input of bad) expect(parentDeviceInputSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('the immediate kinds’ copy', () => {
+  it('is written in both languages, and says nothing about a child', () => {
+    for (const copy of [
+      redemptionRequestedCopy('en'),
+      redemptionRequestedCopy('he'),
+      rewardApprovedCopy('en'),
+      rewardApprovedCopy('he'),
+    ]) {
+      expect(copy.title.length).toBeGreaterThan(0);
+      expect(copy.body.length).toBeGreaterThan(0);
+      // A push travels through Expo, so a first name or a reward title in one would be something
+      // about a child reaching a third party (ADR-0009). The copy takes no arguments at all —
+      // that is what keeps it true, rather than remembering not to interpolate one.
+      expect(`${copy.title} ${copy.body}`).not.toMatch(/%\{/);
+    }
+  });
+
+  it('is not the same words in the two languages, or for the two kinds', () => {
+    expect(redemptionRequestedCopy('he')).not.toEqual(redemptionRequestedCopy('en'));
+    expect(rewardApprovedCopy('he')).not.toEqual(rewardApprovedCopy('en'));
+    expect(rewardApprovedCopy('en')).not.toEqual(redemptionRequestedCopy('en'));
   });
 });
