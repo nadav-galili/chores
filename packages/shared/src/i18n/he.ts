@@ -138,6 +138,7 @@ export const he: Catalog = {
     google: 'המשך עם Google',
     googleUnfinished: 'הכניסה עם Google לא הושלמה',
     googleFailed: 'הכניסה עם Google נכשלה',
+    googleNoBrowser: 'בטלפון הזה אין דפדפן שיכול להשלים כניסה עם Google. השתמשו באימייל במקום.',
     emailLabel: 'או השתמשו באימייל',
     emailCode: 'שלחו לי קוד',
     unfinished: 'התהליך לא הושלם (%{status})',

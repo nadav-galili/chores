@@ -1,10 +1,17 @@
-import { isClerkAPIResponseError, useSignIn, useSignUp, useSSO } from '@clerk/expo';
+import { isClerkAPIResponseError, useClerk, useSignIn, useSignUp } from '@clerk/expo';
+// Core 3's SSO hook, to match the `future` sign-in and sign-up resources this screen already
+// uses. The default `useSSO` is the legacy one: it reads `createdSessionId` off a legacy resource
+// and has no branch for a sign-in that resolves to an existing session, so it reported "no
+// session" for a Google sign-in that had in fact worked (MIBO-3). This one finalizes or activates
+// the session itself.
+import { useSSO } from '@clerk/expo/experimental';
 import * as AuthSession from 'expo-auth-session';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
+import { isMissingBrowser } from '@/lib/browser-error';
 import { reportError } from '@/lib/error-reporting';
 import { t } from '@/lib/i18n';
 
@@ -22,6 +29,7 @@ export function ParentSignIn({
   const { signIn, fetchStatus: signInFetch } = useSignIn();
   const { signUp, fetchStatus: signUpFetch } = useSignUp();
   const { startSSOFlow } = useSSO();
+  const clerk = useClerk();
   const router = useRouter();
   const [step, setStep] = useState<Step>({ kind: 'email' });
   const [email, setEmail] = useState('');
@@ -31,8 +39,18 @@ export function ParentSignIn({
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    void WebBrowser.warmUpAsync();
-    return () => void WebBrowser.coolDownAsync();
+    // Warming up binds a Custom Tabs service so the browser opens faster. A phone with no such
+    // service rejects both calls, and that is inert: the sign-in still opens through a plain
+    // `ACTION_VIEW` and still hands back. Nothing is deduced from the failure — a build that
+    // disabled the Google button on it took the only way in away from a phone that worked
+    // (MIBO-1). `isMissingBrowser` names the failure that does mean something.
+    WebBrowser.warmUpAsync().catch(() => {
+      // Inert, per above: an un-warmed browser is a slower one, not an absent one.
+    });
+    return () =>
+      void WebBrowser.coolDownAsync().catch(() => {
+        // Cooling down a browser that never warmed up fails the same way and means nothing.
+      });
   }, []);
 
   const sendCode = async () => {
@@ -85,20 +103,34 @@ export function ParentSignIn({
       // `mibo:?rotating_token_nonce=...`, which fails the `startsWith(redirectUrl)` test
       // expo-web-browser ends the auth session on — so the flow resolved `dismiss` and threw
       // away a sign-in that had actually succeeded.
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const { authSessionResult } = await startSSOFlow({
         strategy: 'oauth_google',
         redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo', path: 'sso-callback' }),
       });
-      if (createdSessionId && setActive) {
-        await setActive({ session: createdSessionId });
+      // A parent who closed the browser themselves has said everything they mean to; the screen
+      // stays as it was and nothing is reported.
+      if (authSessionResult?.type === 'cancel') return;
+      // Whether we are signed in is Clerk's to answer, not the return value's: the hook activates
+      // the session, and a sign-in that resolved to an existing one creates no new id. Reading
+      // `createdSessionId` instead is what turned a working sign-in into an error (MIBO-3).
+      if (clerk.session) {
         // The redirect left us on `/sso-callback`, which sits outside the `(parent)` group and
         // so has no gate to send a signed-in parent home. Say it explicitly.
         router.replace('/(parent)');
-      } else setError(t('signIn.googleUnfinished'));
+        return;
+      }
+      // Back with no session and no cancel: the browser opened and never handed back. Reported,
+      // because this branch went silent once already and cost MIBO-1 its diagnosis.
+      const kind = authSessionResult?.type ?? 'none';
+      reportError(new Error(`SSO returned no session (${kind})`), 'parent-sign-in.google');
+      setError(t('signIn.googleUnfinished'));
     } catch (e) {
       // The screen says what went wrong, and so does the dashboard: this is the catch that went
       // silent on a real device and cost an instrumented build to read (#35).
       reportError(e, 'parent-sign-in.google');
+      // The one failure the parent can act on: this phone has no browser at all, and the email
+      // code below needs none. Every other cause reads as itself.
+      if (isMissingBrowser(e)) return setError(t('signIn.googleNoBrowser'));
       setError(e instanceof Error ? e.message : t('signIn.googleFailed'));
     }
   };

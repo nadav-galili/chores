@@ -24,6 +24,7 @@ import type {
   SyncResponse,
   UpsertChoreOp,
 } from '@chores/shared';
+import { requireArrays } from '@/lib/payload';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -73,7 +74,14 @@ export function createApi(getToken: GetToken) {
       call<Child>(getToken, `/households/${householdId}/children`, json('POST', input)),
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
-    today: (householdId: string) => call<ParentToday>(getToken, `/households/${householdId}/today`),
+    // The two lists the today screen walks are checked on arrival rather than trusted: a server
+    // older than the app returns neither, and the screen indexing them takes the process down.
+    today: async (householdId: string) =>
+      requireArrays(
+        await call<ParentToday>(getToken, `/households/${householdId}/today`),
+        ['children', 'redemptions'],
+        'today',
+      ),
     // The child's last seven Chore Dates. Ungated — seven days is the free tier's promise — so
     // there is nothing here to catch a paywall answer.
     childWeek: (householdId: string, childId: string) =>

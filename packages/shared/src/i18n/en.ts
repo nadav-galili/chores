@@ -141,6 +141,8 @@ export const en = {
     google: 'Continue with Google',
     googleUnfinished: 'Google sign-in did not finish',
     googleFailed: 'Google sign-in failed',
+    googleNoBrowser:
+      'This phone has no browser that can finish a Google sign-in. Use your email instead.',
     emailLabel: 'Or use your email',
     emailCode: 'Email me a code',
     unfinished: 'That did not finish (%{status})',
