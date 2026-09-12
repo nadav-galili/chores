@@ -1,6 +1,15 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { kidReminderCopy, notificationId, uuid7, type DeviceSession } from '@chores/shared';
+import {
+  builtinRewardId,
+  COINS_PER_CHORE,
+  digestCopy,
+  kidReminderCopy,
+  notificationId,
+  parentDeviceId,
+  uuid7,
+  type DeviceSession,
+} from '@chores/shared';
 import { createApp } from './app.ts';
 import { runTick } from './cron.ts';
 import type { Db } from './db/client.ts';
@@ -8,7 +17,7 @@ import { childDevices, choreInstances, households, notifications } from './db/sc
 import type { Push, PushMessage, PushReceipt, PushSend } from './push.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
-import { setTestPin } from './test/household.ts';
+import { completeOp, setTestPin, syncAs } from './test/household.ts';
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -70,7 +79,15 @@ function fakePush(prefix: string): FakePush {
 /** A household with one child, a daily chore and — unless told otherwise — a joined kid device. */
 async function setup(
   clerkUserId: string,
-  opts: { tz: string; reminder?: string; boundary?: number; device?: boolean } = {
+  opts: {
+    tz: string;
+    reminder?: string;
+    boundary?: number;
+    device?: boolean;
+    /** Every household in this file gets an hour of its own: one tick looks at all of them. */
+    digestHour?: number;
+    chore?: boolean;
+  } = {
     tz: 'Asia/Jerusalem',
   },
 ) {
@@ -81,14 +98,20 @@ async function setup(
       body: JSON.stringify({ name: 'Galili', tz: opts.tz, currency: 'ILS' }),
     }),
   );
-  const { household } = (await res.json()) as { household: { id: string } };
+  const { household, parent } = (await res.json()) as {
+    household: { id: string };
+    parent: { id: string };
+  };
   await setTestPin(app, clerkUserId, household.id);
-  if (opts.boundary !== undefined) {
-    await db
-      .update(households)
-      .set({ dayBoundaryHour: opts.boundary })
-      .where(eq(households.id, household.id));
-  }
+  await db
+    .update(households)
+    .set({
+      ...(opts.boundary !== undefined ? { dayBoundaryHour: opts.boundary } : {}),
+      // 04:00 local is an hour no tick in this file passes, so a household that is not the
+      // digest under test never pushes into another test's recorded sends.
+      digestHour: opts.digestHour ?? 4,
+    })
+    .where(eq(households.id, household.id));
   const created = await app.request(
     `/households/${household.id}/children`,
     asParent(clerkUserId, {
@@ -102,17 +125,21 @@ async function setup(
     }),
   );
   const child = (await created.json()) as { id: string };
-  const chore = uuid7();
-  await app.request(
-    `/households/${household.id}/chores/${chore}`,
-    asParent(clerkUserId, {
-      method: 'PUT',
-      body: JSON.stringify({
-        fields: { title: 'Dishes', kind: 'daily', assignees: [child.id] },
-        updated_at: new Date().toISOString(),
+  const addChore = async (title: string) => {
+    const choreId = uuid7();
+    await app.request(
+      `/households/${household.id}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: { title, kind: 'daily', assignees: [child.id] },
+          updated_at: new Date().toISOString(),
+        }),
       }),
-    }),
-  );
+    );
+    return choreId;
+  };
+  const chore = opts.chore === false ? undefined : await addChore('Dishes');
 
   let session: DeviceSession | undefined;
   if (opts.device !== false) {
@@ -129,8 +156,30 @@ async function setup(
     });
     session = (await redeemed.json()) as DeviceSession;
   }
-  return { householdId: household.id, childId: child.id, chore, session };
+  return {
+    householdId: household.id,
+    parentId: parent.id,
+    childId: child.id,
+    chore,
+    session,
+    addChore,
+  };
 }
+
+/** A parent's own phone registering for push, the way the parent app does on every open. */
+const registerParent = (
+  householdId: string,
+  clerkUserId: string,
+  expo_push_token: string,
+  locale: 'en' | 'he' = 'en',
+) =>
+  app.request(
+    `/households/${householdId}/devices`,
+    asParent(clerkUserId, {
+      method: 'POST',
+      body: JSON.stringify({ expo_push_token, platform: 'android', locale }),
+    }),
+  );
 
 /** Registers a push token the way a kid device does: one `/sync` op. */
 async function registerToken(session: DeviceSession, token = TOKEN, locale?: 'en' | 'he') {
@@ -168,6 +217,14 @@ const reminderRow = async (childId: string, choreDate: string) => {
     .select()
     .from(notifications)
     .where(eq(notifications.id, notificationId('kid_reminder', childId, choreDate)));
+  return row;
+};
+
+const digestRow = async (parentId: string, choreDate: string) => {
+  const [row] = await db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.id, notificationId('parent_digest', parentId, choreDate)));
   return row;
 };
 
@@ -371,5 +428,188 @@ describe('kid reminder', () => {
     // The receipt has been read; a later tick does not ask again.
     await runTick(db, push.push, at('2026-09-09T17:00:10Z'));
     expect(push.asked.filter((id) => id === ticket)).toEqual([ticket]);
+  });
+});
+
+describe('evening digest', () => {
+  const at = (utc: string) => new Date(utc);
+  /** Midnight in Jerusalem on the 9th: the boundary tick that materializes that day. */
+  const BOUNDARY_OF_THE_NINTH = '2026-09-08T21:00:20Z';
+
+  it('summarises the chore date that is still open, and sends it once', async () => {
+    const fixture = await setup('user_digest_one', { tz: 'Asia/Jerusalem', digestHour: 20 });
+    const { householdId, parentId, chore, session } = fixture;
+    await fixture.addChore('Laundry');
+    const token = 'ExponentPushToken[digest-one]';
+    await registerParent(householdId, 'user_digest_one', token);
+    const push = fakePush('digest');
+
+    await runTick(db, push.push, at(BOUNDARY_OF_THE_NINTH));
+    // One of the two chores gets done on the 9th; the day is still open.
+    await syncAs(app, session!, [completeOp(chore!, { chore_date: '2026-09-09' })]);
+
+    const result = await runTick(db, push.push, at('2026-09-09T17:00:20Z')); // 20:00 in Jerusalem
+    expect(result.digested).toEqual([{ household_id: householdId, chore_date: '2026-09-09' }]);
+    expect(push.sent).toEqual([
+      {
+        to: token,
+        ...digestCopy('en', {
+          children: [{ first_name: 'Noa', due_count: 2, done_count: 1 }],
+          undecided_redemptions: 0,
+        }),
+        data: { chore_date: '2026-09-09' },
+      },
+    ]);
+    // What the parent reads counts what is done, and never says the day was not finished.
+    expect(push.sent[0]!.body).toContain('1/2 done');
+    expect(push.sent[0]!.body.toLowerCase()).not.toContain('did not');
+
+    const row = await digestRow(parentId, '2026-09-09');
+    expect(row).toMatchObject({
+      kind: 'parent_digest',
+      target: 'parent_device',
+      ticket: 'digest-1',
+    });
+    expect(row!.targetId).toBe(parentDeviceId(parentId, token));
+    expect(row!.sentAt).not.toBeNull();
+
+    // The catch-up window is five ticks wide, and a restart is a sixth: one digest all the same.
+    for (const minute of [1, 2, 3, 4]) {
+      const later = await runTick(db, push.push, at(`2026-09-09T17:0${minute}:20Z`));
+      expect(later.digested).toEqual([]);
+    }
+    expect(push.sent).toHaveLength(1);
+  });
+
+  it('says who is Day Complete, and each parent in their own language', async () => {
+    const parent = 'user_digest_two_at_galili.test';
+    const partner = 'user_partner_at_galili.test';
+    const fixture = await setup(parent, { tz: 'Asia/Jerusalem', digestHour: 22 });
+    const { householdId, parentId, chore, session } = fixture;
+    await app.request(
+      `/households/${householdId}/parents`,
+      asParent(parent, { method: 'POST', body: JSON.stringify({ email: 'partner@galili.test' }) }),
+    );
+    // The partner becomes a parent on their first sign-in with the address they were invited at.
+    const me = await app.request('/me', asParent(partner));
+    const { parent: partnerRow } = (await me.json()) as { parent: { id: string } };
+
+    const english = 'ExponentPushToken[digest-en]';
+    const hebrew = 'ExponentPushToken[digest-he]';
+    await registerParent(householdId, parent, english, 'en');
+    await registerParent(householdId, partner, hebrew, 'he');
+    const push = fakePush('two');
+
+    await runTick(db, push.push, at(BOUNDARY_OF_THE_NINTH));
+    await syncAs(app, session!, [completeOp(chore!, { chore_date: '2026-09-09' })]);
+
+    const result = await runTick(db, push.push, at('2026-09-09T19:00:20Z')); // 22:00 in Jerusalem
+    expect(result.digested).toEqual([{ household_id: householdId, chore_date: '2026-09-09' }]);
+    const summary = {
+      children: [{ first_name: 'Noa', due_count: 1, done_count: 1 }],
+      undecided_redemptions: 0,
+    };
+    const to = (token: string) => push.sent.find((m) => m.to === token);
+    expect(push.sent).toHaveLength(2);
+    expect(to(english)).toMatchObject(digestCopy('en', summary));
+    expect(to(hebrew)).toMatchObject(digestCopy('he', summary));
+    expect(to(english)!.body).toContain('1/1 done — all done');
+
+    // Each parent's claim is their own, and repeated ticks tell each of them once.
+    expect((await digestRow(parentId, '2026-09-09'))!.ticket).toBe('two-1');
+    expect((await digestRow(partnerRow.id, '2026-09-09'))!.ticket).toBe('two-2');
+    await runTick(db, push.push, at('2026-09-09T19:01:20Z'));
+    await runTick(db, push.push, at('2026-09-09T19:02:20Z'));
+    expect(push.sent).toHaveLength(2);
+  });
+
+  it('records the digest with no ticket when the parent has registered no phone', async () => {
+    const fixture = await setup('user_digest_nophone', {
+      tz: 'Asia/Jerusalem',
+      digestHour: 23,
+      device: false,
+    });
+    const push = fakePush('nophone');
+
+    await runTick(db, push.push, at(BOUNDARY_OF_THE_NINTH));
+    const result = await runTick(db, push.push, at('2026-09-09T20:00:20Z')); // 23:00 in Jerusalem
+    expect(result.digested).toEqual([
+      { household_id: fixture.householdId, chore_date: '2026-09-09' },
+    ]);
+    expect(push.sent).toEqual([]);
+    expect(await digestRow(fixture.parentId, '2026-09-09')).toMatchObject({
+      kind: 'parent_digest',
+      ticket: null,
+      sentAt: null,
+      targetId: null,
+    });
+  });
+
+  it('sends nothing at all when nothing was due and nothing is waiting', async () => {
+    const fixture = await setup('user_digest_quiet', {
+      tz: 'Asia/Jerusalem',
+      digestHour: 21,
+      chore: false,
+      device: false,
+    });
+    await registerParent(fixture.householdId, 'user_digest_quiet', 'ExponentPushToken[quiet]');
+    const push = fakePush('quiet');
+
+    // The boundary rolls the 9th; this household has no chore, so it materializes nothing.
+    await runTick(db, push.push, at(BOUNDARY_OF_THE_NINTH));
+    const result = await runTick(db, push.push, at('2026-09-09T18:00:20Z')); // 21:00 in Jerusalem
+    expect(result.digested).toEqual([]);
+    expect(push.sent).toEqual([]);
+    // No claim row either: a chore that becomes due at 21:30 must still be able to send.
+    expect(await digestRow(fixture.parentId, '2026-09-09')).toBeUndefined();
+  });
+
+  it('counts the undecided redemptions on a day with nothing else to say', async () => {
+    const fixture = await setup('user_digest_waiting', {
+      tz: 'Asia/Jerusalem',
+      digestHour: 19,
+      chore: false,
+    });
+    const { householdId, parentId, session } = fixture;
+    const token = 'ExponentPushToken[digest-waiting]';
+    await registerParent(householdId, 'user_digest_waiting', token);
+
+    // Coins today, and a reward asked for with them: nothing is due on the 9th all the same.
+    const earning = [];
+    for (let i = 0; i < Math.ceil(50 / COINS_PER_CHORE); i++) {
+      earning.push(completeOp(await fixture.addChore(`Chore ${i}`)));
+    }
+    await syncAs(app, session!, earning);
+    await syncAs(app, session!, [
+      {
+        op_id: uuid7(),
+        type: 'request_redemption',
+        payload: {
+          redemption_id: uuid7(),
+          reward_id: builtinRewardId(householdId, 'snack'),
+          requested_at: new Date().toISOString(),
+        },
+      },
+    ]);
+    const push = fakePush('waiting');
+
+    const result = await runTick(db, push.push, at('2026-09-09T16:00:20Z')); // 19:00 in Jerusalem
+    expect(result.digested).toEqual([{ household_id: householdId, chore_date: '2026-09-09' }]);
+    expect(push.sent).toEqual([
+      {
+        to: token,
+        ...digestCopy('en', {
+          children: [{ first_name: 'Noa', due_count: 0, done_count: 0 }],
+          undecided_redemptions: 1,
+        }),
+        data: { chore_date: '2026-09-09' },
+      },
+    ]);
+    expect(push.sent[0]!.body).toContain('1 reward is waiting for you');
+    expect(push.sent[0]!.body).toContain('Noa — nothing due');
+    expect((await digestRow(parentId, '2026-09-09'))!.payload).toMatchObject({
+      parent_id: parentId,
+      chore_date: '2026-09-09',
+    });
   });
 });
