@@ -150,6 +150,21 @@ export const en = {
     rejected: 'Rejected. %{title} is back for a redo.',
     rejectAlreadyUndone: '%{title} was already undone. Nothing changed.',
     rejectFailed: 'Could not reject %{title}.',
+    // The reward requests waiting on a parent. The coins are already gone by the time one of
+    // these appears (ADR-0014), so a decline gives them back and says so: to a child, that is
+    // the whole of what happened.
+    requests: {
+      title: plural({ one: 'One request', other: '%{count} requests' }),
+      asked: '%{name} asked for %{reward}',
+      approve: 'Approve',
+      decline: 'Decline',
+      deciding: 'Saving…',
+      approved: 'Approved %{reward} for %{name}.',
+      declined: 'Declined. %{name} has their coins back.',
+      alreadyDecided: 'That was already decided. Nothing changed.',
+      alreadyCancelled: '%{name} changed their mind first. Their coins are back.',
+      failed: 'Could not answer %{name}’s request.',
+    },
     nav: {
       children: 'Children',
       chores: 'Chores',

@@ -1,5 +1,12 @@
 import { useAuth } from '@clerk/expo';
-import type { ParentTodayChild, ParentTodayItem } from '@chores/shared';
+import type {
+  BuiltinRewardKey,
+  DecideRedemptionResult,
+  ParentTodayChild,
+  ParentTodayItem,
+  ParentTodayRedemption,
+  RedemptionDecision,
+} from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -17,7 +24,7 @@ import {
 } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
-import { formatNumber, formatWallClock, t } from '@/lib/i18n';
+import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
 import { useParentToday } from '@/lib/use-parent-today';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -68,6 +75,94 @@ function ChoreLine({
         </Pressable>
       )}
     </View>
+  );
+}
+
+/**
+ * A built-in reward has no title of its own — the seeded row carries its key — so the parent
+ * reads its name in their own language, the same string the child tapped in theirs.
+ */
+const BUILTIN_TITLE: Record<BuiltinRewardKey, TranslationKey> = {
+  snack: 'rewards.builtin.snack',
+  screen_time: 'rewards.builtin.screen_time',
+  friday_dinner: 'rewards.builtin.friday_dinner',
+};
+
+const rewardTitle = (r: ParentTodayRedemption) =>
+  r.title ?? (r.builtin_key ? t(BUILTIN_TITLE[r.builtin_key]) : '');
+
+/** What each answer reads as. Neither `already_` answer is a failure: it is news, and the
+ * refresh behind it puts the screen back in step with what actually happened. */
+const DECIDED_NOTICE: Record<DecideRedemptionResult, TranslationKey> = {
+  approved: 'parent.requests.approved',
+  declined: 'parent.requests.declined',
+  already_decided: 'parent.requests.alreadyDecided',
+  already_cancelled: 'parent.requests.alreadyCancelled',
+};
+
+/**
+ * What the children have asked for and nobody has answered, counted in its own heading so the
+ * parent sees there is something to do without a badge anywhere else in the app.
+ *
+ * The coins have already left the ledger, so the cost is shown as what was spent rather than as
+ * a price: approving moves nothing, and declining is what gives it back (ADR-0014). Both controls
+ * borrow the chip pill the Reject control borrows — they sit inside the same scan, and the one
+ * green means "act" on the child's side.
+ */
+function RequestCard({
+  requests,
+  onDecide,
+  deciding,
+}: {
+  requests: ParentTodayRedemption[];
+  onDecide: (request: ParentTodayRedemption, decision: RedemptionDecision) => void;
+  deciding: string | null;
+}) {
+  const styles = useThemedStyles(todayStyles);
+  return (
+    <Card>
+      <Text style={styles.name}>{t('parent.requests.title', { count: requests.length })}</Text>
+      <View style={styles.rows}>
+        {requests.map((request) => {
+          const busy = deciding === request.redemption_id;
+          return (
+            <View key={request.redemption_id} style={styles.request}>
+              <View style={styles.head}>
+                <Text style={styles.rowTitle}>
+                  {t('parent.requests.asked', {
+                    name: request.first_name,
+                    reward: `${request.icon ? `${request.icon} ` : ''}${rewardTitle(request)}`,
+                  })}
+                </Text>
+                <Coins amount={request.cost_coins} step="label" />
+              </View>
+              <View style={styles.decisions}>
+                <Pressable
+                  style={[styles.reject, busy && styles.rejectBusy]}
+                  onPress={() => onDecide(request, 'approve')}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('parent.requests.approve')}
+                >
+                  <Text style={styles.approveText}>
+                    {busy ? t('parent.requests.deciding') : t('parent.requests.approve')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.reject, busy && styles.rejectBusy]}
+                  onPress={() => onDecide(request, 'decline')}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('parent.requests.decline')}
+                >
+                  <Text style={styles.rejectText}>{t('parent.requests.decline')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </Card>
   );
 }
 
@@ -135,6 +230,7 @@ export default function ParentToday() {
   const today = useParentToday(household?.id ?? null);
   const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
   const { api } = state;
   const householdId = household?.id ?? null;
 
@@ -172,6 +268,38 @@ export default function ParentToday() {
     [api, householdId, today],
   );
 
+  /**
+   * Answer one request. A decision the server says was already made, or one the child cancelled
+   * first, is news rather than an error — and the refresh that follows either is what keeps the
+   * screen from claiming a request is still waiting when it is not.
+   */
+  const decide = useCallback(
+    async (request: ParentTodayRedemption, decision: RedemptionDecision) => {
+      if (!householdId) return;
+      setDeciding(request.redemption_id);
+      setNotice(null);
+      try {
+        const { status } = await api.decideRedemption(householdId, request.redemption_id, decision);
+        setNotice({
+          text: t(DECIDED_NOTICE[status], {
+            name: request.first_name,
+            reward: rewardTitle(request),
+          }),
+          bad: false,
+        });
+        await today.refresh();
+      } catch (e) {
+        setNotice({
+          text: withCause(t('parent.requests.failed', { name: request.first_name }), e),
+          bad: true,
+        });
+      } finally {
+        setDeciding(null);
+      }
+    },
+    [api, householdId, today],
+  );
+
   if (!household) return null;
 
   return (
@@ -195,6 +323,13 @@ export default function ParentToday() {
               title={t('parent.noChildren')}
               actionTitle={t('children.add')}
               onAction={() => router.push('/(parent)/children/new')}
+            />
+          )}
+          {today.today !== null && today.today.redemptions.length > 0 && (
+            <RequestCard
+              requests={today.today.redemptions}
+              onDecide={(request, decision) => void decide(request, decision)}
+              deciding={deciding}
             />
           )}
           {today.today?.children.map((child) => (
@@ -252,6 +387,10 @@ const todayStyles = (theme: Theme) => ({
     paddingVertical: theme.space.xs,
   },
   rejectBusy: { opacity: 0.5 },
+  request: { gap: theme.space.xs, paddingTop: theme.space.xs },
+  // Direction is never hardcoded: the pills follow the reader, so they sit the other way in Hebrew.
+  decisions: { flexDirection: 'row' as const, gap: theme.space.sm },
+  approveText: { ...theme.type.label, color: theme.colors.text, fontWeight: '600' as const },
   rejectText: { ...theme.type.label, color: theme.colors.muted },
   notice: { ...theme.type.label, color: theme.colors.text },
   noticeBad: { color: theme.colors.danger },
