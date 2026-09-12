@@ -127,6 +127,16 @@ export function choreRoutes(db: Db, analytics: Analytics) {
         }
       }
 
+      if (before?.fields.requires_photo !== true && merged.fields.requires_photo) {
+        const answer = await gate(tx, 'photo_proof', {
+          householdId,
+          now: new Date().toISOString(),
+          child_count: 0,
+          parent_count: 0,
+        });
+        if (answer instanceof Response) return answer;
+      }
+
       const fields = merged.fields;
       const columns = {
         title: fields.title,

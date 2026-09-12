@@ -21,6 +21,7 @@ import {
   completions,
   daySummaries,
   growthEntries,
+  households,
   ledgerEntries,
   xpEvents,
 } from './db/schema.ts';
@@ -101,6 +102,34 @@ describe('POST /sync complete', () => {
     expect(tables).toContain('ledger_entries');
     expect(tables).toContain('day_summaries');
     expect(tables).toContain('xp_events');
+  });
+
+  it('accepts a completion for a photo chore after the household entitlement lapses', async () => {
+    const clerkUserId = 'user_lapsed_photo';
+    const { householdId, noa, addChore } = await setup(clerkUserId);
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+    const choreId = await addChore('Photo chore', [noa.id]);
+    const setPhoto = await app.request(
+      `/households/${householdId}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: { requires_photo: true },
+          updated_at: new Date(Date.now() + 1_000).toISOString(),
+        }),
+      }),
+    );
+    expect(setPhoto.status).toBe(200);
+    await db.update(households).set({ entitlement: 'free' }).where(eq(households.id, householdId));
+
+    const op = completeOp(choreId);
+    const { status, body } = await sync(noa.session, [op]);
+    expect(status).toBe(200);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+    expect(body.rejected).toEqual([]);
   });
 
   it('is a no-op when the same op is replayed, whatever the device thinks', async () => {

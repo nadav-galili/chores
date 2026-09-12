@@ -267,6 +267,8 @@ export const he: Catalog = {
     clearAll: 'לנקות הכול',
     selectAll: 'כל יום',
     dueDate: 'תאריך יעד (YYYY-MM-DD)',
+    photoProof: 'דרישת תמונה',
+    photoProofHint: 'בסיום המטלה צריך להוסיף תמונה.',
     who: 'למי',
     delete: 'מחיקת מטלה',
   },

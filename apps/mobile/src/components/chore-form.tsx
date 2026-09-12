@@ -9,7 +9,7 @@ import {
 } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 import {
   Button,
   Chip,
@@ -78,6 +78,7 @@ export function ChoreForm({
   const [kind, setKind] = useState<ChoreKind>(initial.kind);
   const [mask, setMask] = useState(initial.weekday_mask ?? 0);
   const [dueDate, setDueDate] = useState(initial.due_date ?? '');
+  const [requiresPhoto, setRequiresPhoto] = useState(initial.requires_photo);
   const [assignees, setAssignees] = useState<string[]>(initial.assignees);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +106,7 @@ export function ChoreForm({
       kind,
       weekday_mask: kind === 'weekdays' ? mask : null,
       due_date: kind === 'once' ? dueDate.trim() || null : null,
+      requires_photo: requiresPhoto,
       assignees,
     });
     if (!parsed.success) {
@@ -185,6 +187,17 @@ export function ChoreForm({
           keyboardType="numbers-and-punctuation"
         />
       )}
+      <View style={styles.photoField}>
+        <View style={styles.photoCopy}>
+          <Text style={styles.photoLabel}>{t('choreForm.photoProof')}</Text>
+          <Text style={styles.photoHint}>{t('choreForm.photoProofHint')}</Text>
+        </View>
+        <Switch
+          value={requiresPhoto}
+          onValueChange={setRequiresPhoto}
+          accessibilityLabel={t('choreForm.photoProof')}
+        />
+      </View>
       <ChipGroup label={t('choreForm.who')}>
         <Chip
           title={
@@ -225,4 +238,13 @@ const choreFormStyles = (theme: Theme) => ({
   // as tappable as a button is.
   linkTarget: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
   link: { ...theme.type.label, color: theme.colors.action },
+  photoField: {
+    minHeight: theme.touchTarget,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: theme.space.md,
+  },
+  photoCopy: { flex: 1, gap: theme.space.xs },
+  photoLabel: { ...theme.type.label, color: theme.colors.text },
+  photoHint: { ...theme.type.label, color: theme.colors.muted },
 });

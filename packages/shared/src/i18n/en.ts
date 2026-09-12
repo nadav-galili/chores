@@ -278,6 +278,8 @@ export const en = {
     clearAll: 'Clear all',
     selectAll: 'Every day',
     dueDate: 'Due date (YYYY-MM-DD)',
+    photoProof: 'Require a photo',
+    photoProofHint: 'The child adds a photo when finishing this chore.',
     who: 'Who',
     delete: 'Delete chore',
   },
