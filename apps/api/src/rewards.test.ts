@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
-import { rewards } from './db/schema.ts';
+import { households, redemptions, rewards } from './db/schema.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 import { setupHousehold, syncAs } from './test/household.ts';
@@ -193,5 +193,184 @@ describe('the change log', () => {
     const theirIds = new Set((await catalogOf(theirs.householdId)).map((r) => r.id));
     const seen = await pullAll(mine.noa.session);
     expect(seen.filter((c) => theirIds.has(c.row_id))).toEqual([]);
+  });
+});
+
+describe('custom rewards', () => {
+  const custom = (over: Record<string, unknown> = {}) => ({
+    title: 'Choose the family movie',
+    icon: '🎬',
+    cost_coins: 225,
+    active: true,
+    sort: 20,
+    updated_at: '2026-09-12T09:00:00.000Z',
+    ...over,
+  });
+
+  async function makePremium(user: string) {
+    const fixture = await setupHousehold(app, user);
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, fixture.householdId));
+    return fixture;
+  }
+
+  const upsert = (user: string, householdId: string, rewardId: string, body = custom()) =>
+    app.request(
+      `/households/${householdId}/rewards/${rewardId}`,
+      asParent(user, { method: 'PUT', body: JSON.stringify(body) }),
+    );
+
+  const remove = (user: string, householdId: string, rewardId: string) =>
+    app.request(
+      `/households/${householdId}/rewards/${rewardId}`,
+      asParent(user, {
+        method: 'DELETE',
+        body: JSON.stringify({ updated_at: '2026-09-12T10:00:00.000Z' }),
+      }),
+    );
+
+  it('refuses free upsert and delete with the custom_rewards gate, without gating built-ins', async () => {
+    const fixture = await setupHousehold(app, 'user_custom_free');
+    const rewardId = uuid7();
+
+    for (const response of [
+      await upsert('user_custom_free', fixture.householdId, rewardId),
+      await remove('user_custom_free', fixture.householdId, rewardId),
+    ]) {
+      expect(response.status).toBe(402);
+      expect(await response.json()).toEqual({ error: 'gated', gate: 'custom_rewards' });
+    }
+
+    const builtin = await setActive(
+      'user_custom_free',
+      fixture.householdId,
+      builtinRewardId(fixture.householdId, 'snack'),
+      false,
+    );
+    expect(builtin.status).toBe(200);
+  });
+
+  it('lets premium create and edit only a custom row, preserving the parent-written title', async () => {
+    const fixture = await makePremium('user_custom_premium');
+    const rewardId = uuid7();
+    const created = await upsert('user_custom_premium', fixture.householdId, rewardId);
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({
+      id: rewardId,
+      household_id: fixture.householdId,
+      builtin_key: null,
+      title: 'Choose the family movie',
+      icon: '🎬',
+      cost_coins: 225,
+      is_builtin: false,
+      active: true,
+      sort: 20,
+      deleted_at: null,
+    });
+
+    const edited = await upsert(
+      'user_custom_premium',
+      fixture.householdId,
+      rewardId,
+      custom({ title: 'Pick our movie', cost_coins: 250 }),
+    );
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({
+      title: 'Pick our movie',
+      cost_coins: 250,
+      builtin_key: null,
+      is_builtin: false,
+    });
+
+    const builtinId = builtinRewardId(fixture.householdId, 'snack');
+    expect(
+      (
+        await upsert(
+          'user_custom_premium',
+          fixture.householdId,
+          builtinId,
+          custom({ title: 'Rename snack' }),
+        )
+      ).status,
+    ).toBe(400);
+  });
+
+  it('soft-deletes a premium custom reward while an existing redemption still resolves', async () => {
+    const fixture = await makePremium('user_custom_delete');
+    const rewardId = uuid7();
+    await upsert('user_custom_delete', fixture.householdId, rewardId);
+    const redemptionId = uuid7();
+    await db.insert(redemptions).values({
+      id: redemptionId,
+      rewardId,
+      childId: fixture.noa.id,
+      householdId: fixture.householdId,
+      costCoins: 225,
+      status: 'requested',
+      requestedAt: new Date('2026-09-12T09:30:00.000Z'),
+    });
+
+    const deleted = await remove('user_custom_delete', fixture.householdId, rewardId);
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toMatchObject({ id: rewardId, deleted_at: expect.any(String) });
+    const catalog = await listRewards('user_custom_delete', fixture.householdId);
+    expect(catalog.body.some((reward) => reward.id === rewardId)).toBe(false);
+
+    const decided = await app.request(
+      `/households/${fixture.householdId}/redemptions/${redemptionId}/decide`,
+      asParent('user_custom_delete', {
+        method: 'POST',
+        body: JSON.stringify({ decision: 'approve' }),
+      }),
+    );
+    expect(decided.status).toBe(200);
+    expect(await decided.json()).toEqual({ status: 'approved' });
+  });
+
+  it('scopes custom upsert and delete to the caller’s household', async () => {
+    const mine = await makePremium('user_custom_scope_mine');
+    const theirs = await makePremium('user_custom_scope_theirs');
+    const rewardId = uuid7();
+    await upsert('user_custom_scope_theirs', theirs.householdId, rewardId);
+
+    expect(
+      (
+        await upsert(
+          'user_custom_scope_mine',
+          mine.householdId,
+          rewardId,
+          custom({ title: 'Mine' }),
+        )
+      ).status,
+    ).toBe(404);
+    expect((await remove('user_custom_scope_mine', mine.householdId, rewardId)).status).toBe(404);
+    expect((await listRewards('user_custom_scope_theirs', theirs.householdId)).body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: rewardId, title: 'Choose the family movie' }),
+      ]),
+    );
+  });
+
+  it('reaches a Kid Device through the existing household-wide catalog scope', async () => {
+    const fixture = await makePremium('user_custom_device');
+    const cursor = (await syncAs(app, fixture.noa.session, [], 0)).body.cursor;
+    const rewardId = uuid7();
+    await upsert('user_custom_device', fixture.householdId, rewardId);
+
+    const { body } = await syncAs(app, fixture.noa.session, [], cursor);
+    const change = body.changes.find(
+      (item) => item.table === 'rewards' && item.row_id === rewardId,
+    );
+    expect(change).toMatchObject({
+      op: 'insert',
+      row: {
+        household_id: fixture.householdId,
+        builtin_key: null,
+        title: 'Choose the family movie',
+        is_builtin: false,
+      },
+    });
   });
 });

@@ -23,6 +23,7 @@ import type {
   SyncRequest,
   SyncResponse,
   UpsertChoreOp,
+  CustomRewardInput,
   Gate,
 } from '@chores/shared';
 import { gateSchema } from '@chores/shared';
@@ -138,6 +139,13 @@ export function createApi(getToken: GetToken, onGate?: OnGate) {
     // Hiding a built-in, and nothing more: a custom reward is M3's `custom_reward` gate.
     setRewardActive: (householdId: string, rewardId: string, active: boolean) =>
       request<Reward>(`/households/${householdId}/rewards/${rewardId}`, json('PATCH', { active })),
+    upsertCustomReward: (householdId: string, rewardId: string, input: CustomRewardInput) =>
+      request<Reward>(`/households/${householdId}/rewards/${rewardId}`, json('PUT', input)),
+    deleteCustomReward: (householdId: string, rewardId: string) =>
+      request<Reward>(
+        `/households/${householdId}/rewards/${rewardId}`,
+        json('DELETE', { updated_at: new Date().toISOString() }),
+      ),
     registerDevice: (householdId: string, input: ParentDeviceInput) =>
       request<ParentDevice>(`/households/${householdId}/devices`, json('POST', input)),
     listChores: (householdId: string) => request<Chore[]>(`/households/${householdId}/chores`),
