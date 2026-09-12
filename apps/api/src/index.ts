@@ -11,6 +11,10 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 if (!clerkSecretKey) throw new Error('CLERK_SECRET_KEY is required');
+const revenuecatWebhookSigningSecret = process.env.REVENUECAT_WEBHOOK_SIGNING_SECRET;
+if (!revenuecatWebhookSigningSecret) {
+  throw new Error('REVENUECAT_WEBHOOK_SIGNING_SECRET is required');
+}
 const port = Number(process.env.PORT ?? 3000);
 
 const r2AccountId = process.env.R2_ACCOUNT_ID;
@@ -45,6 +49,7 @@ const app = createApp(db, {
         },
       }
     : {}),
+  revenuecatWebhookSigningSecret,
 });
 serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
   console.log(`api listening on :${info.port}`);

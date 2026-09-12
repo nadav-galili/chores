@@ -165,6 +165,20 @@ export function redemptionDecided(decision: { decision: 'approved' | 'declined' 
   return { event: 'redemption_decided', properties: { decision: decision.decision } };
 }
 
+/** A verified store purchase, reported by the server without anything about a child (ADR-0009). */
+export function purchaseCompleted(purchase: {
+  product_id: string;
+  purchase_kind: 'subscription' | 'lifetime';
+}): AnalyticsEvent {
+  return {
+    event: 'purchase_completed',
+    properties: {
+      product_id: purchase.product_id,
+      purchase_kind: purchase.purchase_kind,
+    },
+  };
+}
+
 /**
  * A notification was tapped. What M2 asks is the digest's open rate (docs/spec/01-product.md), and
  * one event answers it for every kind this app sends — the three M2 added included — because the

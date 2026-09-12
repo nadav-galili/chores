@@ -10,6 +10,7 @@ import { parentDeviceRoutes } from './parent-devices.ts';
 import { pinRoutes } from './pin.ts';
 import type { RateLimit } from './rate-limit.ts';
 import { redemptionRoutes } from './redemptions.ts';
+import { revenuecatRoutes } from './revenuecat.ts';
 import { rejectionRoutes } from './rejection.ts';
 import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
@@ -27,6 +28,8 @@ export type AppOptions = {
   analytics?: Analytics;
   /** Private R2 bucket used for 30-day Photo Proof objects. */
   r2?: R2Config;
+  /** HMAC secret RevenueCat uses to sign the exact webhook request body (ADR-0016). */
+  revenuecatWebhookSigningSecret?: string;
 };
 
 const DEFAULT_SYNC_PAGE_SIZE = 500;
@@ -34,7 +37,14 @@ const DEFAULT_REDEEM_LIMIT: RateLimit = { max: 10, windowMs: 15 * 60 * 1000 };
 
 export function createApp(
   db: Db,
-  { verifyToken, redeemLimit, syncPageSize, analytics = noAnalytics, r2 }: AppOptions,
+  {
+    verifyToken,
+    redeemLimit,
+    syncPageSize,
+    analytics = noAnalytics,
+    r2,
+    revenuecatWebhookSigningSecret,
+  }: AppOptions,
 ) {
   const app = new Hono();
 
@@ -58,6 +68,7 @@ export function createApp(
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
   app.route('/', uploadRoutes(db, r2));
+  app.route('/', revenuecatRoutes(db, analytics, revenuecatWebhookSigningSecret));
 
   return app;
 }

@@ -1,5 +1,6 @@
 import {
   bigserial,
+  bigint,
   boolean,
   date,
   index,
@@ -70,6 +71,26 @@ export const parents = pgTable(
     createdAt: timestamptz('created_at').notNull().defaultNow(),
   },
   (t) => [index('parents_email').on(t.email)],
+);
+
+/**
+ * Every authenticated RevenueCat delivery, exactly as received. The event id is RevenueCat's
+ * retry-stable id, so inserting this row and moving the household entitlement are one idempotent
+ * transaction (ADR-0016).
+ */
+export const revenuecatEvents = pgTable(
+  'revenuecat_events',
+  {
+    eventId: text('id').primaryKey(),
+    householdId: uuid('household_id')
+      .notNull()
+      .references(() => households.id),
+    type: text('type').notNull(),
+    eventTimestampMs: bigint('event_timestamp_ms', { mode: 'number' }).notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    receivedAt: timestamptz('received_at').notNull().defaultNow(),
+  },
+  (t) => [index('revenuecat_events_household').on(t.householdId)],
 );
 
 /**
