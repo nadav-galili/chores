@@ -42,7 +42,9 @@ Tooling: pnpm workspaces + Turborepo, Node 22, `node-linker=hoisted`, TypeScript
 
 Live API: https://api-production-c5c7.up.railway.app/health
 
-Local Postgres for API tests: `docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`, then `DATABASE_URL=postgres://postgres:postgres@localhost:5499/chores`.
+Local Postgres: `docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`, then `createdb chores_test` inside it.
+
+Two databases on it, and they must stay two. `chores` is the dev server's, named by `DATABASE_URL` in `apps/api/.env`. `chores_test` is the tests', named by `TEST_DATABASE_URL` and defaulted to in `apps/api/src/test/db.ts`. Every test file begins by dropping the whole `public` schema of the database it is pointed at, so pointing the tests at `DATABASE_URL` destroys the dev data — do not reintroduce that fallback.
 
 ## Testing seams (pre-agreed for `/tdd`; these three only)
 

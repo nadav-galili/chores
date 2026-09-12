@@ -21,6 +21,12 @@
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y29tbXVuYWwtcHVwLTMxNzAuY2xlcmsuYWNjb3VudHMuZGV2JA",
         "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
       }
+    },
+    "preview-local": {
+      "extends": "preview",
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
     }
   }
 }

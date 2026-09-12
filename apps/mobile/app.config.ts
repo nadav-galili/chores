@@ -8,9 +8,14 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * the repo — so they arrive as EAS environment variables (`SENTRY_ORG`, `SENTRY_PROJECT`, plus
  * `SENTRY_AUTH_TOKEN`, which the plugin reads itself). The config plugin is added here rather than
  * in `app.json` so there is one place that decides it, and it is added unconditionally, because it
- * is also what links the native SDK into the Android and iOS builds; only the upload half depends
- * on the environment. A build with no Sentry variables is the app exactly as it was, minus readable
- * stack traces.
+ * is also what links the native SDK into the Android and iOS builds.
+ *
+ * Passing no org and project does not, however, make the upload sit out. The plugin writes a
+ * `sentry.properties` of nothing but comments, and the Gradle task that reads it is gated on the
+ * `SENTRY_DISABLE_AUTO_UPLOAD` environment variable alone — not on what is passed here. So a build
+ * with no Sentry variables that does not also set that variable reaches `sentry-cli` with no
+ * credentials and fails. `SENTRY_AUTH_TOKEN` is an EAS *secret*, readable only on an EAS builder,
+ * which makes every `--local` build one of those: use the `preview-local` profile, which sets it.
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const organization = process.env.SENTRY_ORG;
