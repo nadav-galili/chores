@@ -13,6 +13,8 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@chores/shared": "workspace:*",
     "@clerk/backend": "^3.17.1",
     "@hono/node-server": "^1.19.0",

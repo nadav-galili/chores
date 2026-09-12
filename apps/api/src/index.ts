@@ -13,6 +13,17 @@ const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 if (!clerkSecretKey) throw new Error('CLERK_SECRET_KEY is required');
 const port = Number(process.env.PORT ?? 3000);
 
+const r2AccountId = process.env.R2_ACCOUNT_ID;
+const r2Bucket = process.env.R2_BUCKET;
+const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
+const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+const r2Values = [r2AccountId, r2Bucket, r2AccessKeyId, r2SecretAccessKey];
+if (r2Values.some(Boolean) && !r2Values.every(Boolean)) {
+  throw new Error(
+    'R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set together',
+  );
+}
+
 const db = createDb(databaseUrl);
 await runMigrations(db);
 
@@ -21,7 +32,20 @@ startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
 
 const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY);
 
-const app = createApp(db, { verifyToken: clerkVerifyToken(clerkSecretKey), analytics });
+const app = createApp(db, {
+  verifyToken: clerkVerifyToken(clerkSecretKey),
+  analytics,
+  ...(r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
+    ? {
+        r2: {
+          endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+          bucket: r2Bucket,
+          accessKeyId: r2AccessKeyId,
+          secretAccessKey: r2SecretAccessKey,
+        },
+      }
+    : {}),
+});
 serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
   console.log(`api listening on :${info.port}`);
 });

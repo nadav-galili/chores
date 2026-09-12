@@ -14,6 +14,7 @@ import { rejectionRoutes } from './rejection.ts';
 import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
 import { todayRoutes } from './today.ts';
+import { uploadRoutes, type R2Config } from './uploads.ts';
 import { weekRoutes } from './week.ts';
 
 export type AppOptions = {
@@ -24,6 +25,8 @@ export type AppOptions = {
   syncPageSize?: number;
   /** Where server events go; nothing is sent when this is left out (ADR-0009). */
   analytics?: Analytics;
+  /** Private R2 bucket used for 30-day Photo Proof objects. */
+  r2?: R2Config;
 };
 
 const DEFAULT_SYNC_PAGE_SIZE = 500;
@@ -31,7 +34,7 @@ const DEFAULT_REDEEM_LIMIT: RateLimit = { max: 10, windowMs: 15 * 60 * 1000 };
 
 export function createApp(
   db: Db,
-  { verifyToken, redeemLimit, syncPageSize, analytics = noAnalytics }: AppOptions,
+  { verifyToken, redeemLimit, syncPageSize, analytics = noAnalytics, r2 }: AppOptions,
 ) {
   const app = new Hono();
 
@@ -54,6 +57,7 @@ export function createApp(
   app.route('/', redemptionRoutes(db, analytics));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
+  app.route('/', uploadRoutes(db, r2));
 
   return app;
 }
