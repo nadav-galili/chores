@@ -171,6 +171,38 @@ describe('POST /households/:id/completions/:id/approve', () => {
     expect(await res.json()).toEqual({ error: 'not_pending' });
   });
 
+  it('refuses a keyless pending row instead of paying it', async () => {
+    const home = await setupHousehold(app, 'user_approve_keyless');
+    const choreId = await home.addChore('Tidy room', [home.noa.id]);
+    const key = instanceId(choreId, home.noa.id, testToday());
+    const completionId = uuid7();
+    await db.insert(choreInstances).values({
+      id: key,
+      choreId,
+      childId: home.noa.id,
+      householdId: home.householdId,
+      choreDate: testToday(),
+      status: 'pending_photo',
+    });
+    await db.insert(completions).values({
+      id: completionId,
+      instanceId: key,
+      choreId,
+      childId: home.noa.id,
+      householdId: home.householdId,
+      choreDate: testToday(),
+      completedAt: new Date(),
+      deviceId: home.noa.session.device_id,
+      photoKey: null,
+      status: 'pending_photo',
+    });
+
+    const res = await approve('user_approve_keyless', home.householdId, completionId);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'not_pending' });
+    expect(await balance(home.noa.id)).toBe(0);
+  });
+
   it('does not reach another household’s completion', async () => {
     const mine = await pendingPhoto('user_approve_mine');
     const theirs = await pendingPhoto('user_approve_theirs');

@@ -409,6 +409,8 @@ export const en = {
     owed: 'Owes %{amount}',
     history: 'Payouts and adjustments',
     historyEmpty: 'No payouts or adjustments yet.',
+    kindPayout: 'Payout',
+    kindAdjust: 'Adjustment',
     payoutCoins: 'Coins to pay',
     payout: 'Record payout',
     payoutFailed: 'Could not record the payout.',

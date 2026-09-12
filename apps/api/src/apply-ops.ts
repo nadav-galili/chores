@@ -186,11 +186,17 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       return reject('unknown_chore');
     }
 
-    // Photo proof (ADR-0017, M3.12): a `requires_photo` chore completed with the presigned key
-    // waits on a parent instead of paying. This is never a gate — the photo_proof entitlement
-    // gates the parent's chore upsert, never the child's tap — so a key on a chore that does not
-    // ask for one, or no key at all, keeps the existing accepted path.
-    const waitsOnPhoto = chore.requiresPhoto && typeof photoKey === 'string';
+    // Photo proof (ADR-0017, M3.12): a `requires_photo` chore never pays on a keyless tap —
+    // without the presigned key there is no proof, so it waits on a parent instead of paying.
+    // This is never a gate — the photo_proof entitlement gates the parent's chore upsert, never
+    // the child's tap — so a key on a chore that does not ask for one keeps the accepted path.
+    // A key on a photo chore must be the server-named presign answer echoed back
+    // (`children/{childId}/completions/{completionId}`); anything else is a forged key.
+    const canonicalPhotoKey = `children/${ctx.childId}/completions/${completion_id}`;
+    if (chore.requiresPhoto && typeof photoKey === 'string' && photoKey !== canonicalPhotoKey) {
+      return reject('invalid_payload');
+    }
+    const waitsOnPhoto = chore.requiresPhoto;
     const doneStatus = waitsOnPhoto ? 'pending_photo' : 'done';
     const completionStatus = waitsOnPhoto ? 'pending_photo' : 'accepted';
     await tx
@@ -223,7 +229,7 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         choreDate: chore_date,
         completedAt,
         deviceId: ctx.deviceId,
-        photoKey: waitsOnPhoto ? photoKey : null,
+        photoKey: waitsOnPhoto && typeof photoKey === 'string' ? photoKey : null,
         status: completionStatus,
         createdAt: ctx.now,
       })
