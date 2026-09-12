@@ -75,18 +75,20 @@ Railway logs.
 
 Its build-time config is *not* committed. The PostHog key sits in `eas.json` because it is a
 write-only ingest key; the Sentry values include an auth token that can read the project, so all
-four are EAS environment variables instead — set once, from the repo root:
+four are EAS environment variables instead. `scripts/setup-sentry.sh` walks through creating the
+project, the DSN and the token, pushes all four, and ends by triggering a real error and reading
+the raw payload — run it once per Sentry project:
 
 ```
-eas env:create --environment preview --name EXPO_PUBLIC_SENTRY_DSN --value <dsn> --visibility plaintext
-eas env:create --environment preview --name SENTRY_ORG     --value <org-slug>     --visibility plaintext
-eas env:create --environment preview --name SENTRY_PROJECT --value <project-slug> --visibility plaintext
-eas env:create --environment preview --name SENTRY_AUTH_TOKEN --value <token> --visibility secret
+./scripts/setup-sentry.sh
 ```
+
+It sets these in the `preview` environment (`eas env:set`, so re-running just updates them):
 
 - `EXPO_PUBLIC_SENTRY_DSN` is read at runtime by `src/lib/error-reporting.ts`. With no DSN the
-  reporter is a no-op and the app behaves exactly as before — which is also why nothing breaks
-  before these are set.
+  reporter is a no-op and the app behaves exactly as before — which is why nothing breaks before
+  these are set. Visibility `sensitive`, not `secret`: an `EXPO_PUBLIC_*` value is inlined into the
+  bundle at build time, and a secret variable is write-only so the build could not read it.
 - `SENTRY_ORG` and `SENTRY_PROJECT` are read at build time by `app.config.ts`, and
   `SENTRY_AUTH_TOKEN` by the config plugin, to upload source maps. Without the first two the
   plugin still links the native SDK; only symbolication is lost.
