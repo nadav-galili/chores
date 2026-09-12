@@ -175,6 +175,22 @@ export const en = {
       alreadyCancelled: '%{name} changed their mind first. Their coins are back.',
       failed: 'Could not answer %{name}’s request.',
     },
+    // The seven-day grid. It reuses the today screen's reject copy verbatim, because it is the
+    // same endpoint and the same decision — only the day is older.
+    week: {
+      open: 'Last seven days',
+      title: 'Last seven days · %{name}',
+      empty: 'Nothing recorded in the last seven days.',
+      loadFailed: 'Could not load the last seven days.',
+      // What a cell reads as to a screen reader: the chore, the day, and where it stands.
+      cell: '%{title}, %{date}: %{state}',
+      state: {
+        due: 'not done',
+        done: 'done',
+        redo: 'sent back for a redo',
+        pending_photo: 'waiting on a photo',
+      },
+    },
     nav: {
       children: 'Children',
       chores: 'Chores',

@@ -14,6 +14,7 @@ import type {
   ParentDeviceInput,
   ParentInvite,
   ParentToday,
+  ParentWeek,
   RedeemJoinCodeInput,
   RedemptionDecision,
   RejectCompletionResult,
@@ -72,6 +73,10 @@ export function createApi(getToken: GetToken) {
     updateChild: (householdId: string, childId: string, input: ChildInput) =>
       call<Child>(getToken, `/households/${householdId}/children/${childId}`, json('PATCH', input)),
     today: (householdId: string) => call<ParentToday>(getToken, `/households/${householdId}/today`),
+    // The child's last seven Chore Dates. Ungated — seven days is the free tier's promise — so
+    // there is nothing here to catch a paywall answer.
+    childWeek: (householdId: string, childId: string) =>
+      call<ParentWeek>(getToken, `/households/${householdId}/children/${childId}/week`),
     // Rejecting names a completion, never an instance: the id comes from the today payload.
     rejectCompletion: (householdId: string, completionId: string) =>
       call<{ status: RejectCompletionResult }>(

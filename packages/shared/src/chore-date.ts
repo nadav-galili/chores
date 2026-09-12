@@ -89,3 +89,21 @@ export function withinRedoWindow(date: IsoDate, today: IsoDate): boolean {
 export function redoWindowStart(today: IsoDate): IsoDate {
   return addDays(today, -REDO_WINDOW_DAYS);
 }
+
+/**
+ * The history the free tier promises: seven Chore Dates (docs/spec/01-product.md, Tiers —
+ * "history: 7 days"). M3's `full_history` gate extends the same window backwards; nothing
+ * gates this one.
+ */
+export const HISTORY_WINDOW_DAYS = 7;
+
+/**
+ * The seven Chore Dates ending on `today`, oldest first. Oldest first is the order the grid's
+ * columns are built in, so a right-to-left reader gets the newest day at the near edge without
+ * anything reversing the array.
+ */
+export function historyWindow(today: IsoDate): IsoDate[] {
+  return Array.from({ length: HISTORY_WINDOW_DAYS }, (_, i) =>
+    addDays(today, i - (HISTORY_WINDOW_DAYS - 1)),
+  );
+}
