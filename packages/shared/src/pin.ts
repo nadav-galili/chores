@@ -17,6 +17,48 @@ export function hashPin(salt: string, pin: string): string {
   return sha256Hex(new TextEncoder().encode(salt + pin));
 }
 
+/**
+ * The whole check, made on the kid device with no network (ADR-0013). A household with no PIN yet
+ * — or a device holding a session from before it had one — opens for nothing.
+ */
+export function verifyPin(
+  hash: string | null | undefined,
+  salt: string | null | undefined,
+  entered: string,
+): boolean {
+  if (!hash || !salt) return false;
+  if (!pinSchema.safeParse(entered).success) return false;
+  return hashPin(salt, entered) === hash;
+}
+
+/** Five tries, then a minute's wait: the attempt limit is what stops a curious child (ADR-0013). */
+export const PIN_MAX_ATTEMPTS = 5;
+export const PIN_COOLDOWN_MS = 60_000;
+
+/** The counter the kid device keeps in its secure store, so a restart does not clear it. */
+export const pinAttemptsSchema = z.object({
+  wrong: z.number().int().min(0),
+  cooldown_until: z.number().nullable(),
+});
+export type PinAttempts = z.infer<typeof pinAttemptsSchema>;
+export const NO_PIN_ATTEMPTS: PinAttempts = { wrong: 0, cooldown_until: null };
+
+/** How long the door stays shut; zero means it is open. */
+export function pinCooldownMsLeft(attempts: PinAttempts, now: number): number {
+  return Math.max(0, (attempts.cooldown_until ?? 0) - now);
+}
+
+/** A wrong try. The fifth starts the cooldown, and the count begins again behind it. */
+export function afterWrongPin(attempts: PinAttempts, now: number): PinAttempts {
+  const wrong = attempts.wrong + 1;
+  if (wrong >= PIN_MAX_ATTEMPTS) return { wrong: 0, cooldown_until: now + PIN_COOLDOWN_MS };
+  // A cooldown already served is dropped rather than carried, so a later try reads it as open.
+  return {
+    wrong,
+    cooldown_until: pinCooldownMsLeft(attempts, now) > 0 ? attempts.cooldown_until : null,
+  };
+}
+
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,

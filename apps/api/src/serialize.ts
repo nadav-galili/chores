@@ -97,6 +97,13 @@ export function childSummaryToApi(row: typeof children.$inferSelect): ChildSumma
   return { id: row.id, first_name: row.firstName, ui_mode: row.uiMode, pet_name: row.petName };
 }
 
+/** The Parent PIN crosses to the kid device on purpose, and only here (ADR-0013). */
 export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
-  return { id: row.id, tz: row.tz, day_boundary_hour: row.dayBoundaryHour };
+  return {
+    id: row.id,
+    tz: row.tz,
+    day_boundary_hour: row.dayBoundaryHour,
+    pin_hash: row.pinHash,
+    pin_salt: row.pinSalt,
+  };
 }
