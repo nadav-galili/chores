@@ -24,3 +24,4 @@ export * from './motion.ts';
 export * from './reward.ts';
 export * from './redemption.ts';
 export * from './pin.ts';
+export * from './error-reporting.ts';

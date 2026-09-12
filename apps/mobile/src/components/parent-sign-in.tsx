@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
+import { reportError } from '@/lib/error-reporting';
 import { t } from '@/lib/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -95,6 +96,9 @@ export function ParentSignIn({
         router.replace('/(parent)');
       } else setError(t('signIn.googleUnfinished'));
     } catch (e) {
+      // The screen says what went wrong, and so does the dashboard: this is the catch that went
+      // silent on a real device and cost an instrumented build to read (#35).
+      reportError(e, 'parent-sign-in.google');
       setError(e instanceof Error ? e.message : t('signIn.googleFailed'));
     }
   };

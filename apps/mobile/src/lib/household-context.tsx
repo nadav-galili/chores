@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { openDeviceDb } from '@/db/client';
 import { refreshFlags, startParentAnalytics } from '@/lib/analytics';
 import { createApi, type Api, type Me } from '@/lib/api';
+import { setParentErrorContext } from '@/lib/error-reporting';
 import { registerParentPush } from '@/lib/notifications';
 
 type State =
@@ -21,6 +22,7 @@ const HouseholdContext = createContext<HouseholdContextValue | null>(null);
  */
 async function reportParent(me: Me): Promise<void> {
   if (!me.parent) return;
+  setParentErrorContext(me.parent.clerk_user_id);
   try {
     await startParentAnalytics(me.parent.clerk_user_id, me.household?.id ?? null);
     await refreshFlags(await openDeviceDb());

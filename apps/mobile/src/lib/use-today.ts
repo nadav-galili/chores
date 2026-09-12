@@ -34,6 +34,7 @@ import { syncNow } from '@/sync/sync';
 import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
+import { setKidErrorContext } from '@/lib/error-reporting';
 import { playDoneHaptic } from '@/lib/haptics';
 import { arrangeKidReminder } from '@/lib/notifications';
 
@@ -341,6 +342,8 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   // (ADR-0009). Kid mode never asks PostHog for anything, so there is nothing to await.
   useEffect(() => {
     void startKidAnalytics(session);
+    // A crash report from this device says the same three things and no more (ADR-0015).
+    setKidErrorContext(session);
   }, [session.analytics_anon_id, session.child.ui_mode, session.household.id]);
 
   useFocusEffect(
