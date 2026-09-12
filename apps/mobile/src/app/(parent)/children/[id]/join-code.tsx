@@ -1,8 +1,9 @@
 import type { IssuedJoinCode } from '@chores/shared';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, ErrorText, Screen, Title } from '@/components/ui';
+import { ApiError } from '@/lib/api';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -36,15 +37,25 @@ export default function JoinCode() {
   const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
   const api = state.api;
 
+  // Issuing is refused while the household has no Parent PIN, because kid mode would have no way
+  // out (ADR-0013). That answer is a destination, not a failure: the parent is sent to set one,
+  // and the next visit to this screen issues the code.
+  const issuedFor = useRef<string | null>(null);
   const issue = useCallback(async () => {
     if (!householdId || !id) return;
     setError(null);
     try {
       setIssued(await api.issueJoinCode(householdId, id));
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'pin_required') {
+        issuedFor.current = null;
+        setError(t('joinCode.pinRequired'));
+        router.push('/(parent)/pin');
+        return;
+      }
       setError(withCause(t('joinCode.failed'), e));
     }
-  }, [api, householdId, id]);
+  }, [api, householdId, id, router]);
 
   // Issue once per child, and not once per `issue` identity. `api` is rebuilt whenever Clerk
   // hands back a new token getter, which makes `issue` a new function, and this screen
@@ -52,13 +63,14 @@ export default function JoinCode() {
   // a fresh code continuously, replacing the digits on screen before a parent could finish
   // reading them out. Old codes stay valid for their own fifteen minutes, so the cost was a
   // parent who could not use any of them, plus an unthrottled write loop against the API.
-  const issuedFor = useRef<string | null>(null);
-  useEffect(() => {
-    const key = householdId && id ? `${householdId}/${id}` : null;
-    if (key === null || issuedFor.current === key) return;
-    issuedFor.current = key;
-    void issue();
-  }, [householdId, id, issue]);
+  useFocusEffect(
+    useCallback(() => {
+      const key = householdId && id ? `${householdId}/${id}` : null;
+      if (key === null || issuedFor.current === key) return;
+      issuedFor.current = key;
+      void issue();
+    }, [householdId, id, issue]),
+  );
 
   if (!child) return null;
   const remaining = issued ? new Date(issued.expires_at).getTime() - now : 0;

@@ -8,6 +8,7 @@ import { childDevices, choreInstances, households, notifications } from './db/sc
 import type { Push, PushMessage, PushReceipt, PushSend } from './push.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
+import { setTestPin } from './test/household.ts';
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -81,6 +82,7 @@ async function setup(
     }),
   );
   const { household } = (await res.json()) as { household: { id: string } };
+  await setTestPin(app, clerkUserId, household.id);
   if (opts.boundary !== undefined) {
     await db
       .update(households)

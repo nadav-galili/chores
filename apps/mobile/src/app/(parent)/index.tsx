@@ -214,6 +214,7 @@ export default function ParentToday() {
           { title: t('parent.nav.chores'), onPress: () => router.push('/(parent)/chores') },
           { title: t('parent.nav.rewards'), onPress: () => router.push('/(parent)/rewards') },
           { title: t('parent.nav.partner'), onPress: () => router.push('/(parent)/partner') },
+          { title: t('parent.nav.pin'), onPress: () => router.push('/(parent)/pin') },
           { title: t('parent.nav.signOut'), onPress: () => void signOut() },
         ]}
       />
