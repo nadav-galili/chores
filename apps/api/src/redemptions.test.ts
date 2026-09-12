@@ -5,13 +5,15 @@ import {
   redemptionRefundId,
   uuid7,
   type DeviceSession,
+  type ParentToday,
 } from '@chores/shared';
 import { eq } from 'drizzle-orm';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { recordingAnalytics } from './analytics.ts';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
 import { ledgerEntries, redemptions, rewards, xpEvents } from './db/schema.ts';
-import { fakeVerifyToken } from './test/auth.ts';
+import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 import { completeOp, setupHousehold, syncAs } from './test/household.ts';
 
@@ -337,5 +339,228 @@ describe('the balance a redemption leaves behind', () => {
         .from(ledgerEntries)
         .where(eq(ledgerEntries.id, redemptionRefundId(op.payload.redemption_id))),
     ).toEqual([]);
+  });
+});
+
+describe('a parent decides a redemption', () => {
+  let parentApp: ReturnType<typeof createApp>;
+  let analytics: ReturnType<typeof recordingAnalytics>;
+
+  beforeEach(() => {
+    analytics = recordingAnalytics();
+    parentApp = createApp(db, {
+      verifyToken: fakeVerifyToken,
+      redeemLimit: { max: 1000, windowMs: 60_000 },
+      analytics,
+    });
+  });
+
+  /** A household whose Noa has asked for a snack and whose coins have already left. */
+  const setupRequested = async (user: string) => {
+    const fixture = await setupHousehold(parentApp, user);
+    await earn(fixture, fixture.noa.session, fixture.noa.id, 200);
+    const op = requestOp(builtinRewardId(fixture.householdId, 'snack'));
+    await syncAs(parentApp, fixture.noa.session, [op]);
+    return { ...fixture, user, redemptionId: op.payload.redemption_id };
+  };
+
+  const decide = (
+    fixture: { householdId: string; user: string },
+    redemptionId: string,
+    decision: 'approve' | 'decline',
+  ) =>
+    parentApp.request(
+      `/households/${fixture.householdId}/redemptions/${redemptionId}/decide`,
+      asParent(fixture.user, { method: 'POST', body: JSON.stringify({ decision }) }),
+    );
+
+  const statusOf = async (res: Response) => ((await res.json()) as { status: string }).status;
+
+  const refundsFor = (redemptionId: string) =>
+    db
+      .select()
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.id, redemptionRefundId(redemptionId)));
+
+  const todayOf = async (fixture: { householdId: string; user: string }) => {
+    const res = await parentApp.request(
+      `/households/${fixture.householdId}/today`,
+      asParent(fixture.user),
+    );
+    return (await res.json()) as ParentToday;
+  };
+
+  it('carries the household’s undecided redemptions on the parent today screen', async () => {
+    const fixture = await setupRequested('user_decide_today');
+    const today = await todayOf(fixture);
+    expect(today.redemptions).toEqual([
+      {
+        redemption_id: fixture.redemptionId,
+        child_id: fixture.noa.id,
+        first_name: 'Noa',
+        reward_id: builtinRewardId(fixture.householdId, 'snack'),
+        builtin_key: 'snack',
+        title: null,
+        icon: '🍿',
+        cost_coins: 50,
+        requested_at: expect.any(String),
+      },
+    ]);
+
+    // Decided is decided: the screen carries what is still waiting, and nothing else.
+    await decide(fixture, fixture.redemptionId, 'approve');
+    expect((await todayOf(fixture)).redemptions).toEqual([]);
+  });
+
+  it('approves without writing a ledger entry: the coins went when the child asked', async () => {
+    const fixture = await setupRequested('user_decide_approve');
+    const spent = await balance(fixture.noa.id);
+    const before = await entriesOf(fixture.noa.id);
+
+    expect(await statusOf(await decide(fixture, fixture.redemptionId, 'approve'))).toBe('approved');
+
+    const [row] = await db
+      .select()
+      .from(redemptions)
+      .where(eq(redemptions.id, fixture.redemptionId));
+    expect(row!.status).toBe('approved');
+    expect(row!.decidedBy).not.toBeNull();
+    expect(await balance(fixture.noa.id)).toBe(spent);
+    expect(await entriesOf(fixture.noa.id)).toHaveLength(before.length);
+  });
+
+  it('declines through the same clawback id a cancel would write', async () => {
+    const fixture = await setupRequested('user_decide_decline');
+    const spent = await balance(fixture.noa.id);
+
+    expect(await statusOf(await decide(fixture, fixture.redemptionId, 'decline'))).toBe('declined');
+
+    const [row] = await db
+      .select()
+      .from(redemptions)
+      .where(eq(redemptions.id, fixture.redemptionId));
+    expect(row!.status).toBe('declined');
+    const refunds = await refundsFor(fixture.redemptionId);
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0]).toMatchObject({
+      kind: 'clawback',
+      coins: 50,
+      refType: 'ledger_entry',
+      refId: redeemEntryId(fixture.redemptionId),
+    });
+    expect(await balance(fixture.noa.id)).toBe(spent + 50);
+  });
+
+  it('answers already_decided the second time, and moves nothing', async () => {
+    const fixture = await setupRequested('user_decide_twice');
+    await decide(fixture, fixture.redemptionId, 'decline');
+    const refunded = await balance(fixture.noa.id);
+
+    expect(await statusOf(await decide(fixture, fixture.redemptionId, 'approve'))).toBe(
+      'already_decided',
+    );
+    expect(await balance(fixture.noa.id)).toBe(refunded);
+    expect(await refundsFor(fixture.redemptionId)).toHaveLength(1);
+  });
+
+  it('answers already_cancelled when the child got there first, with one refund', async () => {
+    const fixture = await setupRequested('user_decide_after_cancel');
+    await syncAs(parentApp, fixture.noa.session, [cancelOp(fixture.redemptionId)]);
+    const refunded = await balance(fixture.noa.id);
+
+    expect(await statusOf(await decide(fixture, fixture.redemptionId, 'decline'))).toBe(
+      'already_cancelled',
+    );
+    expect(await balance(fixture.noa.id)).toBe(refunded);
+    expect(await refundsFor(fixture.redemptionId)).toHaveLength(1);
+  });
+
+  it('leaves a cancel nothing to refund once a parent has decided', async () => {
+    const fixture = await setupRequested('user_cancel_after_decide');
+    await decide(fixture, fixture.redemptionId, 'approve');
+    const spent = await balance(fixture.noa.id);
+
+    const op = cancelOp(fixture.redemptionId);
+    const { body } = await syncAs(parentApp, fixture.noa.session, [op]);
+    expect(body.rejected).toEqual([{ op_id: op.op_id, reason: 'already_decided' }]);
+    expect(await balance(fixture.noa.id)).toBe(spent);
+    expect(await refundsFor(fixture.redemptionId)).toEqual([]);
+  });
+
+  it('refunds once when a decline and a cancel race, whichever wins', async () => {
+    const fixture = await setupRequested('user_decide_race');
+    const spent = await balance(fixture.noa.id);
+
+    const [decided, synced] = await Promise.all([
+      decide(fixture, fixture.redemptionId, 'decline'),
+      syncAs(parentApp, fixture.noa.session, [cancelOp(fixture.redemptionId)]),
+    ]);
+    const status = await statusOf(decided);
+
+    // Whoever lost says so; the ledger cannot tell the difference, because both refunds are the
+    // one row under `uuid5('clawback', redeem_entry_id)` (ADR-0014).
+    expect(['declined', 'already_cancelled']).toContain(status);
+    expect(synced.body.rejected.length + synced.body.acked.length).toBe(1);
+    expect(await refundsFor(fixture.redemptionId)).toHaveLength(1);
+    expect(await balance(fixture.noa.id)).toBe(spent + 50);
+  });
+
+  it('refunds not at all when an approval and a cancel race, whichever wins', async () => {
+    const fixture = await setupRequested('user_approve_race');
+    const spent = await balance(fixture.noa.id);
+
+    const [decided, synced] = await Promise.all([
+      decide(fixture, fixture.redemptionId, 'approve'),
+      syncAs(parentApp, fixture.noa.session, [cancelOp(fixture.redemptionId)]),
+    ]);
+    const status = await statusOf(decided);
+    const refunds = await refundsFor(fixture.redemptionId);
+
+    if (status === 'approved') {
+      // The parent won: the cancel is `already_decided` and the coins stay spent.
+      expect(synced.body.rejected).toEqual([
+        { op_id: expect.any(String), reason: 'already_decided' },
+      ]);
+      expect(refunds).toEqual([]);
+      expect(await balance(fixture.noa.id)).toBe(spent);
+    } else {
+      expect(status).toBe('already_cancelled');
+      expect(refunds).toHaveLength(1);
+      expect(await balance(fixture.noa.id)).toBe(spent + 50);
+    }
+  });
+
+  it('is parent-scoped: another household’s parent cannot decide it', async () => {
+    const fixture = await setupRequested('user_decide_scope');
+    const other = await setupHousehold(parentApp, 'user_decide_outsider');
+    const res = await parentApp.request(
+      `/households/${other.householdId}/redemptions/${fixture.redemptionId}/decide`,
+      asParent('user_decide_outsider', {
+        method: 'POST',
+        body: JSON.stringify({ decision: 'approve' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    const [row] = await db
+      .select()
+      .from(redemptions)
+      .where(eq(redemptions.id, fixture.redemptionId));
+    expect(row!.status).toBe('requested');
+  });
+
+  it('reports the decision under the parent, grouped by the household', async () => {
+    const fixture = await setupRequested('user_decide_analytics');
+    await decide(fixture, fixture.redemptionId, 'decline');
+    expect(analytics.sent.filter((s) => s.event.event === 'redemption_decided')).toEqual([
+      {
+        distinctId: 'user_decide_analytics',
+        event: { event: 'redemption_decided', properties: { decision: 'declined' } },
+        groups: { household: fixture.householdId },
+      },
+    ]);
+
+    // A decision that decided nothing is not a decision.
+    await decide(fixture, fixture.redemptionId, 'approve');
+    expect(analytics.sent.filter((s) => s.event.event === 'redemption_decided')).toHaveLength(1);
   });
 });

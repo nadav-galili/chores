@@ -148,6 +148,18 @@ export const he: Catalog = {
     rejected: 'נדחה. %{title} חוזרת לביצוע חוזר.',
     rejectAlreadyUndone: '%{title} כבר בוטלה. שום דבר לא השתנה.',
     rejectFailed: 'לא הצלחנו לדחות את %{title}.',
+    requests: {
+      title: { one: 'בקשה אחת', two: 'שתי בקשות', other: '%{count} בקשות' },
+      asked: '%{name} ביקש/ה %{reward}',
+      approve: 'אישור',
+      decline: 'דחייה',
+      deciding: 'שומרים…',
+      approved: 'אישרתם %{reward} ל%{name}.',
+      declined: 'נדחה. המטבעות חזרו ל%{name}.',
+      alreadyDecided: 'הבקשה כבר טופלה. שום דבר לא השתנה.',
+      alreadyCancelled: '%{name} התחרט/ה קודם. המטבעות כבר חזרו.',
+      failed: 'לא הצלחנו לענות לבקשה של %{name}.',
+    },
     nav: {
       children: 'ילדים',
       chores: 'מטלות',

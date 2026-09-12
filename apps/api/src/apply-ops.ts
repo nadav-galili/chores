@@ -76,7 +76,7 @@ const RECONCILED_OP_TYPES: ReadonlySet<KidOpType> = new Set<KidOpType>(['complet
 const reject = (reason: RejectReason): StoredResult => ({ status: 'rejected', reason });
 
 /** One shared entry as a row of this database. No XP mirrors a redemption's coins (ADR-0004). */
-const ledgerRow = (e: LedgerEntry, now: Date) => ({
+export const ledgerRow = (e: LedgerEntry, now: Date) => ({
   id: e.id,
   householdId: e.household_id,
   childId: e.child_id,
@@ -284,10 +284,13 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
 
   if (op.type === 'cancel_redemption') {
     const { redemption_id } = op.payload;
+    // Locked: a parent deciding at this moment holds or waits for the same row, so the status
+    // read below is the one that decided, and only one of the two writes a refund.
     const [row] = await tx
       .select()
       .from(redemptions)
-      .where(and(eq(redemptions.id, redemption_id), eq(redemptions.childId, ctx.childId)));
+      .where(and(eq(redemptions.id, redemption_id), eq(redemptions.childId, ctx.childId)))
+      .for('update');
     if (!row) return reject('unknown_redemption');
     // Approved or declined, the parent got there first and the coins are theirs to move.
     if (row.status === 'approved' || row.status === 'declined') return reject('already_decided');

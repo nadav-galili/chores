@@ -3,6 +3,7 @@ import type {
   ChildInput,
   Chore,
   CreateHouseholdInput,
+  DecideRedemptionResult,
   Household,
   IssuedJoinCode,
   ChildSummary,
@@ -14,6 +15,7 @@ import type {
   ParentInvite,
   ParentToday,
   RedeemJoinCodeInput,
+  RedemptionDecision,
   RejectCompletionResult,
   Reward,
   SyncRequest,
@@ -76,6 +78,14 @@ export function createApi(getToken: GetToken) {
         getToken,
         `/households/${householdId}/completions/${completionId}/reject`,
         { method: 'POST' },
+      ),
+    // Deciding names a redemption, never a reward: the id comes from the today payload. Approving
+    // moves no coins — they left when the child asked — and declining refunds (ADR-0014).
+    decideRedemption: (householdId: string, redemptionId: string, decision: RedemptionDecision) =>
+      call<{ status: DecideRedemptionResult }>(
+        getToken,
+        `/households/${householdId}/redemptions/${redemptionId}/decide`,
+        json('POST', { decision }),
       ),
     listParents: (householdId: string) =>
       call<{ parents: Parent[]; invites: ParentInvite[] }>(

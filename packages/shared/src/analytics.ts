@@ -154,3 +154,12 @@ export function rewardRequested(reward: {
     properties: { builtin_key: reward.builtin_key, cost_coins: reward.cost_coins },
   };
 }
+
+/**
+ * A parent decided a Redemption: the one number the reward loop turns on. Sent server-side under
+ * the parent's Clerk id — the decision, and nothing about the child who asked or what they asked
+ * for (ADR-0009).
+ */
+export function redemptionDecided(decision: { decision: 'approved' | 'declined' }): AnalyticsEvent {
+  return { event: 'redemption_decided', properties: { decision: decision.decision } };
+}
