@@ -36,7 +36,7 @@ import {
   xpEvents,
 } from './db/schema.ts';
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Household = typeof households.$inferSelect;
 
 /** Whose rows a reconciliation recomputes, when, and whose name goes on what it writes. */

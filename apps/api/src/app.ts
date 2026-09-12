@@ -9,6 +9,7 @@ import { joinRoutes } from './join.ts';
 import { moneyLedgerRoutes } from './money-ledger.ts';
 import { parentDeviceRoutes } from './parent-devices.ts';
 import { pinRoutes } from './pin.ts';
+import { photoApprovalRoutes } from './photo-approval.ts';
 import type { RateLimit } from './rate-limit.ts';
 import { redemptionRoutes } from './redemptions.ts';
 import { revenuecatRoutes } from './revenuecat.ts';
@@ -64,6 +65,7 @@ export function createApp(
   app.route('/', todayRoutes(db));
   app.route('/', weekRoutes(db));
   app.route('/', rejectionRoutes(db));
+  app.route('/', photoApprovalRoutes(db));
   app.route('/', rewardRoutes(db));
   app.route('/', redemptionRoutes(db, analytics));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
