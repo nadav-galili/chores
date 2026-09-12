@@ -39,6 +39,7 @@ export const he: Catalog = {
       coins: 'תראו כמה מטבעות יש לכם!',
       doneMoment: 'יופי! עוד %{coins} מטבעות',
       grew: 'העץ שלכם צמח! 🌱',
+      waitingPhoto: 'מחכים שמבוגר יעיף מבט!',
     },
     big: {
       greeting: 'היי %{name}',
@@ -51,6 +52,7 @@ export const he: Catalog = {
       coins: 'המטבעות שלכם',
       doneMoment: 'עוד %{coins} מטבעות',
       grew: 'העץ שלכם צמח 🌱',
+      waitingPhoto: 'מחכים שמבוגר יעיף מבט.',
     },
   },
   coins: {

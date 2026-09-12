@@ -59,6 +59,13 @@ export default {
       "when": 1789231236454,
       "tag": "0007_bored_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789234353528,
+      "tag": "0008_photo_uploads",
+      "breakpoints": true
     }
   ]
 },
@@ -71,5 +78,6 @@ export default {
     m0005: "CREATE TABLE `analytics_state` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`opened_on` text,\n\t`completed_on` text,\n\t`grove_stage` integer\n);\n",
     m0006: "PRAGMA foreign_keys=OFF;--> statement-breakpoint\nCREATE TABLE `__new_rewards` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`household_id` text NOT NULL,\n\t`builtin_key` text,\n\t`title` text,\n\t`icon` text,\n\t`cost_coins` integer NOT NULL,\n\t`is_builtin` integer DEFAULT false NOT NULL,\n\t`active` integer DEFAULT true NOT NULL,\n\t`sort` integer DEFAULT 0 NOT NULL,\n\t`updated_at` text NOT NULL,\n\t`deleted_at` text\n);\n--> statement-breakpoint\n-- `builtin_key` is new, so it is not in the SELECT: drizzle-kit names every column of the new\n-- table on both sides, and the old one has no such column to read.\nINSERT INTO `__new_rewards`(\"id\", \"household_id\", \"title\", \"icon\", \"cost_coins\", \"is_builtin\", \"active\", \"sort\", \"updated_at\", \"deleted_at\") SELECT \"id\", \"household_id\", \"title\", \"icon\", \"cost_coins\", \"is_builtin\", \"active\", \"sort\", \"updated_at\", \"deleted_at\" FROM `rewards` WHERE \"household_id\" IS NOT NULL;--> statement-breakpoint\nDROP TABLE `rewards`;--> statement-breakpoint\nALTER TABLE `__new_rewards` RENAME TO `rewards`;--> statement-breakpoint\nPRAGMA foreign_keys=ON;",
     m0007: "ALTER TABLE `children` ADD `read_only_after` text;",
+    m0008: "CREATE TABLE `photo_uploads` (\n\t`completion_id` text PRIMARY KEY NOT NULL,\n\t`chore_id` text NOT NULL,\n\t`chore_date` text NOT NULL,\n\t`completed_at` text NOT NULL,\n\t`local_uri` text NOT NULL,\n\t`content_type` text NOT NULL,\n\t`created_at` text NOT NULL,\n\t`attempts` integer DEFAULT 0 NOT NULL,\n\t`next_attempt_at` text NOT NULL\n);\n",
   },
 };

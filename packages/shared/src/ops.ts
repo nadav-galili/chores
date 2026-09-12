@@ -12,12 +12,16 @@ import { expoPushTokenSchema } from './notification.ts';
 /**
  * A tap on a chore. The child comes from the device token, never from here. `chore_date` is what
  * the device believed at tap time; the server recomputes it from `completed_at` and may override.
+ * `photo_key` is the presign's answer echoed back (ADR-0017): the device never chooses a key, and
+ * only a `requires_photo` chore is ever completed with one — which is what writes the completion
+ * `pending_photo` instead of paying it.
  */
 export const completePayloadSchema = z.object({
   completion_id: z.string().uuid(),
   chore_id: z.string().uuid(),
   chore_date: isoDateSchema,
   completed_at: z.string().datetime({ offset: true }),
+  photo_key: z.string().min(1).max(512).optional(),
 });
 export type CompletePayload = z.infer<typeof completePayloadSchema>;
 

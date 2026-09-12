@@ -19,6 +19,18 @@ describe('kidOpSchema', () => {
     expect(kidOpSchema.safeParse(complete({})).success).toBe(true);
   });
 
+  it('accepts a complete op carrying the presigned photo key', () => {
+    const parsed = kidOpSchema.safeParse(complete({ photo_key: 'children/abc/completions/def' }));
+    expect(parsed.success).toBe(true);
+    if (parsed.success && parsed.data.type === 'complete') {
+      expect(parsed.data.payload.photo_key).toBe('children/abc/completions/def');
+    }
+  });
+
+  it('refuses a complete op with an empty photo key', () => {
+    expect(kidOpSchema.safeParse(complete({ photo_key: '' })).success).toBe(false);
+  });
+
   it('accepts an uncomplete op', () => {
     const op = { op_id: uuid7(), type: 'uncomplete', payload: { completion_id: uuid7() } };
     expect(kidOpSchema.safeParse(op).success).toBe(true);

@@ -218,11 +218,22 @@ export const redeemJoinCode = (input: RedeemJoinCodeInput) =>
 
 export type DeviceMe = { child: ChildSummary; household: HouseholdSummary };
 
+/** What the kid presign route answers: the server-chosen key and five minutes to use it. */
+export type PresignResponse = { key: string; upload_url: string; expires_in: number };
+
 /** The kid-side surface; every call carries the device token, which alone decides the child. */
 export function createDeviceApi(deviceToken: string) {
   const getToken: GetToken = () => Promise.resolve(deviceToken);
   return {
     me: () => call<DeviceMe>(getToken, '/device/me'),
     sync: (body: SyncRequest) => call<SyncResponse>(getToken, '/sync', json('POST', body)),
+    // Photo proof (ADR-0017): the device names only the completion, and the key in the answer
+    // is what the later `complete` op carries. The bytes go to R2, never through this client.
+    presign: (completion_id: string, content_type: 'image/jpeg' | 'image/png' | 'image/webp') =>
+      call<PresignResponse>(
+        getToken,
+        '/uploads/presign',
+        json('POST', { completion_id, content_type }),
+      ),
   };
 }

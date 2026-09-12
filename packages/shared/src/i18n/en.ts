@@ -48,6 +48,9 @@ export const en = {
       coins: 'Look how many coins you have!',
       doneMoment: 'Nice! Plus %{coins} coins',
       grew: 'Your tree grew! 🌱',
+      // A photo chore's done moment: the coins are waiting on a grown-up, so the card says who
+      // holds them rather than paying. Nothing here blames the child — waiting is the state.
+      waitingPhoto: 'Waiting on a grown-up to take a look!',
     },
     big: {
       greeting: 'Hi %{name}',
@@ -60,6 +63,7 @@ export const en = {
       coins: 'Your coins',
       doneMoment: 'Plus %{coins} coins',
       grew: 'Your tree grew 🌱',
+      waitingPhoto: 'Waiting on a grown-up to take a look.',
     },
   },
   // The coin display's own strings: the glyph sits where the language wants it, which is why a

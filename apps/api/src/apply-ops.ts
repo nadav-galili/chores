@@ -105,7 +105,13 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
   }
 
   if (op.type === 'complete') {
-    const { chore_id, completion_id, completed_at, chore_date: claimed } = op.payload;
+    const {
+      chore_id,
+      completion_id,
+      completed_at,
+      chore_date: claimed,
+      photo_key: photoKey,
+    } = op.payload;
     // A deleted chore still pays (docs/spec/03-sync.md); one that was never this child's does not.
     const [chore] = await tx
       .select()
@@ -180,6 +186,13 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       return reject('unknown_chore');
     }
 
+    // Photo proof (ADR-0017, M3.12): a `requires_photo` chore completed with the presigned key
+    // waits on a parent instead of paying. This is never a gate — the photo_proof entitlement
+    // gates the parent's chore upsert, never the child's tap — so a key on a chore that does not
+    // ask for one, or no key at all, keeps the existing accepted path.
+    const waitsOnPhoto = chore.requiresPhoto && typeof photoKey === 'string';
+    const doneStatus = waitsOnPhoto ? 'pending_photo' : 'done';
+    const completionStatus = waitsOnPhoto ? 'pending_photo' : 'accepted';
     await tx
       .insert(choreInstances)
       .values({
@@ -188,14 +201,14 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         childId: ctx.childId,
         householdId: ctx.householdId,
         choreDate: chore_date,
-        status: 'done',
+        status: doneStatus,
       })
       .onConflictDoNothing();
     // A redo is due again after a parent's rejection, so the child may complete it; a
     // `pending_photo` instance is waiting on a parent and is not theirs to flip.
     await tx
       .update(choreInstances)
-      .set({ status: 'done' })
+      .set({ status: doneStatus })
       .where(
         and(eq(choreInstances.id, instance_id), inArray(choreInstances.status, ['due', 'redo'])),
       );
@@ -210,7 +223,8 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         choreDate: chore_date,
         completedAt,
         deviceId: ctx.deviceId,
-        status: 'accepted',
+        photoKey: waitsOnPhoto ? photoKey : null,
+        status: completionStatus,
         createdAt: ctx.now,
       })
       .onConflictDoNothing();

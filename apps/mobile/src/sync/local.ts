@@ -15,6 +15,7 @@ import {
   daySummaries,
   growthEntries,
   ledgerEntries,
+  photoUploads,
   xpEvents,
 } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
@@ -193,6 +194,91 @@ async function completeInstance(
       },
       ctx.now,
     );
+    return paid;
+  });
+}
+
+/**
+ * The child finishes a `requires_photo` chore with a photo in hand (M3.12, ADR-0017): the
+ * completion is written `pending_photo` in the same transaction as its upload row, and no ledger
+ * or XP rows are written — the shared rules count only `accepted` completions, so reconciling
+ * here moves nothing and the day's counters do not count it. No outbox op is enqueued: the
+ * `complete` op carrying the presigned `photo_key` is queued only after the bytes reach R2
+ * (`sync/photo`), which is what holds the op until the upload succeeds and what keeps it working
+ * offline.
+ */
+export type PhotoProof = {
+  /** Where this device holds the bytes until the upload succeeds. */
+  local_uri: string;
+  /** One of the presign route's accepted image types. */
+  content_type: 'image/jpeg' | 'image/png' | 'image/webp';
+};
+
+export async function tapPhotoDone(
+  db: DeviceDb,
+  ctx: TapContext,
+  instance: { id: string; chore_id: string },
+  photo: PhotoProof,
+): Promise<number> {
+  return completePhotoInstance(db, ctx, instance, ctx.today, photo);
+}
+
+/**
+ * The child photographs a rejected photo chore again. Like `tapRedo`, it counts for the Chore
+ * Date the instance belongs to, inside the Redo Window only.
+ */
+export async function tapPhotoRedo(
+  db: DeviceDb,
+  ctx: TapContext,
+  instance: { id: string; chore_id: string; chore_date: IsoDate },
+  photo: PhotoProof,
+): Promise<number> {
+  if (!withinRedoWindow(instance.chore_date, ctx.today)) return 0;
+  return completePhotoInstance(db, ctx, instance, instance.chore_date, photo);
+}
+
+async function completePhotoInstance(
+  db: DeviceDb,
+  ctx: TapContext,
+  instance: { id: string; chore_id: string },
+  chore_date: IsoDate,
+  photo: PhotoProof,
+): Promise<number> {
+  return inTransaction(db, async () => {
+    const completion_id = uuid7();
+    const completed_at = ctx.now.toISOString();
+    await db
+      .insert(completions)
+      .values({
+        id: completion_id,
+        instance_id: instance.id,
+        chore_id: instance.chore_id,
+        child_id: ctx.childId,
+        household_id: ctx.householdId,
+        chore_date,
+        completed_at,
+        device_id: ctx.deviceId,
+        status: 'pending_photo',
+        created_at: completed_at,
+      })
+      .onConflictDoNothing();
+    await db
+      .update(choreInstances)
+      .set({ status: 'pending_photo' })
+      .where(eq(choreInstances.id, instance.id));
+    // Reconciled like any tap, and moves nothing: `pending_photo` is not a Completion yet, so
+    // the shared rules pay no earn, no bonus, no streak and no XP for it.
+    const paid = await reconcileLocal(db, ctx);
+    await db.insert(photoUploads).values({
+      completion_id,
+      chore_id: instance.chore_id,
+      chore_date,
+      completed_at,
+      local_uri: photo.local_uri,
+      content_type: photo.content_type,
+      created_at: completed_at,
+      next_attempt_at: completed_at,
+    });
     return paid;
   });
 }
