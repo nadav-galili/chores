@@ -9,7 +9,7 @@ import {
   type DeviceSession,
 } from '@chores/shared';
 import { randomInt, randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
@@ -23,7 +23,7 @@ import {
 import { parseBody } from './parse-body.ts';
 import { rateLimit, type RateLimit } from './rate-limit.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
-import { childSummaryToApi, householdSummaryToApi } from './serialize.ts';
+import { childDeviceToApi, childSummaryToApi, householdSummaryToApi } from './serialize.ts';
 
 const secureRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
 
@@ -95,6 +95,23 @@ export function joinRoutes(db: Db, redeemLimit: RateLimit, analytics: Analytics)
       }
     }
     return c.json({ error: 'code_collision' }, 503);
+  });
+
+  // Beside the DELETE, because seeing what is bound to a child and unbinding it are one story.
+  // Sibling isolation is the query's own `child_id` predicate, not a filter on the screen.
+  // Newest use first, so the tablet in the child's hands is the row a parent reads first.
+  scoped.get('/households/:householdId/children/:childId/devices', async (c) => {
+    const rows = await db
+      .select()
+      .from(childDevices)
+      .where(
+        and(
+          eq(childDevices.childId, c.req.param('childId')),
+          eq(childDevices.householdId, c.get('householdId')),
+        ),
+      )
+      .orderBy(desc(childDevices.lastSeenAt));
+    return c.json(rows.map(childDeviceToApi));
   });
 
   scoped.delete('/households/:householdId/children/:childId/devices/:deviceId', async (c) => {

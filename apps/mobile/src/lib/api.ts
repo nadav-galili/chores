@@ -1,5 +1,6 @@
 import type {
   Child,
+  ChildDevice,
   ChildInput,
   Chore,
   CreateHouseholdInput,
@@ -100,6 +101,16 @@ export function createApi(getToken: GetToken) {
       call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',
       }),
+    listChildDevices: (householdId: string, childId: string) =>
+      call<ChildDevice[]>(getToken, `/households/${householdId}/children/${childId}/devices`),
+    // Revoking is idempotent server-side, so a second tap answers with the first revocation's
+    // timestamp rather than an error. There is no un-revoke: reconnecting is a new join code.
+    revokeChildDevice: (householdId: string, childId: string, deviceId: string) =>
+      call<{ id: string; revoked_at: string }>(
+        getToken,
+        `/households/${householdId}/children/${childId}/devices/${deviceId}`,
+        { method: 'DELETE' },
+      ),
     listRewards: (householdId: string) =>
       call<Reward[]>(getToken, `/households/${householdId}/rewards`),
     // Hiding a built-in, and nothing more: a custom reward is M3's `custom_reward` gate.

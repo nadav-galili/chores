@@ -247,6 +247,7 @@ export const en = {
     petName: 'Pet name',
     reminder: 'Reminder time (HH:MM, optional)',
     showJoinCode: 'Show join code',
+    devices: 'Devices',
   },
   pin: {
     title: 'Parent PIN',
@@ -264,6 +265,26 @@ export const en = {
     failed: 'Could not get a code',
     pinRequired: 'Set a Parent PIN first: it is how kid mode ends.',
     newCode: 'New code',
+  },
+  // The devices bound to one child. A revoked device is listed as revoked rather than dropped,
+  // and reconnecting is a new join code — there is no un-revoke, because redeeming rotates the
+  // device's analytics id (ADR-0009).
+  devices: {
+    title: '%{name}’s devices',
+    hint: 'Each device here can open %{name}’s side of the app.',
+    ios: 'iPhone or iPad',
+    android: 'Android phone or tablet',
+    lastSeen: 'Last used %{time}',
+    revokedAt: 'Revoked %{time}',
+    revoke: 'Revoke',
+    cancel: 'Keep it',
+    confirmTitle: 'Revoke this device?',
+    confirmBody: 'It stops syncing straight away. To use it again, show a new join code.',
+    revoking: 'Revoking…',
+    empty: 'No device is bound to %{name} yet.',
+    showJoinCode: 'Show a join code',
+    loadFailed: 'Could not load the devices.',
+    revokeFailed: 'Could not revoke that device.',
   },
   // The reward shop. Flat rather than mode-voiced: what a button does and what a request is
   // waiting for read the same to a 7-year-old and a 10-year-old; only the section's name changes,
