@@ -1,4 +1,4 @@
-import { hashPin, verifyPin, type DeviceSession } from '@chores/shared';
+import { hashPin, verifyPin, type DeviceSession, type Household } from '@chores/shared';
 import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
@@ -46,16 +46,27 @@ const setPin = (clerkUserId: string, householdId: string, pin: string) =>
 const row = (householdId: string) =>
   db.query.households.findFirst({ where: eq(households.id, householdId) });
 
+/** The keys of a serialised object that could be carrying something about the Parent PIN. */
+const pinKeys = (value: object) =>
+  Object.keys(value)
+    .filter((key) => key.includes('pin'))
+    .sort();
+
 describe('setting the Parent PIN', () => {
   it('stores SHA-256(salt ‖ pin) with a per-household salt, never the pin', async () => {
     const { householdId } = await household('user_pin_set');
     const res = await setPin('user_pin_set', householdId, '4271');
     expect(res.status).toBe(200);
     // The answer is the household the write left behind, carrying neither the pin nor its hash.
-    const answered = await res.text();
-    expect(JSON.parse(answered)).toMatchObject({ id: householdId, name: 'Galili' });
-    expect(answered).not.toContain('4271');
-    expect(answered).not.toContain('pin_');
+    // No key of it could be carrying one either. Scanning the whole serialised answer for the
+    // digits would also be scanning the household id — a fresh uuid whose hex is allowed to
+    // contain them — so the id is checked by equality and the rest is scanned.
+    const answered = (await res.json()) as Household;
+    expect(pinKeys(answered)).toEqual([]);
+    const { id, ...rest } = answered;
+    expect(id).toBe(householdId);
+    expect(rest).toMatchObject({ name: 'Galili' });
+    expect(JSON.stringify(rest)).not.toContain('4271');
 
     const saved = await row(householdId);
     expect(saved!.pinSalt).toMatch(/^[0-9a-f]{32}$/);
@@ -142,11 +153,7 @@ describe('the pin reaches the kid device', () => {
     // would also be scanning a fresh 32-character salt that is allowed to contain them, so what
     // is asserted is the shape: the household carries the hash and the salt, and no other key
     // that could hold a pin.
-    expect(
-      Object.keys(session.household)
-        .filter((key) => key.includes('pin'))
-        .sort(),
-    ).toEqual(['pin_hash', 'pin_salt']);
+    expect(pinKeys(session.household)).toEqual(['pin_hash', 'pin_salt']);
 
     const refreshed = await me(session);
     expect(refreshed.household.pin_hash).toBe(session.household.pin_hash);
