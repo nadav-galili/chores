@@ -12,6 +12,7 @@ import type { Db } from './db/client.ts';
 import { choreInstances } from './db/schema.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
+import { setTestPin } from './test/household.ts';
 
 let db: Db;
 let app: ReturnType<typeof createApp>;
@@ -38,6 +39,7 @@ async function setup(clerkUserId: string) {
     }),
   );
   const { household } = (await res.json()) as { household: { id: string } };
+  await setTestPin(app, clerkUserId, household.id);
   const joined: { id: string; session: DeviceSession }[] = [];
   for (const first_name of ['Noa', 'Ori']) {
     const c = await app.request(

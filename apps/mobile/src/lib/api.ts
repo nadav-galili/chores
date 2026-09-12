@@ -81,6 +81,8 @@ export function createApi(getToken: GetToken) {
       ),
     inviteParent: (householdId: string, email: string) =>
       call<ParentInvite>(getToken, `/households/${householdId}/parents`, json('POST', { email })),
+    setPin: (householdId: string, pin: string) =>
+      call<{ pin_set: boolean }>(getToken, `/households/${householdId}/pin`, json('PUT', { pin })),
     issueJoinCode: (householdId: string, childId: string) =>
       call<IssuedJoinCode>(getToken, `/households/${householdId}/children/${childId}/join-code`, {
         method: 'POST',

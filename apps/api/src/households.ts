@@ -3,10 +3,13 @@ import {
   canDo,
   childInputSchema,
   createHouseholdInputSchema,
+  hashPin,
   householdCreated,
   parentInviteInputSchema,
+  setPinInputSchema,
   uuid7,
 } from '@chores/shared';
+import { randomBytes } from 'node:crypto';
 import { and, asc, count, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Analytics } from './analytics.ts';
@@ -250,6 +253,21 @@ export function householdRoutes(db: Db, analytics: Analytics) {
       .values({ email, householdId, invitedBy: c.get('parentId') })
       .returning();
     return c.json(parentInviteToApi(row!), 201);
+  });
+
+  /**
+   * Set or replace the household's Parent PIN. Any signed-in parent may: a Clerk session outranks
+   * the PIN, so there is no old-PIN challenge to fail (ADR-0013). A replacement gets a new salt.
+   */
+  scoped.put('/households/:householdId/pin', async (c) => {
+    const body = await parseBody(c, setPinInputSchema);
+    if (!body.ok) return body.response;
+    const salt = randomBytes(16).toString('hex');
+    await db
+      .update(households)
+      .set({ pinSalt: salt, pinHash: hashPin(salt, body.data.pin) })
+      .where(eq(households.id, c.get('householdId')));
+    return c.json({ pin_set: true });
   });
 
   app.route('/', scoped);

@@ -50,6 +50,9 @@ export const households = pgTable('households', {
   coinsPerUnit: integer('coins_per_unit').notNull().default(10),
   entitlement: entitlementEnum('entitlement').notNull().default('free'),
   entitlementSource: text('entitlement_source'),
+  /** The Parent PIN: `SHA-256(salt ‖ pin)` and a per-household salt. Null until a parent sets one (ADR-0013). */
+  pinHash: text('pin_hash'),
+  pinSalt: text('pin_salt'),
   createdAt: timestamptz('created_at').notNull().defaultNow(),
 });
 
@@ -64,7 +67,6 @@ export const parents = pgTable(
     /** Lower-cased; from the Clerk token. Null when the token carried no email claim. */
     email: text('email'),
     displayName: text('display_name'),
-    pinHash: text('pin_hash'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
   },
   (t) => [index('parents_email').on(t.email)],

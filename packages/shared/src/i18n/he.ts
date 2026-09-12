@@ -150,6 +150,7 @@ export const he: Catalog = {
       children: 'ילדים',
       chores: 'מטלות',
       partner: 'הוספת בן/בת זוג',
+      pin: 'קוד הורה',
       signOut: 'התנתקות',
     },
   },
@@ -217,6 +218,14 @@ export const he: Catalog = {
     reminder: 'שעת תזכורת (HH:MM, לא חובה)',
     showJoinCode: 'הצגת קוד הצטרפות',
   },
+  pin: {
+    title: 'קוד הורה',
+    hint: 'ארבע ספרות. יציאה ממצב ילד אפשרית רק עם הקוד הזה, אז הגדירו אותו לפני שמכשיר מצטרף.',
+    label: 'קוד',
+    save: 'שמירת הקוד',
+    saved: 'הקוד נשמר',
+    failed: 'לא הצלחנו לשמור את הקוד',
+  },
   joinCode: {
     title: 'קוד ההצטרפות של %{name}',
     hint: 'במכשיר של %{name}, בחרו "ילד/ה" והקלידו את הקוד.',
@@ -224,6 +233,7 @@ export const he: Catalog = {
     expiresIn: 'פג בעוד %{time}',
     getting: 'מביאים קוד…',
     failed: 'לא הצלחנו לקבל קוד',
+    pinRequired: 'קודם הגדירו קוד הורה: זו הדרך לצאת ממצב ילד.',
     newCode: 'קוד חדש',
   },
   rewards: {

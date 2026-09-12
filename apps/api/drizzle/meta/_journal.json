@@ -64,6 +64,13 @@
       "when": 1789146566957,
       "tag": "0008_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789201245356,
+      "tag": "0009_household_pin",
+      "breakpoints": true
     }
   ]
 }

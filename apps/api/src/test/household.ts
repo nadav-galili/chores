@@ -7,6 +7,14 @@ import { asParent } from './auth.ts';
 type App = ReturnType<typeof createApp>;
 
 export const TEST_TZ = 'Asia/Jerusalem';
+export const TEST_PIN = '1234';
+
+/** No PIN, no join code (ADR-0013), so every fixture sets one before it issues a code. */
+export const setTestPin = (app: App, clerkUserId: string, householdId: string) =>
+  app.request(
+    `/households/${householdId}/pin`,
+    asParent(clerkUserId, { method: 'PUT', body: JSON.stringify({ pin: TEST_PIN }) }),
+  );
 export const testToday = () => choreDate(new Date(), TEST_TZ, 0);
 
 /** A household with two children on kid devices, plus helpers to write chores as the parent. */
@@ -19,6 +27,7 @@ export async function setupHousehold(app: App, clerkUserId: string) {
     }),
   );
   const { household } = (await res.json()) as { household: { id: string } };
+  await setTestPin(app, clerkUserId, household.id);
   const joined: { id: string; session: DeviceSession }[] = [];
   for (const first_name of ['Noa', 'Ori']) {
     const c = await app.request(

@@ -154,6 +154,7 @@ export const en = {
       children: 'Children',
       chores: 'Chores',
       partner: 'Add a partner',
+      pin: 'Parent PIN',
       signOut: 'Sign out',
     },
   },
@@ -221,6 +222,14 @@ export const en = {
     reminder: 'Reminder time (HH:MM, optional)',
     showJoinCode: 'Show join code',
   },
+  pin: {
+    title: 'Parent PIN',
+    hint: 'Four digits. Kid mode ends only with this PIN, so set one before a device joins.',
+    label: 'PIN',
+    save: 'Save PIN',
+    saved: 'PIN saved',
+    failed: 'Could not save the PIN',
+  },
   joinCode: {
     title: '%{name}’s join code',
     hint: 'On %{name}’s device, choose Kid and type this code.',
@@ -228,6 +237,7 @@ export const en = {
     expiresIn: 'Expires in %{time}',
     getting: 'Getting a code…',
     failed: 'Could not get a code',
+    pinRequired: 'Set a Parent PIN first: it is how kid mode ends.',
     newCode: 'New code',
   },
   // Built-in reward titles, keyed by `builtin_key` verbatim (packages/shared/src/reward.ts): the
