@@ -39,13 +39,14 @@ export function openedNotificationKind(data: unknown): NotificationKind | null {
  * allowlist and the matched constant is what is navigated to; nothing off a payload is ever
  * interpolated into a route.
  */
-export const NOTIFICATION_PATHS = ['/(parent)', '/(kid)/shop'] as const;
+export const NOTIFICATION_PATHS = ['/(parent)', '/(kid)', '/(kid)/shop'] as const;
 export type NotificationPath = (typeof NOTIFICATION_PATHS)[number];
 const notificationPathSchema = z.enum(NOTIFICATION_PATHS);
 
 /** Which side of the app a path belongs to: a device is one role, and only routes to its own. */
 const PATH_AUDIENCE: Readonly<Record<NotificationPath, 'parent' | 'kid'>> = {
   '/(parent)': 'parent',
+  '/(kid)': 'kid',
   '/(kid)/shop': 'kid',
 };
 

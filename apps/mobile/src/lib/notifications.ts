@@ -3,6 +3,7 @@ import {
   localTimeFor,
   openedNotificationDestination,
   openedNotificationKind,
+  type NotificationPath,
   type ParentDeviceInput,
 } from '@chores/shared';
 import Constants from 'expo-constants';
@@ -63,7 +64,13 @@ const localReminder =
     const { hour, minute } = localTimeFor(time, tz);
     await Notifications.scheduleNotificationAsync({
       identifier: REMINDER_ID,
-      content: kidReminderCopy(locale),
+      // The same payload the server's push carries (#57), because this is the same notification:
+      // a child whose token the server does not hold gets nudged by this one instead, and their
+      // tap has to report the same kind and land in the same place as everyone else's.
+      content: {
+        ...kidReminderCopy(locale),
+        data: { kind: 'kid_reminder', path: '/(kid)' satisfies NotificationPath },
+      },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         channelId: CHANNEL_ID,
@@ -157,7 +164,8 @@ export function watchOpenedNotifications(): () => void {
 
 /**
  * Takes a tapped notification to the thing it was about (#51, and story 34 of #37): the parent's
- * day with the request that is waiting named, the child's shop for the reward that was approved.
+ * day with the request that is waiting named, the child's shop for the reward that was approved,
+ * the child's own list for the reminder that there is still something on it (#57).
  *
  * Separate from `watchOpenedNotifications` on purpose. That one reports the kind and may learn
  * nothing else — its allowlist is what keeps the ids beside the kind out of PostHog (ADR-0009) —
@@ -192,6 +200,9 @@ export function useNotificationTapRouting(audience: 'parent' | 'kid'): void {
     switch (destination.path) {
       case '/(parent)':
         router.navigate({ pathname: '/(parent)', params: destination.params });
+        return;
+      case '/(kid)':
+        router.navigate('/(kid)');
         return;
       case '/(kid)/shop':
         router.navigate('/(kid)/shop');

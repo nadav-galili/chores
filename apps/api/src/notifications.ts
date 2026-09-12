@@ -151,7 +151,16 @@ export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Da
   const message: PushMessage = {
     to: device.token,
     ...kidReminderCopy(device.locale),
-    data: { child_id: due.child_id, chore_date: due.chore_date },
+    // Ids the app resolves for itself after it pulls, never state (#37). The kind is what a tap
+    // reports to analytics (#54, ADR-0009) — this is the app's highest-volume notification, and
+    // without it its open rate could not be measured at all — and the path is where that tap
+    // lands: the child's own list, which is the thing the reminder is about.
+    data: {
+      kind: 'kid_reminder',
+      child_id: due.child_id,
+      chore_date: due.chore_date,
+      path: '/(kid)' satisfies NotificationPath,
+    },
   };
   const results = await push.send([message]);
   const forgotten = await recordSends(

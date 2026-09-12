@@ -301,8 +301,27 @@ describe('kid reminder', () => {
 
     await runTick(db, push.push, at('2026-09-09T13:00:10Z')); // 16:00 in Jerusalem
     expect(push.sent).toEqual([
-      expect.objectContaining({ to: TOKEN, data: { child_id: childId, chore_date: '2026-09-09' } }),
+      {
+        to: TOKEN,
+        ...kidReminderCopy('en'),
+        // Ids the app resolves after it pulls, the kind a tap reports (#54, ADR-0009), and the
+        // path it lands on: the child's own list, which is what the reminder is about.
+        data: {
+          kind: 'kid_reminder',
+          child_id: childId,
+          chore_date: '2026-09-09',
+          path: '/(kid)',
+        },
+      },
     ]);
+    // The highest-volume notification in the app is now the one we can say something about: a
+    // tap on it reports its kind, and takes the child to their list.
+    expect(openedNotificationKind(push.sent[0]!.data)).toBe('kid_reminder');
+    expect(openedNotificationDestination(push.sent[0]!.data)).toEqual({
+      path: '/(kid)',
+      audience: 'kid',
+      params: {},
+    });
     const row = await reminderRow(childId, '2026-09-09');
     expect(row).toMatchObject({
       kind: 'kid_reminder',

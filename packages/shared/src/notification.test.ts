@@ -151,6 +151,17 @@ describe('openedNotificationDestination', () => {
     ).toEqual({ path: '/(kid)/shop', audience: 'kid', params: { redemption } });
   });
 
+  it('takes a reminder to the child\u2019s own list, which is what it is about', () => {
+    expect(
+      openedNotificationDestination({
+        kind: 'kid_reminder',
+        child_id: noa,
+        chore_date: '2026-03-01',
+        path: '/(kid)',
+      }),
+    ).toEqual({ path: '/(kid)', audience: 'kid', params: {} });
+  });
+
   it('takes a digest to the parent\u2019s day, which is the day it is about', () => {
     expect(
       openedNotificationDestination({
