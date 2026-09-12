@@ -3,6 +3,7 @@ import {
   expoPushTokenSchema,
   notificationId,
   notificationKindSchema,
+  openedNotificationKind,
   notificationTargetSchema,
   parentDeviceId,
   parentDeviceInputSchema,
@@ -93,5 +94,28 @@ describe('parentDeviceInputSchema', () => {
       { expo_push_token: 'ExponentPushToken[a]', platform: 'ios' },
     ];
     for (const input of bad) expect(parentDeviceInputSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('openedNotificationKind', () => {
+  it('reads back the kind of every notification this app sends', () => {
+    for (const kind of notificationKindSchema.options) {
+      expect(openedNotificationKind({ kind })).toBe(kind);
+    }
+  });
+
+  it('takes the kind and leaves the rest of the payload where it is (ADR-0009)', () => {
+    const tapped = {
+      kind: 'redemption_requested',
+      redemption_id: 'cccccccc-0000-4000-8000-000000000001',
+      child_first_name: 'Noa',
+    };
+    expect(openedNotificationKind(tapped)).toBe('redemption_requested');
+  });
+
+  it('is nothing at all for a payload that names no kind of ours', () => {
+    for (const data of [undefined, null, {}, 'kid_reminder', { kind: 'something_later' }]) {
+      expect(openedNotificationKind(data)).toBeNull();
+    }
   });
 });

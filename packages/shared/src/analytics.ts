@@ -1,6 +1,7 @@
 import type { UiMode } from './child.ts';
 import type { DevicePlatform } from './join-code.ts';
 import type { ChoreKind } from './materialize.ts';
+import type { NotificationKind } from './notification.ts';
 import type { BuiltinRewardKey } from './reward.ts';
 import { uuid5 } from './uuid5.ts';
 
@@ -162,4 +163,15 @@ export function rewardRequested(reward: {
  */
 export function redemptionDecided(decision: { decision: 'approved' | 'declined' }): AnalyticsEvent {
   return { event: 'redemption_decided', properties: { decision: decision.decision } };
+}
+
+/**
+ * A notification was tapped. What M2 asks is the digest's open rate (docs/spec/01-product.md), and
+ * one event answers it for every kind this app sends — the three M2 added included — because the
+ * kind is the whole of what it carries: a `NotificationKind` is a catalog constant, so this says
+ * what the push was about and nothing about the child it was about (ADR-0009). The ids a push
+ * carries so a tap can land on the right screen stay on the device.
+ */
+export function pushOpened(open: { kind: NotificationKind }): AnalyticsEvent {
+  return { event: 'push_opened', properties: { kind: open.kind } };
 }
