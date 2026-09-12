@@ -101,6 +101,7 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
         ListFooterComponent={
           <View style={styles.footer}>
             {today.status === 'ready' && <RedoSection today={today} />}
+            <ShopStrip today={today} onPress={() => router.push('/(kid)/shop')} />
             {today.grove.enabled && (
               <GroveStrip today={today} onPress={() => router.push('/(kid)/grove')} />
             )}
@@ -305,6 +306,27 @@ function Head({ today, onPet }: { today: Today; onPet: () => void }) {
         </Pressable>
       )}
     </View>
+  );
+}
+
+/**
+ * The way into the reward shop, and the answer to what the coins in the header are for. It sits
+ * below the chores and above the grove because that is the order of the loop: do the thing, spend
+ * what it paid, watch what it grew.
+ *
+ * It shows the balance again rather than a count of what is affordable: what a child can buy is
+ * the shop's own question, and asking it here would put the same list on two screens.
+ */
+function ShopStrip({ today, onPress }: { today: Today; onPress: () => void }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  return (
+    <Card onPress={onPress} accessibilityLabel={t(`kid.${mode}.shop`)}>
+      <Text style={styles.sectionTitle}>{t(`kid.${mode}.shop`)}</Text>
+      <View style={styles.hero}>
+        <Coins amount={today.coins} step="heading" />
+      </View>
+    </Card>
   );
 }
 

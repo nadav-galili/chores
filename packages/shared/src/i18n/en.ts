@@ -44,6 +44,7 @@ export const en = {
       redo: 'Do these again!',
       redoEmpty: 'Nothing to do again. Great!',
       grove: 'Your grove is growing!',
+      shop: 'Spend your coins!',
       coins: 'Look how many coins you have!',
       doneMoment: 'Nice! Plus %{coins} coins',
       grew: 'Your tree grew! 🌱',
@@ -55,6 +56,7 @@ export const en = {
       redo: 'Do again',
       redoEmpty: 'Nothing to do again.',
       grove: 'Your grove',
+      shop: 'Reward shop',
       coins: 'Your coins',
       doneMoment: 'Plus %{coins} coins',
       grew: 'Your tree grew 🌱',
@@ -240,6 +242,22 @@ export const en = {
     failed: 'Could not get a code',
     pinRequired: 'Set a Parent PIN first: it is how kid mode ends.',
     newCode: 'New code',
+  },
+  // The reward shop. Flat rather than mode-voiced: what a button does and what a request is
+  // waiting for read the same to a 7-year-old and a 10-year-old; only the section's name changes,
+  // and that one lives under `kid.little` / `kid.big` with the rest of the voice.
+  shop: {
+    back: 'Today',
+    title: 'Reward shop',
+    yours: 'Yours to spend',
+    ask: 'Ask',
+    cantAfford: 'Not enough coins yet',
+    waiting: 'Waiting for a parent',
+    cancel: 'Change my mind',
+    empty: 'Nothing to spend coins on yet.',
+    requests: 'What you asked for',
+    approved: 'Yes — go and get it',
+    declined: 'Not this time',
   },
   // Built-in reward titles, keyed by `builtin_key` verbatim (packages/shared/src/reward.ts): the
   // seeded row carries the key and no title, so the shop renders its name in the reader's own
