@@ -1,4 +1,4 @@
-import type { BuiltinRewardKey, DeviceSession, RedemptionStatus } from '@chores/shared';
+import type { DeviceSession, RedemptionStatus } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -7,6 +7,7 @@ import { wipeDeviceDb } from '@/db/client';
 import { shutdownAnalytics } from '@/lib/analytics';
 import { useDeviceSession, type DeviceSessionValue } from '@/lib/device-session';
 import { BACK_ARROW, t, type TranslationKey } from '@/lib/i18n';
+import { rewardTitle } from '@/lib/reward-title';
 import { clearRole } from '@/lib/role';
 import { useShop, type Shop } from '@/lib/use-shop';
 import { useTheme, useThemedStyles, type Theme } from '@/theme';
@@ -142,21 +143,6 @@ function Requests({ shop }: { shop: Shop }) {
 
 /** Placeholder art, swapped for drawn assets with the rest of it. */
 const REWARD_GLYPH = '🎁';
-
-/**
- * A built-in's name, in the reader's language. The seeded row carries the key and no title
- * (packages/shared/src/reward.ts), so the household is never stuck in the language it was
- * created in; a custom reward, when M3 has them, carries the words a parent wrote.
- */
-const BUILTIN_TITLES = {
-  snack: 'rewards.builtin.snack',
-  screen_time: 'rewards.builtin.screen_time',
-  friday_dinner: 'rewards.builtin.friday_dinner',
-} as const satisfies Record<BuiltinRewardKey, TranslationKey>;
-
-function rewardTitle(reward: { builtin_key: BuiltinRewardKey | null; title: string | null }) {
-  return reward.builtin_key ? t(BUILTIN_TITLES[reward.builtin_key]) : (reward.title ?? '');
-}
 
 /** A cancelled request is never drawn, so there is no line for one. */
 const STATUS_LINE = {

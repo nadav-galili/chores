@@ -1,6 +1,5 @@
 import { useAuth } from '@clerk/expo';
 import type {
-  BuiltinRewardKey,
   DecideRedemptionResult,
   ParentTodayChild,
   ParentTodayItem,
@@ -25,6 +24,7 @@ import {
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
+import { rewardTitle } from '@/lib/reward-title';
 import { useParentToday } from '@/lib/use-parent-today';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -77,19 +77,6 @@ function ChoreLine({
     </View>
   );
 }
-
-/**
- * A built-in reward has no title of its own — the seeded row carries its key — so the parent
- * reads its name in their own language, the same string the child tapped in theirs.
- */
-const BUILTIN_TITLE: Record<BuiltinRewardKey, TranslationKey> = {
-  snack: 'rewards.builtin.snack',
-  screen_time: 'rewards.builtin.screen_time',
-  friday_dinner: 'rewards.builtin.friday_dinner',
-};
-
-const rewardTitle = (r: ParentTodayRedemption) =>
-  r.title ?? (r.builtin_key ? t(BUILTIN_TITLE[r.builtin_key]) : '');
 
 /** What each answer reads as. Neither `already_` answer is a failure: it is news, and the
  * refresh behind it puts the screen back in step with what actually happened. */

@@ -125,8 +125,9 @@ export const en = {
     unlock: 'Continue',
     wrongPin: 'That PIN is not right. Have another go.',
     cooldown: 'That is enough tries for now. Try again in %{seconds}s.',
+    noPinTitle: 'Not yet',
     noPin:
-      'This device has not got the PIN yet. Connect it to the internet and open the app again.',
+      'The PIN has not reached this device yet. It arrives with the next sync, so this device needs to be online once — then kid mode ends here with the PIN.',
     title: 'Leave kid mode?',
     body: 'This device will forget %{name} and switch to parent mode. Show a new join code to connect it again.',
     theChild: 'the child',
@@ -252,7 +253,6 @@ export const en = {
     hint: 'Four digits. Kid mode ends only with this PIN, so set one before a device joins.',
     label: 'PIN',
     save: 'Save PIN',
-    saved: 'PIN saved',
     failed: 'Could not save the PIN',
   },
   joinCode: {
@@ -270,7 +270,6 @@ export const en = {
   // and that one lives under `kid.little` / `kid.big` with the rest of the voice.
   shop: {
     back: 'Today',
-    title: 'Reward shop',
     yours: 'Yours to spend',
     ask: 'Ask',
     cantAfford: 'Not enough coins yet',

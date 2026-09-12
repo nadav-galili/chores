@@ -13,13 +13,13 @@ import {
   withinRedoWindow,
   type IsoDate,
   type KidOpType,
-  type LedgerEntry,
   type RejectReason,
   type SyncOp,
   type SyncResponse,
 } from '@chores/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
+import { ledgerRow } from './ledger-row.ts';
 import {
   appliedOps,
   childDevices,
@@ -74,20 +74,6 @@ export type ApplyOpsResult = {
 const RECONCILED_OP_TYPES: ReadonlySet<KidOpType> = new Set<KidOpType>(['complete', 'uncomplete']);
 
 const reject = (reason: RejectReason): StoredResult => ({ status: 'rejected', reason });
-
-/** One shared entry as a row of this database. No XP mirrors a redemption's coins (ADR-0004). */
-export const ledgerRow = (e: LedgerEntry, now: Date) => ({
-  id: e.id,
-  householdId: e.household_id,
-  childId: e.child_id,
-  kind: e.kind,
-  coins: e.coins,
-  moneyAmount: e.money_amount,
-  refType: e.ref_type,
-  refId: e.ref_id,
-  createdAt: now,
-  createdBy: e.created_by,
-});
 
 const ack = (date_adjusted = false): StoredResult =>
   date_adjusted ? { status: 'acked', date_adjusted: true } : { status: 'acked' };

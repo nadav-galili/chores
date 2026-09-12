@@ -51,7 +51,11 @@ describe('setting the Parent PIN', () => {
     const { householdId } = await household('user_pin_set');
     const res = await setPin('user_pin_set', householdId, '4271');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ pin_set: true });
+    // The answer is the household the write left behind, carrying neither the pin nor its hash.
+    const answered = await res.text();
+    expect(JSON.parse(answered)).toMatchObject({ id: householdId, name: 'Galili' });
+    expect(answered).not.toContain('4271');
+    expect(answered).not.toContain('pin_');
 
     const saved = await row(householdId);
     expect(saved!.pinSalt).toMatch(/^[0-9a-f]{32}$/);
