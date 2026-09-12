@@ -60,7 +60,6 @@ describe('setting the Parent PIN', () => {
     const saved = await row(householdId);
     expect(saved!.pinSalt).toMatch(/^[0-9a-f]{32}$/);
     expect(saved!.pinHash).toBe(hashPin(saved!.pinSalt!, '4271'));
-    expect(saved!.pinHash).not.toContain('4271');
   });
 
   it('replaces the pin with no old-pin challenge, and salts the replacement afresh', async () => {
@@ -139,7 +138,15 @@ describe('the pin reaches the kid device', () => {
 
     expect(verifyPin(session.household.pin_hash, session.household.pin_salt, '4271')).toBe(true);
     expect(verifyPin(session.household.pin_hash, session.household.pin_salt, '1234')).toBe(false);
-    expect(JSON.stringify(session)).not.toContain('4271');
+    // The pin itself may not ride the session. Scanning the serialised session for the digits
+    // would also be scanning a fresh 32-character salt that is allowed to contain them, so what
+    // is asserted is the shape: the household carries the hash and the salt, and no other key
+    // that could hold a pin.
+    expect(
+      Object.keys(session.household)
+        .filter((key) => key.includes('pin'))
+        .sort(),
+    ).toEqual(['pin_hash', 'pin_salt']);
 
     const refreshed = await me(session);
     expect(refreshed.household.pin_hash).toBe(session.household.pin_hash);

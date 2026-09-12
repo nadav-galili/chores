@@ -1,11 +1,14 @@
 import {
   kidReminderCopy,
   localTimeFor,
+  openedNotificationDestination,
   openedNotificationKind,
   type ParentDeviceInput,
 } from '@chores/shared';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { capturePushOpened } from '@/lib/analytics';
 import { locale, t } from '@/lib/i18n';
@@ -150,4 +153,49 @@ export function watchOpenedNotifications(): () => void {
     if (kind) capturePushOpened(kind);
   });
   return () => subscription.remove();
+}
+
+/**
+ * Takes a tapped notification to the thing it was about (#51, and story 34 of #37): the parent's
+ * day with the request that is waiting named, the child's shop for the reward that was approved.
+ *
+ * Separate from `watchOpenedNotifications` on purpose. That one reports the kind and may learn
+ * nothing else — its allowlist is what keeps the ids beside the kind out of PostHog (ADR-0009) —
+ * and this one needs those ids. Two readers of one payload, each taking only what it is allowed.
+ *
+ * `useLastNotificationResponse` rather than a listener, because a tap is usually what launched
+ * the app: on a cold start the response is already waiting before anything mounts, which a
+ * response listener added afterwards would miss entirely. It covers the warm tap too, so there is
+ * one path and not two.
+ *
+ * Called from inside each role's group, not from the root layout: the root renders `/` first,
+ * whose redirect to the role's home lands after a root effect would have navigated and would
+ * carry the tap straight back off its destination. By the time a role's gate is mounted that
+ * redirect has already happened. Each group takes only its own audience, so a payload for the
+ * other side of the app routes nowhere.
+ */
+export function useNotificationTapRouting(audience: 'parent' | 'kid'): void {
+  const router = useRouter();
+  const response = Notifications.useLastNotificationResponse();
+  useEffect(() => {
+    if (!response) return;
+    const destination = openedNotificationDestination(response.notification.request.content.data);
+    if (!destination || destination.audience !== audience) return;
+    // Handled, and cleared so it is handled once: the response outlives the screen it opened,
+    // and a gate that remounts later — a parent signing out and back in — would otherwise be
+    // carried off to a request they dealt with hours ago. Only this reader is cleared; the
+    // analytics listener above counted the tap when it arrived.
+    Notifications.clearLastNotificationResponse();
+    // A switch over the allowlist, so what is navigated to is one of this file's own literals.
+    // Nothing off the payload is interpolated into a route: the only thing that crosses is a
+    // uuid the destination already validated, as a parameter. Routing writes nothing (#51).
+    switch (destination.path) {
+      case '/(parent)':
+        router.navigate({ pathname: '/(parent)', params: destination.params });
+        return;
+      case '/(kid)/shop':
+        router.navigate('/(kid)/shop');
+        return;
+    }
+  }, [audience, response, router]);
 }

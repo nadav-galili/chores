@@ -32,6 +32,54 @@ export function openedNotificationKind(data: unknown): NotificationKind | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Where a tap may land, and nowhere else. The server writes one of these into a push's `path`
+ * and the device reads it back — one list, so the two cannot drift into a route that does not
+ * exist. A payload is untrusted input from outside the app, so the path is matched against this
+ * allowlist and the matched constant is what is navigated to; nothing off a payload is ever
+ * interpolated into a route.
+ */
+export const NOTIFICATION_PATHS = ['/(parent)', '/(kid)/shop'] as const;
+export type NotificationPath = (typeof NOTIFICATION_PATHS)[number];
+const notificationPathSchema = z.enum(NOTIFICATION_PATHS);
+
+/** Which side of the app a path belongs to: a device is one role, and only routes to its own. */
+const PATH_AUDIENCE: Readonly<Record<NotificationPath, 'parent' | 'kid'>> = {
+  '/(parent)': 'parent',
+  '/(kid)/shop': 'kid',
+};
+
+export type NotificationDestination = {
+  path: NotificationPath;
+  audience: 'parent' | 'kid';
+  /**
+   * Which of the things on that screen the tap was about. Ids only, each one validated as a uuid
+   * before it is passed on — a route parameter is the one place payload text could otherwise
+   * reach navigation.
+   */
+  params: { redemption?: string };
+};
+
+/**
+ * Where a tapped notification should land, read off its own payload the same way the kind is: as
+ * an allowlist. A payload naming a path this build does not have — an older or a newer server —
+ * routes nowhere, which is exactly what tapping did before any of this existed.
+ *
+ * Routing is not a write: nothing read here reaches the local database (#51). The ids it does
+ * take go into the route and are resolved against what the device pulls for itself.
+ */
+export function openedNotificationDestination(data: unknown): NotificationDestination | null {
+  const payload = (data ?? {}) as Record<string, unknown>;
+  const path = notificationPathSchema.safeParse(payload.path);
+  if (!path.success) return null;
+  const redemption = z.string().uuid().safeParse(payload.redemption_id);
+  return {
+    path: path.data,
+    audience: PATH_AUDIENCE[path.data],
+    params: redemption.success ? { redemption: redemption.data } : {},
+  };
+}
+
 export const notificationTargetSchema = z.enum(['parent_device', 'child_device']);
 export type NotificationTarget = z.infer<typeof notificationTargetSchema>;
 
@@ -97,9 +145,12 @@ export function kidReminderCopy(locale: Locale): { title: string; body: string }
 /**
  * The two immediate kinds' words. A redemption request is the one interrupt this app sends a
  * parent, because it is the only thing that leaves a child waiting on them; an approval is told
- * to the child straight away. Neither names the child or the reward: a push goes through Expo,
- * and nothing about a child crosses to a third party (ADR-0009). Which child it was is in the
- * push's data, as an id the app resolves after it pulls.
+ * to the child straight away. Neither of these two names the child or the reward: they take no
+ * arguments at all, which is what keeps them nameless rather than a rule to remember. Which child
+ * it was is in the push's data, as an id the app resolves after it pulls.
+ *
+ * This says nothing about the digest below, which does name children under the carve-out in
+ * CODING_STANDARDS and ADR-0009.
  */
 const REDEMPTION_REQUESTED_COPY: Readonly<Record<Locale, { title: string; body: string }>> = {
   en: { title: 'A reward was asked for', body: 'Tap to decide.' },
@@ -183,6 +234,13 @@ const DIGEST_COPY: Readonly<Record<Locale, DigestWords>> = {
 /**
  * The digest as one parent reads it, in the locale their device registered. Lines rather than a
  * run-on sentence, so a household with three children is still scannable on a lock screen.
+ *
+ * This is the one place child data crosses to a third party, and it is a carve-out written down
+ * rather than an oversight: the digest says who is done and who is not, so a first name is what
+ * makes it readable at all, and a lock screen naming nobody is useless to a parent of three. The
+ * carve-out is exactly this — first names only, in copy addressed to a registered device of a
+ * parent of that child's own household — and it is stated in CODING_STANDARDS (Child privacy)
+ * and ADR-0009. It widens nothing about analytics: a child is still anonymous there.
  */
 export function digestCopy(
   locale: Locale,

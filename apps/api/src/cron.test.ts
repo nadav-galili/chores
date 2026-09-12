@@ -6,6 +6,8 @@ import {
   digestCopy,
   kidReminderCopy,
   notificationId,
+  openedNotificationDestination,
+  openedNotificationKind,
   parentDeviceId,
   uuid7,
   type DeviceSession,
@@ -457,9 +459,19 @@ describe('evening digest', () => {
           children: [{ first_name: 'Noa', due_count: 2, done_count: 1 }],
           undecided_redemptions: 0,
         }),
-        data: { chore_date: '2026-09-09' },
+        // The kind is what a tap reports (#54, ADR-0009) and the path is where it lands: the
+        // parent's own day, which is the Chore Date this digest is about.
+        data: { kind: 'parent_digest', chore_date: '2026-09-09', path: '/(parent)' },
       },
     ]);
+    // A tap on it reports its kind, and takes the parent to that day — neither of which the
+    // digest could do while its payload named no kind and no path at all.
+    expect(openedNotificationKind(push.sent[0]!.data)).toBe('parent_digest');
+    expect(openedNotificationDestination(push.sent[0]!.data)).toEqual({
+      path: '/(parent)',
+      audience: 'parent',
+      params: {},
+    });
     // What the parent reads counts what is done, and never says the day was not finished.
     expect(push.sent[0]!.body).toContain('1/2 done');
     expect(push.sent[0]!.body.toLowerCase()).not.toContain('did not');
@@ -601,7 +613,8 @@ describe('evening digest', () => {
     expect(result.announced).toEqual([
       { kind: 'redemption_requested', redemption_id: redemptionId, subject_id: parentId },
     ]);
-    const digests = push.sent.filter((m) => !('kind' in (m.data ?? {})));
+    // Both pushes name their kind, so that is what tells the evening from the interrupt.
+    const digests = push.sent.filter((m) => m.data?.['kind'] === 'parent_digest');
     expect(digests).toEqual([
       {
         to: token,
@@ -609,7 +622,7 @@ describe('evening digest', () => {
           children: [{ first_name: 'Noa', due_count: 0, done_count: 0 }],
           undecided_redemptions: 1,
         }),
-        data: { chore_date: '2026-09-09' },
+        data: { kind: 'parent_digest', chore_date: '2026-09-09', path: '/(parent)' },
       },
     ]);
     expect(digests[0]!.body).toContain('1 reward is waiting for you');

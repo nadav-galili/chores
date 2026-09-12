@@ -6,6 +6,7 @@ import {
   isDayComplete,
   notificationId,
   notificationKindSchema,
+  openedNotificationDestination,
   openedNotificationKind,
   notificationTargetSchema,
   parentDeviceId,
@@ -122,6 +123,64 @@ describe('openedNotificationKind', () => {
   it('is nothing at all for a payload that names no kind of ours', () => {
     for (const data of [undefined, null, {}, 'kid_reminder', { kind: 'something_later' }]) {
       expect(openedNotificationKind(data)).toBeNull();
+    }
+  });
+});
+
+describe('openedNotificationDestination', () => {
+  const redemption = 'cccccccc-0000-4000-8000-000000000001';
+
+  it('takes a request to the parent\u2019s day with the request it is about named', () => {
+    expect(
+      openedNotificationDestination({
+        kind: 'redemption_requested',
+        redemption_id: redemption,
+        path: '/(parent)',
+      }),
+    ).toEqual({ path: '/(parent)', audience: 'parent', params: { redemption } });
+  });
+
+  it('takes an approval to the child\u2019s shop', () => {
+    expect(
+      openedNotificationDestination({
+        kind: 'reward_approved',
+        child_id: noa,
+        redemption_id: redemption,
+        path: '/(kid)/shop',
+      }),
+    ).toEqual({ path: '/(kid)/shop', audience: 'kid', params: { redemption } });
+  });
+
+  it('takes a digest to the parent\u2019s day, which is the day it is about', () => {
+    expect(
+      openedNotificationDestination({
+        kind: 'parent_digest',
+        chore_date: '2026-03-01',
+        path: '/(parent)',
+      }),
+    ).toEqual({ path: '/(parent)', audience: 'parent', params: {} });
+  });
+
+  it('is nothing at all for a payload naming no path of ours', () => {
+    for (const data of [
+      undefined,
+      null,
+      {},
+      'path',
+      { kind: 'kid_reminder' },
+      { path: '/(parent)/pin' },
+      { path: '../../(parent)' },
+      { path: 'https://example.com' },
+    ]) {
+      expect(openedNotificationDestination(data)).toBeNull();
+    }
+  });
+
+  it('passes on an id only when it is one, so nothing off a payload can shape a route', () => {
+    for (const bad of ['', 'not-a-uuid', '../oops', 42, null, { id: noa }]) {
+      expect(
+        openedNotificationDestination({ path: '/(parent)', redemption_id: bad })?.params,
+      ).toEqual({});
     }
   });
 });

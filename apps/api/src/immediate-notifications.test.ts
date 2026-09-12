@@ -2,6 +2,7 @@ import {
   builtinRewardId,
   COINS_PER_CHORE,
   notificationId,
+  openedNotificationDestination,
   parentDeviceId,
   redemptionRequestedCopy,
   rewardApprovedCopy,
@@ -13,8 +14,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
 import { runTick } from './cron.ts';
 import type { Db } from './db/client.ts';
-import { childDevices, notifications, parentDevices } from './db/schema.ts';
-import { RECEIPT_DELAY_MS } from './notifications.ts';
+import { childDevices, notifications, parentDevices, redemptions } from './db/schema.ts';
+import { IMMEDIATE_CATCHUP_MS, RECEIPT_DELAY_MS } from './notifications.ts';
 import type { Push, PushError, PushMessage, PushReceipt, PushSend } from './push.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
@@ -175,6 +176,14 @@ const parentTokenOf = async (deviceId: string) => {
   return row?.expoPushToken ?? null;
 };
 
+const decidedAtOf = async (redemptionId: string) => {
+  const [row] = await db
+    .select({ decidedAt: redemptions.decidedAt })
+    .from(redemptions)
+    .where(eq(redemptions.id, redemptionId));
+  return row!.decidedAt!;
+};
+
 const kidTokenOf = async (deviceId: string) => {
   const [row] = await db.select().from(childDevices).where(eq(childDevices.id, deviceId));
   return row?.expoPushToken ?? null;
@@ -240,6 +249,13 @@ describe('redemption_requested', () => {
       redemption_id: redemptionId,
       path: '/(parent)',
     });
+    // And the device reads that back as the parent's day with this request named, which is what
+    // makes the tap land on the request rather than on the screen in general.
+    expect(openedNotificationDestination(message?.data)).toEqual({
+      path: '/(parent)',
+      audience: 'parent',
+      params: { redemption: redemptionId },
+    });
   });
 
   it('is not an error for a parent with no device: the row stands, unsent', async () => {
@@ -297,6 +313,11 @@ describe('reward_approved', () => {
       redemption_id: redemptionId,
       path: '/(kid)/shop',
     });
+    expect(openedNotificationDestination(mine[0]?.data)).toEqual({
+      path: '/(kid)/shop',
+      audience: 'kid',
+      params: { redemption: redemptionId },
+    });
 
     const row = await rowOf('reward_approved', redemptionId, h.noa.id);
     expect(row?.target).toBe('child_device');
@@ -321,6 +342,34 @@ describe('reward_approved', () => {
     expect(row?.sentAt).toBeNull();
     expect(row?.targetId).toBeNull();
     expect(push.sent.filter((m) => m.to.includes('app-no'))).toHaveLength(0);
+  });
+
+  /**
+   * `IMMEDIATE_CATCHUP_MS` is what stops a restart from telling a child about months of old
+   * approvals: an approved redemption stays approved forever, so the scan is bounded rather than
+   * the status being the whole condition. One approval, two ticks on either side of the bound —
+   * everything but the clock held equal, because the clock is the whole claim.
+   */
+  it('tells the child at the edge of the catch-up window, and not past it', async () => {
+    const h = await spender('app_edge');
+    const token = 'ExponentPushToken[app-edge-kid]';
+    await registerKid(h.noa.session, token);
+    const redemptionId = await ask(h.noa.session, h.snack);
+    expect((await decide(h.householdId, h.owner, redemptionId, 'approve')).status).toBe(200);
+    const decidedAt = await decidedAtOf(redemptionId);
+
+    const push = fakePush('app-edge');
+    // A minute past the window: old news. No claim row is the assertion — a send that was merely
+    // skipped would leave the row behind and go out on the next tick.
+    await runTick(db, push.push, new Date(decidedAt.getTime() + IMMEDIATE_CATCHUP_MS + 60_000));
+    expect(push.sent.filter((m) => m.to === token)).toHaveLength(0);
+    expect(await rowOf('reward_approved', redemptionId, h.noa.id)).toBeUndefined();
+
+    // The far edge itself is inside it: the bound is inclusive, so an approval exactly the window
+    // old is still told to the child.
+    await runTick(db, push.push, new Date(decidedAt.getTime() + IMMEDIATE_CATCHUP_MS));
+    expect(push.sent.filter((m) => m.to === token)).toHaveLength(1);
+    expect((await rowOf('reward_approved', redemptionId, h.noa.id))?.sentAt).not.toBeNull();
   });
 });
 
