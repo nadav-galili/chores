@@ -7,6 +7,7 @@ import {
   type ChoreKind,
   type UpsertChoreOp,
 } from '@chores/shared';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
 import {
@@ -20,6 +21,7 @@ import {
   Title,
 } from '@/components/ui';
 import { withCause } from '@/lib/errors';
+import { useHousehold } from '@/lib/household-context';
 import { fieldError, t, weekdayLabels } from '@/lib/i18n';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -70,6 +72,8 @@ export function ChoreForm({
   onDelete?: () => Promise<void>;
 }) {
   const styles = useThemedStyles(choreFormStyles);
+  const household = useHousehold();
+  const router = useRouter();
   const [choreTitle, setChoreTitle] = useState(initial.title);
   const [kind, setKind] = useState<ChoreKind>(initial.kind);
   const [mask, setMask] = useState(initial.weekday_mask ?? 0);
@@ -82,6 +86,17 @@ export function ChoreForm({
   const toggleAssignee = (id: string) =>
     setAssignees((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
   const toggleDay = (i: number) => setMask((m) => m ^ (1 << i));
+  const childIsLocked = (child: Child) =>
+    household.status === 'ready' &&
+    household.me.household?.entitlement === 'free' &&
+    child.read_only_after !== null &&
+    Date.parse(child.read_only_after) <= Date.now();
+  const allNext = allAssigned ? [] : children.map((child) => child.id);
+  const allChangesLockedChild = children.some(
+    (child) => childIsLocked(child) && assignees.includes(child.id) !== allNext.includes(child.id),
+  );
+  const openChildGate = () =>
+    router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } });
 
   const submit = async () => {
     const parsed = choreFieldsSchema.safeParse({
@@ -172,16 +187,22 @@ export function ChoreForm({
       )}
       <ChipGroup label={t('choreForm.who')}>
         <Chip
-          title={t('common.all')}
+          title={
+            allChangesLockedChild
+              ? t('paywall.lockedChild', { name: t('common.all') })
+              : t('common.all')
+          }
           active={allAssigned}
-          onPress={() => setAssignees(allAssigned ? [] : children.map((c) => c.id))}
+          onPress={() => (allChangesLockedChild ? openChildGate() : setAssignees(allNext))}
         />
         {children.map((c) => (
           <Chip
             key={c.id}
-            title={c.first_name}
+            title={
+              childIsLocked(c) ? t('paywall.lockedChild', { name: c.first_name }) : c.first_name
+            }
             active={assignees.includes(c.id)}
-            onPress={() => toggleAssignee(c.id)}
+            onPress={() => (childIsLocked(c) ? openChildGate() : toggleAssignee(c.id))}
           />
         ))}
       </ChipGroup>
@@ -205,4 +226,3 @@ const choreFormStyles = (theme: Theme) => ({
   linkTarget: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
   link: { ...theme.type.label, color: theme.colors.action },
 });
-

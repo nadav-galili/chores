@@ -283,6 +283,7 @@ export function ScrollScreen({ children }: { children: React.ReactNode }) {
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={[styles.screen, styles.scrollContent]}
+      contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
     >
       {children}

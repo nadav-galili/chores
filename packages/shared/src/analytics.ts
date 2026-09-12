@@ -3,6 +3,7 @@ import type { DevicePlatform } from './join-code.ts';
 import type { ChoreKind } from './materialize.ts';
 import type { NotificationKind } from './notification.ts';
 import type { BuiltinRewardKey } from './reward.ts';
+import type { Gate } from './entitlement.ts';
 import { uuid5 } from './uuid5.ts';
 
 /**
@@ -177,6 +178,11 @@ export function purchaseCompleted(purchase: {
       purchase_kind: purchase.purchase_kind,
     },
   };
+}
+
+/** The premium prompt is attributable to the capability that opened it, never to a browse. */
+export function paywallShown(shown: { gate: Gate }): AnalyticsEvent {
+  return { event: 'paywall_shown', properties: { gate: shown.gate } };
 }
 
 /**
