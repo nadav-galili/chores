@@ -118,3 +118,83 @@ export function redemptionRequestedCopy(locale: Locale): { title: string; body: 
 export function rewardApprovedCopy(locale: Locale): { title: string; body: string } {
   return REWARD_APPROVED_COPY[locale];
 }
+
+/** One child's standing in the digest's Chore Date. Day Complete is derived, never carried. */
+export type DigestChild = { first_name: string; due_count: number; done_count: number };
+
+export type DigestSummary = {
+  children: readonly DigestChild[];
+  /** Redemptions nobody has decided, whatever Chore Date they were asked for. */
+  undecided_redemptions: number;
+};
+
+/** Day Complete: every Instance of that Chore Date done. Derived here, as it is everywhere. */
+export const isDayComplete = (child: DigestChild): boolean =>
+  child.due_count > 0 && child.done_count === child.due_count;
+
+/**
+ * Whether the digest is worth a parent's evening. A day with nothing due and nothing waiting
+ * sends nothing at all, so the notification keeps meaning something (docs/spec/01-product.md,
+ * notifications). Asked before the claim row is written: a day that later gets a chore must not
+ * stay suppressed because an earlier tick already spent its claim.
+ */
+export function digestWorthSending(summary: DigestSummary): boolean {
+  if (summary.undecided_redemptions > 0) return true;
+  return summary.children.some((child) => child.due_count > 0);
+}
+
+type DigestWords = {
+  title: string;
+  child: (name: string, done: number, due: number) => string;
+  complete: (name: string, due: number) => string;
+  nothingDue: (name: string) => string;
+  waiting: (count: number) => string;
+};
+
+/**
+ * The digest's words. The day is still open when this arrives, so the copy counts what is done
+ * — "3/4 done" — and never says a child did not complete something they still have hours to do.
+ * Server-only, but it lives beside the reminder's copy for the same reason: one place to read
+ * what this app says to a family.
+ */
+const DIGEST_COPY: Readonly<Record<Locale, DigestWords>> = {
+  en: {
+    title: 'Today so far',
+    child: (name, done, due) => `${name} ${done}/${due} done`,
+    complete: (name, due) => `${name} ${due}/${due} done — all done`,
+    nothingDue: (name) => `${name} — nothing due`,
+    waiting: (count) =>
+      count === 1 ? '1 reward is waiting for you' : `${count} rewards are waiting for you`,
+  },
+  he: {
+    title: 'היום עד עכשיו',
+    child: (name, done, due) => `${name} ${done}/${due} בוצעו`,
+    complete: (name, due) => `${name} ${due}/${due} בוצעו — הכול בוצע`,
+    nothingDue: (name) => `${name} — אין מטלות`,
+    // Hebrew counts two as a word of its own; "2 פרסים" reads like a form nobody writes.
+    waiting: (count) => {
+      if (count === 1) return 'פרס אחד ממתין להחלטה שלך';
+      if (count === 2) return 'שני פרסים ממתינים להחלטה שלך';
+      return `${count} פרסים ממתינים להחלטה שלך`;
+    },
+  },
+};
+
+/**
+ * The digest as one parent reads it, in the locale their device registered. Lines rather than a
+ * run-on sentence, so a household with three children is still scannable on a lock screen.
+ */
+export function digestCopy(
+  locale: Locale,
+  summary: DigestSummary,
+): { title: string; body: string } {
+  const words = DIGEST_COPY[locale];
+  const lines = summary.children.map((child) => {
+    if (child.due_count === 0) return words.nothingDue(child.first_name);
+    if (isDayComplete(child)) return words.complete(child.first_name, child.due_count);
+    return words.child(child.first_name, child.done_count, child.due_count);
+  });
+  // Zero is not news; a waiting request is.
+  if (summary.undecided_redemptions > 0) lines.push(words.waiting(summary.undecided_redemptions));
+  return { title: words.title, body: lines.join('\n') };
+}

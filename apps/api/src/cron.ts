@@ -1,9 +1,22 @@
-import { remindersDue, rolloversDue, type DueReminder, type DueRollover } from '@chores/shared';
+import {
+  digestsDue,
+  remindersDue,
+  rolloversDue,
+  type DueDigest,
+  type DueReminder,
+  type DueRollover,
+} from '@chores/shared';
 import { eq, isNotNull } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
 import { children, households } from './db/schema.ts';
 import { writeHouseholdInstances } from './materialize.ts';
-import { readReceipts, sendImmediates, sendReminder, type DueImmediate } from './notifications.ts';
+import {
+  readReceipts,
+  sendDigest,
+  sendImmediates,
+  sendReminder,
+  type DueImmediate,
+} from './notifications.ts';
 import type { Push } from './push.ts';
 
 /**
@@ -22,6 +35,8 @@ export type TickResult = {
   reminded: DueReminder[];
   /** The immediate kinds this tick claimed: a request waiting on a parent, an approval on a child. */
   announced: DueImmediate[];
+  /** The digests this tick claimed. A suppressed evening, and a later tick, are not in here. */
+  digested: DueDigest[];
   /** Tokens forgotten this tick because Expo said the device is gone. */
   forgotten: number;
 };
@@ -29,7 +44,12 @@ export type TickResult = {
 /** One minute of the cron's work. Idempotent: every write it does is claimed by a fixed id. */
 export async function runTick(db: Db, push: Push, now = new Date()): Promise<TickResult> {
   const householdRows = await db
-    .select({ id: households.id, tz: households.tz, day_boundary_hour: households.dayBoundaryHour })
+    .select({
+      id: households.id,
+      tz: households.tz,
+      day_boundary_hour: households.dayBoundaryHour,
+      digest_hour: households.digestHour,
+    })
     .from(households);
 
   const rolled = rolloversDue(householdRows, now);
@@ -58,9 +78,17 @@ export async function runTick(db: Db, push: Push, now = new Date()): Promise<Tic
   // Nothing on a clock asks for these two; the tick is only where the claim row lives.
   const immediate = await sendImmediates(db, push, now);
   forgotten += immediate.forgotten;
+
+  const digested: DueDigest[] = [];
+  for (const due of digestsDue(householdRows, now)) {
+    const sent = await sendDigest(db, push, due, now);
+    forgotten += sent.forgotten;
+    if (sent.claimed) digested.push(due);
+  }
+
   forgotten += await readReceipts(db, push, now);
 
-  return { rolled, reminded, announced: immediate.announced, forgotten };
+  return { rolled, reminded, announced: immediate.announced, digested, forgotten };
 }
 
 /** Starts the minute cron; returns the stop the process never calls but a test might. */

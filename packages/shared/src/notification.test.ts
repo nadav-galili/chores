@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  digestCopy,
+  digestWorthSending,
   expoPushTokenSchema,
+  isDayComplete,
   notificationId,
   notificationKindSchema,
   openedNotificationKind,
@@ -9,6 +12,7 @@ import {
   parentDeviceInputSchema,
   redemptionRequestedCopy,
   rewardApprovedCopy,
+  type DigestSummary,
 } from './notification.ts';
 import { uuid5 } from './uuid5.ts';
 
@@ -143,5 +147,92 @@ describe('the immediate kinds’ copy', () => {
     expect(redemptionRequestedCopy('he')).not.toEqual(redemptionRequestedCopy('en'));
     expect(rewardApprovedCopy('he')).not.toEqual(rewardApprovedCopy('en'));
     expect(rewardApprovedCopy('en')).not.toEqual(redemptionRequestedCopy('en'));
+  });
+});
+
+describe('digestWorthSending', () => {
+  const summary = (children: DigestSummary['children'], undecided = 0): DigestSummary => ({
+    children,
+    undecided_redemptions: undecided,
+  });
+
+  it('is nothing at all on a day with nothing due and nothing waiting', () => {
+    expect(digestWorthSending(summary([]))).toBe(false);
+    expect(digestWorthSending(summary([{ first_name: 'Noa', due_count: 0, done_count: 0 }]))).toBe(
+      false,
+    );
+  });
+
+  it('is worth sending when a chore was due, done or not', () => {
+    expect(digestWorthSending(summary([{ first_name: 'Noa', due_count: 4, done_count: 0 }]))).toBe(
+      true,
+    );
+    expect(digestWorthSending(summary([{ first_name: 'Noa', due_count: 4, done_count: 4 }]))).toBe(
+      true,
+    );
+  });
+
+  it('is worth sending for a waiting request on a day with nothing due', () => {
+    expect(
+      digestWorthSending(summary([{ first_name: 'Noa', due_count: 0, done_count: 0 }], 1)),
+    ).toBe(true);
+  });
+});
+
+describe('isDayComplete', () => {
+  it('is every instance of the day done, and never a day with nothing in it', () => {
+    expect(isDayComplete({ first_name: 'Noa', due_count: 4, done_count: 4 })).toBe(true);
+    expect(isDayComplete({ first_name: 'Noa', due_count: 4, done_count: 3 })).toBe(false);
+    expect(isDayComplete({ first_name: 'Noa', due_count: 0, done_count: 0 })).toBe(false);
+  });
+});
+
+describe('digestCopy', () => {
+  const day: DigestSummary = {
+    children: [
+      { first_name: 'Noa', due_count: 4, done_count: 3 },
+      { first_name: 'Ori', due_count: 2, done_count: 2 },
+    ],
+    undecided_redemptions: 0,
+  };
+
+  it('counts what is done, because the day is not over', () => {
+    const { title, body } = digestCopy('en', day);
+    expect(title).toBe('Today so far');
+    expect(body).toContain('Noa 3/4 done');
+    // The day is still open: nothing in the digest may say a child failed to finish it.
+    expect(body.toLowerCase()).not.toContain('did not');
+    expect(body.toLowerCase()).not.toContain('missed');
+  });
+
+  it('says who is Day Complete', () => {
+    expect(digestCopy('en', day).body).toContain('Ori 2/2 done — all done');
+  });
+
+  it('names a child with nothing due rather than reading 0/0', () => {
+    const { body } = digestCopy('en', {
+      children: [{ first_name: 'Noa', due_count: 0, done_count: 0 }],
+      undecided_redemptions: 1,
+    });
+    expect(body).toContain('Noa — nothing due');
+    expect(body).not.toContain('0/0');
+  });
+
+  it('counts the waiting requests only when there are any', () => {
+    expect(digestCopy('en', day).body).not.toContain('waiting');
+    expect(digestCopy('en', { ...day, undecided_redemptions: 1 }).body).toContain(
+      '1 reward is waiting for you',
+    );
+    expect(digestCopy('en', { ...day, undecided_redemptions: 3 }).body).toContain(
+      '3 rewards are waiting for you',
+    );
+  });
+
+  it('speaks Hebrew', () => {
+    const { title, body } = digestCopy('he', { ...day, undecided_redemptions: 2 });
+    expect(title).toBe('היום עד עכשיו');
+    expect(body).toContain('Noa 3/4 בוצעו');
+    expect(body).toContain('Ori 2/2 בוצעו — הכול בוצע');
+    expect(body).toContain('שני פרסים ממתינים להחלטה שלך');
   });
 });
