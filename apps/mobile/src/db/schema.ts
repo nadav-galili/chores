@@ -202,6 +202,26 @@ export const outbox = sqliteTable('outbox', {
 });
 
 /**
+ * Photos waiting on an upload (M3.12, ADR-0017). One row per `pending_photo` completion whose
+ * `complete` op has not been queued yet: the op is enqueued only after the bytes reach R2, so a
+ * device with no network holds the photo here rather than an op the server cannot yet accept.
+ * Local-only, never synced — the server learns the photo through the op's `photo_key`.
+ */
+export const photoUploads = sqliteTable('photo_uploads', {
+  completion_id: text('completion_id').primaryKey(),
+  chore_id: text('chore_id').notNull(),
+  chore_date: text('chore_date').notNull(),
+  completed_at: text('completed_at').notNull(),
+  /** Where the bytes live on this device until the upload succeeds; replaced on a retake. */
+  local_uri: text('local_uri').notNull(),
+  content_type: text('content_type').notNull(),
+  created_at: text('created_at').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  /** Nothing is uploaded before this instant; it moves out on every failed attempt. */
+  next_attempt_at: text('next_attempt_at').notNull(),
+});
+
+/**
  * Feature flags, fetched in parent mode and cached here: kid mode never calls the flag service,
  * and must work offline (docs/spec/01-product.md, analytics). A flag with no row falls back to
  * its default, so a device that has never seen a parent still behaves.

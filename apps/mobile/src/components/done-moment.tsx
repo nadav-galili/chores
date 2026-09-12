@@ -98,14 +98,25 @@ export function DoneMoment({
   const petScale = bounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
   const treeScale = grow.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
 
+  // A photo chore's moment: no coins move — they wait on a grown-up — so the card says who
+  // holds them instead of paying. The pet still answers, and nothing here blames the child.
+  const waiting = reaction.pendingPhoto === true;
+  const label = waiting
+    ? t(`kid.${uiMode}.waitingPhoto`)
+    : t(`kid.${uiMode}.doneMoment`, { coins: reaction.coins });
+
   return (
     <View style={styles.overlay} pointerEvents="none">
       <Animated.View
         style={[styles.card, { opacity: progress, transform: [{ scale }, { translateY: lift }] }]}
         accessibilityLiveRegion="polite"
-        accessibilityLabel={t(`kid.${uiMode}.doneMoment`, { coins: reaction.coins })}
+        accessibilityLabel={label}
       >
-        <Coins amount={reaction.coins} variant="pays" step="display" />
+        {waiting ? (
+          <Text style={styles.waitingText}>{label}</Text>
+        ) : (
+          <Coins amount={reaction.coins} variant="pays" step="display" />
+        )}
         {pet.enabled && (
           <Animated.View style={{ transform: [{ scale: petScale }] }}>
             <PetFigure
@@ -159,6 +170,9 @@ const doneMomentStyles = (theme: Theme) => ({
     elevation: 8,
   },
   grew: { alignItems: 'center' as const, gap: theme.space.xs },
+  // The waiting line is copy, so it is text and centered like every other line on this card —
+  // centering has no reading direction, so Hebrew needs nothing special here.
+  waitingText: { ...theme.type.heading, color: theme.colors.text, textAlign: 'center' as const },
   // The line under the tree is copy, so it is text: the green on this card is the tree's own.
   grewText: { ...theme.type.label, color: theme.colors.text, fontWeight: '600' as const },
 });

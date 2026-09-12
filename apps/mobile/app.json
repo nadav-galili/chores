@@ -35,7 +35,14 @@
       "expo-web-browser",
       "expo-localization",
       "expo-notifications",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to take a photo when a chore asks for one",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

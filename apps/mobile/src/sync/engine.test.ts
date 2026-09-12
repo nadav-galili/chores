@@ -306,8 +306,22 @@ describe('todayList', () => {
     );
     const list = await todayList(db, childId, TODAY);
     expect(list).toEqual([
-      { id: instanceId(b, childId, TODAY), chore_id: b, title: 'Apple', icon: '🍽️', status: 'due' },
-      { id: instanceId(a, childId, TODAY), chore_id: a, title: 'Zebra', icon: '🦓', status: 'due' },
+      {
+        id: instanceId(b, childId, TODAY),
+        chore_id: b,
+        title: 'Apple',
+        icon: '🍽️',
+        status: 'due',
+        requires_photo: false,
+      },
+      {
+        id: instanceId(a, childId, TODAY),
+        chore_id: a,
+        title: 'Zebra',
+        icon: '🦓',
+        status: 'due',
+        requires_photo: false,
+      },
     ]);
   });
 });
