@@ -52,6 +52,13 @@ export default {
       "when": 1789146679034,
       "tag": "0006_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789231236454,
+      "tag": "0007_bored_madripoor",
+      "breakpoints": true
     }
   ]
 },
@@ -63,5 +70,6 @@ export default {
     m0004: "ALTER TABLE `notification_state` ADD `locale` text;",
     m0005: "CREATE TABLE `analytics_state` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`opened_on` text,\n\t`completed_on` text,\n\t`grove_stage` integer\n);\n",
     m0006: "PRAGMA foreign_keys=OFF;--> statement-breakpoint\nCREATE TABLE `__new_rewards` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`household_id` text NOT NULL,\n\t`builtin_key` text,\n\t`title` text,\n\t`icon` text,\n\t`cost_coins` integer NOT NULL,\n\t`is_builtin` integer DEFAULT false NOT NULL,\n\t`active` integer DEFAULT true NOT NULL,\n\t`sort` integer DEFAULT 0 NOT NULL,\n\t`updated_at` text NOT NULL,\n\t`deleted_at` text\n);\n--> statement-breakpoint\n-- `builtin_key` is new, so it is not in the SELECT: drizzle-kit names every column of the new\n-- table on both sides, and the old one has no such column to read.\nINSERT INTO `__new_rewards`(\"id\", \"household_id\", \"title\", \"icon\", \"cost_coins\", \"is_builtin\", \"active\", \"sort\", \"updated_at\", \"deleted_at\") SELECT \"id\", \"household_id\", \"title\", \"icon\", \"cost_coins\", \"is_builtin\", \"active\", \"sort\", \"updated_at\", \"deleted_at\" FROM `rewards` WHERE \"household_id\" IS NOT NULL;--> statement-breakpoint\nDROP TABLE `rewards`;--> statement-breakpoint\nALTER TABLE `__new_rewards` RENAME TO `rewards`;--> statement-breakpoint\nPRAGMA foreign_keys=ON;",
+    m0007: "ALTER TABLE `children` ADD `read_only_after` text;",
   },
 };

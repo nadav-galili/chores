@@ -1,0 +1,1 @@
+ALTER TABLE `children` ADD `read_only_after` text;

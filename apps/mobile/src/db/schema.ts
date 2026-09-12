@@ -30,6 +30,8 @@ export const children = sqliteTable('children', {
   ui_mode: text('ui_mode', { enum: ['little', 'big'] }).notNull(),
   pet_name: text('pet_name').notNull(),
   reminder_time: text('reminder_time'),
+  /** Display-only quota metadata mirror. Kid-device behavior never consults it (ADR-0005). */
+  read_only_after: text('read_only_after'),
   sort: integer('sort').notNull().default(0),
   created_at: text('created_at').notNull(),
 });

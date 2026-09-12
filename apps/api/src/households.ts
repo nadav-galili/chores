@@ -1,6 +1,5 @@
 import {
   builtinRewardsFor,
-  canDo,
   childInputSchema,
   createHouseholdInputSchema,
   householdCreated,
@@ -16,6 +15,7 @@ import { children, households, parentInvites, parents, rewards } from './db/sche
 import { childToApi, householdToApi, parentInviteToApi, parentToApi } from './serialize.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
+import { gate } from './gate.ts';
 
 type Env = { Variables: AuthVariables };
 
@@ -215,11 +215,6 @@ export function householdRoutes(db: Db, analytics: Analytics) {
     const { email } = body.data;
     const householdId = c.get('householdId');
 
-    const household = await db.query.households.findFirst({
-      where: eq(households.id, householdId),
-    });
-    if (!household) return c.json({ error: 'not_found' }, 404);
-
     const existing = await db.query.parentInvites.findFirst({
       where: eq(parentInvites.email, email),
     });
@@ -240,12 +235,13 @@ export function householdRoutes(db: Db, analytics: Analytics) {
         .from(parentInvites)
         .where(and(eq(parentInvites.householdId, householdId), isNull(parentInvites.acceptedAt))),
     ]);
-    const gate = canDo(household, 'add_parent', {
+    const answer = await gate(db, 'add_parent', {
+      householdId,
       now: new Date().toISOString(),
       child_count: 0,
       parent_count: (parentCount[0]?.n ?? 0) + (pendingCount[0]?.n ?? 0),
     });
-    if (!gate.ok) return c.json({ error: 'gated', gate: gate.gate }, 402);
+    if (answer instanceof Response) return answer;
 
     const [row] = await db
       .insert(parentInvites)
