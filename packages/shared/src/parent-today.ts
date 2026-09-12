@@ -10,10 +10,11 @@ export const parentTodayItemSchema = z.object({
   title: z.string(),
   icon: z.string().nullable(),
   status: instanceStatusSchema,
-  /** The accepted completion's instant, or null while the instance is still due. */
+  /** The accepted completion's instant — or the photo-taken instant while it still waits on a parent — or null while the instance is still due. */
   completed_at: z.string().datetime().nullable(),
   /**
-   * The accepted completion's id, or null while the instance is still due. It is the only thing
+   * The accepted completion's id — or the waiting photo's, so a parent can open it and
+   * approve or decline — or null while the instance is still due. It is the only thing
    * on a parent surface that can name a completion, so it is what makes a rejection reachable.
    */
   completion_id: z.string().uuid().nullable(),

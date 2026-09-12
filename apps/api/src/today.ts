@@ -114,19 +114,22 @@ export function todayRoutes(db: Db) {
           id: completions.id,
           instanceId: completions.instanceId,
           completedAt: completions.completedAt,
+          status: completions.status,
         })
         .from(completions)
         .where(
           and(
             inArray(completions.childId, childIds),
             eq(completions.choreDate, today),
-            eq(completions.status, 'accepted'),
+            // A photo still waiting on a parent names its completion here, so the parent can
+            // open the photo and approve or decline it; it pays nothing until approved.
+            inArray(completions.status, ['accepted', 'pending_photo']),
           ),
         )
         // An instance can hold more than one accepted completion — a child with two devices,
-        // both offline, taps it twice — and the map below keeps the last row it reads. Oldest
-        // first makes that the newest completion: the one still holding the instance up, and so
-        // the one a parent rejecting from this screen means.
+        // both offline, taps it twice — and `doneBy` below keeps the newest accepted one: the
+        // one still holding the instance up, and so the one a parent rejecting from this
+        // screen means. A photo-waiting row never displaces an accepted one.
         .orderBy(asc(completions.completedAt)),
       // Balance is always SUM(coins) over the whole ledger; never a stored column (ADR-0002).
       db
@@ -159,7 +162,15 @@ export function todayRoutes(db: Db) {
         .orderBy(asc(redemptions.requestedAt)),
     ]);
 
-    const doneBy = new Map(completionRows.map((r) => [r.instanceId, r]));
+    // Newest accepted completion wins per instance; a photo-waiting row names its
+    // completion only while no accepted row holds the instance up.
+    const doneBy = new Map<string, (typeof completionRows)[number]>();
+    for (const r of completionRows) {
+      const held = doneBy.get(r.instanceId);
+      if (!held || (held.status !== 'accepted' && r.status === 'accepted'))
+        doneBy.set(r.instanceId, r);
+      else if (held.status === r.status) doneBy.set(r.instanceId, r);
+    }
     const balanceByChild = new Map(balanceRows.map((r) => [r.childId, r.coins]));
 
     const body: ParentToday = {
