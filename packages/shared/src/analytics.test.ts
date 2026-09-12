@@ -13,6 +13,7 @@ import {
   kidProperties,
   parentIdentity,
   petReacted,
+  redemptionDecided,
   type AnalyticsEvent,
 } from './analytics.ts';
 
@@ -89,6 +90,13 @@ describe('the events', () => {
     expect(groveGrew({ stage: 4 }).properties).toEqual({ stage: 4 });
   });
 
+  it('reports a decided redemption as the decision alone, never what was asked for', () => {
+    expect(redemptionDecided({ decision: 'declined' })).toEqual({
+      event: 'redemption_decided',
+      properties: { decision: 'declined' },
+    });
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -105,6 +113,7 @@ describe('what an event may carry', () => {
     petReacted({ tapped_at: 1000, shown_at: 1120 }),
     kidDayComplete({ streak: 3 }),
     groveGrew({ stage: 4 }),
+    redemptionDecided({ decision: 'approved' }),
   ];
 
   it('is never the child id, their first name or their pet name (ADR-0009)', () => {

@@ -123,8 +123,8 @@ export const rejectReasonSchema = z.enum([
    * The child cancelled first. The refund has been written once under the id both paths share
    * (ADR-0014), so the parent's decision moves no coins and is answered this instead.
    *
-   * Its producer is the parent's decide-redemption endpoint, which is ticket #45: nothing returns
-   * it yet, and that is a missing endpoint rather than a dead code path.
+   * No kid op produces it: it is the answer the parent's decide-redemption endpoint gives, and it
+   * lives here because that endpoint answers in the same vocabulary a refused op does.
    */
   'already_cancelled',
   /**
@@ -144,3 +144,18 @@ export type RejectReason = z.infer<typeof rejectReasonSchema>;
  * completion the child already undid is `already_undone` and nothing moves.
  */
 export type RejectCompletionResult = 'rejected' | 'already_undone';
+
+/** What a parent decides about a Redemption. Approving moves no coins; declining refunds. */
+export const redemptionDecisionSchema = z.enum(['approve', 'decline']);
+export type RedemptionDecision = z.infer<typeof redemptionDecisionSchema>;
+
+export const decideRedemptionInputSchema = z.object({ decision: redemptionDecisionSchema });
+export type DecideRedemptionInput = z.infer<typeof decideRedemptionInputSchema>;
+
+/**
+ * The answer to a decision. A redemption already approved or declined answers `already_decided`
+ * however the second decision was meant; one the child cancelled first answers `already_cancelled`
+ * and moves nothing, because the refund is already written under the id both paths share.
+ */
+export type DecideRedemptionResult =
+  'approved' | 'declined' | 'already_decided' | 'already_cancelled';

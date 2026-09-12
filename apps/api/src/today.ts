@@ -5,6 +5,7 @@ import {
   type IsoDate,
   type ParentToday,
   type ParentTodayItem,
+  type ParentTodayRedemption,
 } from '@chores/shared';
 import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -17,6 +18,8 @@ import {
   daySummaries,
   households,
   ledgerEntries,
+  redemptions,
+  rewards,
 } from './db/schema.ts';
 import { writeHouseholdInstances } from './materialize.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -82,9 +85,11 @@ export function todayRoutes(db: Db) {
       orderBy: asc(children.sort),
     });
     const childIds = childRows.map((r) => r.id);
-    if (!childIds.length) return c.json({ chore_date: today, children: [] } satisfies ParentToday);
+    if (!childIds.length) {
+      return c.json({ chore_date: today, children: [], redemptions: [] } satisfies ParentToday);
+    }
 
-    const [instanceRows, completionRows, balanceRows, summariesByChild] = await Promise.all([
+    const [instanceRows, completionRows, balanceRows, summariesByChild, asked] = await Promise.all([
       db
         .select({
           id: choreInstances.id,
@@ -133,6 +138,25 @@ export function todayRoutes(db: Db) {
         .where(inArray(ledgerEntries.childId, childIds))
         .groupBy(ledgerEntries.childId),
       streakSummaries(db, childIds, today),
+      // Every Redemption nobody has decided, whatever day it was asked for: a request does not
+      // expire with the chore date, and a parent who was away decides yesterday's today.
+      db
+        .select({
+          id: redemptions.id,
+          childId: redemptions.childId,
+          firstName: children.firstName,
+          rewardId: redemptions.rewardId,
+          builtinKey: rewards.builtinKey,
+          title: rewards.title,
+          icon: rewards.icon,
+          costCoins: redemptions.costCoins,
+          requestedAt: redemptions.requestedAt,
+        })
+        .from(redemptions)
+        .innerJoin(rewards, eq(rewards.id, redemptions.rewardId))
+        .innerJoin(children, eq(children.id, redemptions.childId))
+        .where(and(eq(redemptions.householdId, householdId), eq(redemptions.status, 'requested')))
+        .orderBy(asc(redemptions.requestedAt)),
     ]);
 
     const doneBy = new Map(completionRows.map((r) => [r.instanceId, r]));
@@ -164,6 +188,19 @@ export function todayRoutes(db: Db) {
           streak: currentStreak(summariesByChild.get(child.id) ?? [], today),
         };
       }),
+      redemptions: asked.map((r): ParentTodayRedemption => ({
+        redemption_id: r.id,
+        child_id: r.childId,
+        first_name: r.firstName,
+        reward_id: r.rewardId,
+        builtin_key: r.builtinKey,
+        // A built-in reward carries no title of its own; the app renders it from `builtin_key`.
+        title: r.title,
+        icon: r.icon,
+        // The snapshot taken when the child asked, not what the catalog says today.
+        cost_coins: r.costCoins,
+        requested_at: r.requestedAt.toISOString(),
+      })),
     };
     return c.json(body);
   });

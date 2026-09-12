@@ -7,6 +7,7 @@ import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
 import type { RateLimit } from './rate-limit.ts';
+import { redemptionRoutes } from './redemptions.ts';
 import { rejectionRoutes } from './rejection.ts';
 import { syncRoutes } from './sync.ts';
 import { todayRoutes } from './today.ts';
@@ -42,6 +43,7 @@ export function createApp(
   app.route('/', choreRoutes(db, analytics));
   app.route('/', todayRoutes(db));
   app.route('/', rejectionRoutes(db));
+  app.route('/', redemptionRoutes(db, analytics));
   app.route('/', joinRoutes(db, redeemLimit ?? DEFAULT_REDEEM_LIMIT, analytics));
   app.route('/', syncRoutes(db, syncPageSize ?? DEFAULT_SYNC_PAGE_SIZE));
 

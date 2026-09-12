@@ -137,3 +137,12 @@ export function kidDayComplete(day: { streak: number }): AnalyticsEvent {
 export function groveGrew(grove: { stage: number }): AnalyticsEvent {
   return { event: 'grove_grew', properties: { stage: grove.stage } };
 }
+
+/**
+ * A parent decided a Redemption: the one number the reward loop turns on. Sent server-side under
+ * the parent's Clerk id — the decision, and nothing about the child who asked or what they asked
+ * for (ADR-0009).
+ */
+export function redemptionDecided(decision: { decision: 'approved' | 'declined' }): AnalyticsEvent {
+  return { event: 'redemption_decided', properties: { decision: decision.decision } };
+}
