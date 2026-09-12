@@ -13,6 +13,7 @@ import {
   kidProperties,
   parentIdentity,
   petReacted,
+  rewardRequested,
   type AnalyticsEvent,
 } from './analytics.ts';
 
@@ -89,6 +90,12 @@ describe('the events', () => {
     expect(groveGrew({ stage: 4 }).properties).toEqual({ stage: 4 });
   });
 
+  it('names what a child asked for by its catalog key and its price, and nothing else', () => {
+    const asked = rewardRequested({ builtin_key: 'screen_time', cost_coins: 150 });
+    expect(asked.event).toBe('reward_requested');
+    expect(asked.properties).toEqual({ builtin_key: 'screen_time', cost_coins: 150 });
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -105,6 +112,7 @@ describe('what an event may carry', () => {
     petReacted({ tapped_at: 1000, shown_at: 1120 }),
     kidDayComplete({ streak: 3 }),
     groveGrew({ stage: 4 }),
+    rewardRequested({ builtin_key: 'snack', cost_coins: 50 }),
   ];
 
   it('is never the child id, their first name or their pet name (ADR-0009)', () => {
