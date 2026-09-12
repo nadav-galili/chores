@@ -3,35 +3,17 @@ import {
   canDo,
   childInputSchema,
   createHouseholdInputSchema,
-  hashPin,
   householdCreated,
-  parentDeviceId,
-  parentDeviceInputSchema,
   parentInviteInputSchema,
-  setPinInputSchema,
   uuid7,
 } from '@chores/shared';
-import { randomBytes } from 'node:crypto';
 import { and, asc, count, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Analytics } from './analytics.ts';
 import type { AuthVariables } from './auth.ts';
 import type { Db } from './db/client.ts';
-import {
-  children,
-  households,
-  parentDevices,
-  parentInvites,
-  parents,
-  rewards,
-} from './db/schema.ts';
-import {
-  childToApi,
-  householdToApi,
-  parentDeviceToApi,
-  parentInviteToApi,
-  parentToApi,
-} from './serialize.ts';
+import { children, households, parentInvites, parents, rewards } from './db/schema.ts';
+import { childToApi, householdToApi, parentInviteToApi, parentToApi } from './serialize.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
 
@@ -270,50 +252,6 @@ export function householdRoutes(db: Db, analytics: Analytics) {
       .values({ email, householdId, invitedBy: c.get('parentId') })
       .returning();
     return c.json(parentInviteToApi(row!), 201);
-  });
-
-  /**
-   * This parent's phone registering for push, on every app open: a token rots, and the language
-   * the phone reads can change between opens. The id is derived from the parent and the token
-   * (ADR-0010), so re-registering is the same row rather than a second phone.
-   */
-  scoped.post('/households/:householdId/devices', async (c) => {
-    const body = await parseBody(c, parentDeviceInputSchema);
-    if (!body.ok) return body.response;
-    const parentId = c.get('parentId');
-    const { expo_push_token, platform, locale } = body.data;
-    const [row] = await db
-      .insert(parentDevices)
-      .values({
-        id: parentDeviceId(parentId, expo_push_token),
-        parentId,
-        expoPushToken: expo_push_token,
-        platform,
-        locale,
-      })
-      .onConflictDoUpdate({
-        target: parentDevices.id,
-        // The token is the id's own input, so only what can differ between opens is written —
-        // plus the last seen, which is what says this phone is still the one to push to.
-        set: { platform, locale, expoPushToken: expo_push_token, lastSeenAt: new Date() },
-      })
-      .returning();
-    return c.json(parentDeviceToApi(row!), 201);
-  });
-
-  /**
-   * Set or replace the household's Parent PIN. Any signed-in parent may: a Clerk session outranks
-   * the PIN, so there is no old-PIN challenge to fail (ADR-0013). A replacement gets a new salt.
-   */
-  scoped.put('/households/:householdId/pin', async (c) => {
-    const body = await parseBody(c, setPinInputSchema);
-    if (!body.ok) return body.response;
-    const salt = randomBytes(16).toString('hex');
-    await db
-      .update(households)
-      .set({ pinSalt: salt, pinHash: hashPin(salt, body.data.pin) })
-      .where(eq(households.id, c.get('householdId')));
-    return c.json({ pin_set: true });
   });
 
   app.route('/', scoped);

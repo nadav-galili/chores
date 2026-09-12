@@ -1,23 +1,14 @@
-import type { BuiltinRewardKey, Reward } from '@chores/shared';
+import type { Reward } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { Body, Button, Coins, ErrorState, FILL, Screen, Title } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
-import { t, type TranslationKey } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
+import { rewardTitle } from '@/lib/reward-title';
 import { useRewards } from '@/lib/use-rewards';
 import { useThemedStyles, type Theme } from '@/theme';
-
-/** A built-in carries a key and no title, so its name is read here rather than off the row. */
-const BUILTIN_TITLES: Record<BuiltinRewardKey, TranslationKey> = {
-  snack: 'rewards.builtin.snack',
-  screen_time: 'rewards.builtin.screen_time',
-  friday_dinner: 'rewards.builtin.friday_dinner',
-};
-
-const titleOf = (reward: Reward) =>
-  reward.title ?? (reward.builtin_key ? t(BUILTIN_TITLES[reward.builtin_key]) : '');
 
 /**
  * One reward and the one thing a parent may do to it. The toggle borrows the chip's pill rather
@@ -34,7 +25,7 @@ function RewardLine({
   busy: boolean;
 }) {
   const styles = useThemedStyles(rewardStyles);
-  const title = titleOf(reward);
+  const title = rewardTitle(reward);
   return (
     <View style={styles.row}>
       <View style={styles.text}>
@@ -81,7 +72,7 @@ export default function Rewards() {
       await state.api.setRewardActive(householdId, reward.id, !reward.active);
       await rewards.refresh();
     } catch (e) {
-      setNotice(withCause(t('rewards.saveFailed', { title: titleOf(reward) }), e));
+      setNotice(withCause(t('rewards.saveFailed', { title: rewardTitle(reward) }), e));
     } finally {
       setBusy(null);
     }

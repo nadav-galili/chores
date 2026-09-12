@@ -43,6 +43,22 @@ export default function Exit() {
   const household = device.session?.household;
   const msLeft = pinCooldownMsLeft(attempts, now);
 
+  /**
+   * A session stored before the household had a PIN carries no hash, and `verifyPin` refuses
+   * everything against one (ADR-0013). Offering the field anyway would read as five wrong PINs
+   * in a row for a parent typing the right one, so the field is not offered: what is wrong is
+   * that the hash has not arrived, and the screen says that instead.
+   */
+  if (!household?.pin_hash) {
+    return (
+      <Screen>
+        <Title>{t('exit.noPinTitle')}</Title>
+        <Body>{t('exit.noPin')}</Body>
+        <Button title={t('exit.stay')} secondary onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
   const save = (next: PinAttempts) => {
     setAttempts(next);
     void writePinAttempts(next);
@@ -50,7 +66,7 @@ export default function Exit() {
 
   const submit = () => {
     setPin('');
-    if (verifyPin(household?.pin_hash, household?.pin_salt, pin)) {
+    if (verifyPin(household.pin_hash, household.pin_salt, pin)) {
       setWrong(false);
       setUnlocked(true);
       save(NO_PIN_ATTEMPTS);
@@ -70,7 +86,7 @@ export default function Exit() {
     return (
       <Screen>
         <Title>{t('exit.pinTitle')}</Title>
-        <Body>{household?.pin_hash ? t('exit.pinBody') : t('exit.noPin')}</Body>
+        <Body>{t('exit.pinBody')}</Body>
         <Field
           label={t('exit.pinLabel')}
           value={pin}

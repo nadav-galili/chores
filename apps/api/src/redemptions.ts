@@ -8,9 +8,9 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Analytics } from './analytics.ts';
-import { ledgerRow } from './apply-ops.ts';
 import type { Db } from './db/client.ts';
 import { ledgerEntries, redemptions } from './db/schema.ts';
+import { ledgerRow } from './ledger-row.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
 
