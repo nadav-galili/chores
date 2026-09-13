@@ -42,6 +42,17 @@ export type Reward = {
   deleted_at: string | null;
 };
 
+/** The parent-authored fields on a custom catalog row. Built-in identity is never writable. */
+export const customRewardInputSchema = z.object({
+  title: z.string().trim().min(1).max(100),
+  icon: z.string().trim().min(1).max(16).nullable(),
+  cost_coins: z.number().int().positive().max(1_000_000),
+  active: z.boolean(),
+  sort: z.number().int().min(0).max(1_000_000),
+  updated_at: z.string().datetime({ offset: true }),
+});
+export type CustomRewardInput = z.infer<typeof customRewardInputSchema>;
+
 export const redemptionStatusSchema = z.enum(['requested', 'approved', 'declined', 'cancelled']);
 export type RedemptionStatus = z.infer<typeof redemptionStatusSchema>;
 

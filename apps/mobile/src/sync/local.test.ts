@@ -4,6 +4,7 @@ import {
   bonusId,
   COINS_PER_CHORE,
   DAY_COMPLETE_BONUS,
+  deviceSessionSchema,
   earnId,
   growthId,
   instanceId,
@@ -76,6 +77,45 @@ beforeEach(async () => {
 });
 
 describe('tapDone', () => {
+  it('does not enforce the entitlement mirrored by /device/me', async () => {
+    const run = async (entitlement: 'free' | 'premium') => {
+      const target = await openTestDb();
+      db = target;
+      const instance = await seedChore();
+      const me = deviceSessionSchema.parse({
+        device_id: deviceId,
+        device_token: 'device-token',
+        analytics_anon_id: 'device-anon-id',
+        child: {
+          id: childId,
+          first_name: 'Noa',
+          ui_mode: 'little',
+          pet_name: 'Pip',
+        },
+        household: {
+          id: householdId,
+          tz: child.tz,
+          day_boundary_hour: child.dayBoundaryHour,
+          entitlement,
+        },
+      });
+      const pulledContext = tapContext(
+        {
+          householdId: me.household.id,
+          childId,
+          deviceId,
+          tz: me.household.tz,
+          dayBoundaryHour: me.household.day_boundary_hour,
+        },
+        NOW,
+      );
+      return tapDone(target, pulledContext, instance);
+    };
+
+    expect(await run('free')).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+    expect(await run('premium')).toBe(COINS_PER_CHORE + DAY_COMPLETE_BONUS);
+  });
+
   it('writes the completion, the instance, the coins, the xp, the day and the outbox op at once', async () => {
     const instance = await seedChore();
     await tapDone(db, ctx(), instance);

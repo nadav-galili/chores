@@ -21,6 +21,7 @@ import {
   completions,
   daySummaries,
   growthEntries,
+  households,
   ledgerEntries,
   xpEvents,
 } from './db/schema.ts';
@@ -101,6 +102,154 @@ describe('POST /sync complete', () => {
     expect(tables).toContain('ledger_entries');
     expect(tables).toContain('day_summaries');
     expect(tables).toContain('xp_events');
+  });
+
+  it('accepts a completion for a photo chore after the household entitlement lapses', async () => {
+    const clerkUserId = 'user_lapsed_photo';
+    const { householdId, noa, addChore } = await setup(clerkUserId);
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+    const choreId = await addChore('Photo chore', [noa.id]);
+    const setPhoto = await app.request(
+      `/households/${householdId}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: { requires_photo: true },
+          updated_at: new Date(Date.now() + 1_000).toISOString(),
+        }),
+      }),
+    );
+    expect(setPhoto.status).toBe(200);
+    await db.update(households).set({ entitlement: 'free' }).where(eq(households.id, householdId));
+
+    const op = completeOp(choreId);
+    const { status, body } = await sync(noa.session, [op]);
+    expect(status).toBe(200);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+    expect(body.rejected).toEqual([]);
+  });
+
+  it('holds a photo-chore completion as pending_photo with its key, paying nothing', async () => {
+    const clerkUserId = 'user_photo_wait';
+    const { householdId, noa, addChore } = await setup(clerkUserId);
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+    const choreId = await addChore('Tidy room', [noa.id]);
+    const setPhoto = await app.request(
+      `/households/${householdId}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: { requires_photo: true },
+          updated_at: new Date(Date.now() + 1_000).toISOString(),
+        }),
+      }),
+    );
+    expect(setPhoto.status).toBe(200);
+
+    const completionId = uuid7();
+    const op = completeOp(choreId, {
+      completion_id: completionId,
+      photo_key: `children/${noa.id}/completions/${completionId}`,
+    });
+    const { status, body } = await sync(noa.session, [op]);
+    expect(status).toBe(200);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+    expect(body.rejected).toEqual([]);
+
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, completionId));
+    expect(completion).toMatchObject({
+      status: 'pending_photo',
+      photoKey: `children/${noa.id}/completions/${completionId}`,
+    });
+
+    const [instance] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, today())));
+    expect(instance!.status).toBe('pending_photo');
+
+    // A completion that is not a Completion yet earns nothing: no ledger rows, no XP.
+    expect(await balance(noa.id)).toBe(0);
+    expect(await xpTotal(noa.id)).toBe(0);
+  });
+
+  it('holds a keyless complete on a photo chore as pending_photo, paying nothing', async () => {
+    const clerkUserId = 'user_photo_keyless';
+    const { householdId, noa, addChore } = await setup(clerkUserId);
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+    const choreId = await addChore('Tidy room', [noa.id]);
+    const setPhoto = await app.request(
+      `/households/${householdId}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: { requires_photo: true },
+          updated_at: new Date(Date.now() + 1_000).toISOString(),
+        }),
+      }),
+    );
+    expect(setPhoto.status).toBe(200);
+
+    // No photo_key: without proof this waits on a parent instead of paying.
+    const op = completeOp(choreId);
+    const { status, body } = await sync(noa.session, [op]);
+    expect(status).toBe(200);
+    expect(body.acked).toEqual([{ op_id: op.op_id }]);
+    expect(body.rejected).toEqual([]);
+
+    const [completion] = await db
+      .select()
+      .from(completions)
+      .where(eq(completions.id, op.payload.completion_id));
+    expect(completion).toMatchObject({ status: 'pending_photo', photoKey: null });
+
+    const [instance] = await db
+      .select()
+      .from(choreInstances)
+      .where(eq(choreInstances.id, instanceId(choreId, noa.id, today())));
+    expect(instance!.status).toBe('pending_photo');
+
+    expect(await balance(noa.id)).toBe(0);
+    expect(await xpTotal(noa.id)).toBe(0);
+  });
+
+  it('rejects a photo-chore completion carrying a forged photo key', async () => {
+    const clerkUserId = 'user_photo_forged';
+    const { householdId, noa, addChore } = await setup(clerkUserId);
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, householdId));
+    const choreId = await addChore('Tidy room', [noa.id]);
+    const setPhoto = await app.request(
+      `/households/${householdId}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: { requires_photo: true },
+          updated_at: new Date(Date.now() + 1_000).toISOString(),
+        }),
+      }),
+    );
+    expect(setPhoto.status).toBe(200);
+
+    const op = completeOp(choreId, { photo_key: 'children/someone-else/completions/forged' });
+    const { body } = await sync(noa.session, [op]);
+    expect(body.acked).toEqual([]);
+    expect(body.rejected).toEqual([{ op_id: op.op_id, reason: 'invalid_payload' }]);
+    expect(await balance(noa.id)).toBe(0);
   });
 
   it('is a no-op when the same op is replayed, whatever the device thinks', async () => {

@@ -15,8 +15,8 @@ import { parseBody } from './parse-body.ts';
  * (ADR-0011, docs/spec/03-sync.md).
  *
  * The change log carries whole rows, so a sibling's `children` row crosses entire — first name,
- * pet name, ui mode, sort, reminder time, and `read_only_after`, which the device drops as a
- * column it does not have. All of it is household-internal and none of it is a secret: device
+ * pet name, ui mode, sort, reminder time, and `read_only_after`. All of it is household-internal
+ * and none of it is a secret: device
  * tokens live on `child_devices`, which has no change-log trigger at all. What still never
  * crosses is a sibling's chores, coins, completions, xp, day summaries and instances — those stay
  * filtered by `child_id`, and `sync.test.ts` holds that line.

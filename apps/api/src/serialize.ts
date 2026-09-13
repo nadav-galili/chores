@@ -135,12 +135,13 @@ export function childDeviceToApi(row: typeof childDevices.$inferSelect): ChildDe
   };
 }
 
-/** The Parent PIN crosses to the kid device on purpose, and only here (ADR-0013). */
+/** The Parent PIN and display-only entitlement mirror cross only here (ADR-0013, ADR-0005). */
 export function householdSummaryToApi(row: typeof households.$inferSelect): HouseholdSummary {
   return {
     id: row.id,
     tz: row.tz,
     day_boundary_hour: row.dayBoundaryHour,
+    entitlement: row.entitlement,
     pin_hash: row.pinHash,
     pin_salt: row.pinSalt,
   };

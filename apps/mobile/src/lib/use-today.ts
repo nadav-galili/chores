@@ -25,9 +25,18 @@ import {
   type RedoItem,
   type TodayItem,
 } from '@/sync/engine';
-import { balanceOf, tapContext, tapRedo, tapToggle, type ChildContext } from '@/sync/local';
+import {
+  balanceOf,
+  tapContext,
+  tapRedo,
+  tapToggle,
+  tapPhotoDone,
+  tapPhotoRedo,
+  type ChildContext,
+} from '@/sync/local';
 import { serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
+import { retakePhotoForInstance, uploadPendingPhotos, type PhotoTransfer } from '@/sync/photo';
 import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
@@ -37,6 +46,7 @@ import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
 import { playDoneHaptic } from '@/lib/haptics';
 import { arrangeKidReminder } from '@/lib/notifications';
+import { putPhoto, takePhoto, type TakenPhoto } from '@/lib/photo';
 
 export type TodayState = {
   status: 'loading' | 'ready';
@@ -75,6 +85,8 @@ export type DoneReaction = {
   key: number;
   /** What the tap paid. Starts at the per-chore rate and rises if the tap completed the day. */
   coins: number;
+  /** The tap photographed a photo chore: no coins move, and the card says who holds them. */
+  pendingPhoto: boolean;
   /** `Date.now()` at the tap itself. */
   at: number;
   /** The tap completed the day, so it planted a tree; the grove reacts too. */
@@ -115,6 +127,19 @@ const grovePlaceholder = (childId: string): GroveView => {
   const ownTree = { childId, firstName: null, stage: 0, isSelf: true };
   return { enabled: true, trees: [ownTree], ownTree };
 };
+
+/** The live transfer for uploads: presign through the device API, bytes straight to R2. */
+function photoTransfer(deviceToken: string): PhotoTransfer {
+  return {
+    presign: (completion_id, content_type) =>
+      createDeviceApi(deviceToken).presign(
+        completion_id,
+        content_type as 'image/jpeg' | 'image/png' | 'image/webp',
+      ),
+    upload: (upload_url, local_uri, content_type) =>
+      putPhoto(upload_url, { local_uri, content_type }),
+  };
+}
 
 /**
  * What the local rows have just said, reported once each (ADR-0009). Every one of these is a
@@ -225,6 +250,14 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   const refresh = useCallback(async () => {
     const db = await openDeviceDb();
     await readLocal(db, false);
+    // Photos queued by photo taps upload before the sync runs, so a reconnect sends the bytes
+    // and the op in one pass. A failure here is ordinary — no network — and the rows keep their
+    // backoff; it must never fail the sync that follows it.
+    try {
+      await uploadPendingPhotos(db, new Date(), photoTransfer(session.device_token));
+    } catch (e) {
+      console.error('photo upload failed', e);
+    }
     try {
       await syncNow(db, child, createDeviceApi(session.device_token).sync);
       await readLocal(db, false);
@@ -245,17 +278,19 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
    */
   const runTap = useCallback(
     (
-      moment: { completed: boolean; dayComplete: boolean },
+      moment: { completed: boolean; dayComplete: boolean; pendingPhoto?: boolean },
       write: (db: DeviceDb) => Promise<number>,
     ) => {
       // Start the done moment in this very tick: the pet must react to the tap, not to SQLite.
       // Undoing is not a celebration, so only a chore going done gets one.
       const completed = moment.completed;
+      const pendingPhoto = moment.pendingPhoto === true;
       playDoneHaptic({ completed, dayComplete: moment.dayComplete });
       if (completed) {
         setReaction({
           key: (taps.current += 1),
-          coins: COINS_PER_CHORE,
+          coins: pendingPhoto ? 0 : COINS_PER_CHORE,
+          pendingPhoto,
           at: Date.now(),
           grew: false,
           settled: false,
@@ -297,8 +332,70 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     [readLocal, refresh, state.offline],
   );
 
+  /**
+   * Opens the camera for a photo chore and hands the taken photo to `after`. Backing out,
+   * denying the permission or a camera failure all leave the chore exactly as it was — the
+   * child taps it again when ready. A real failure is logged, never shown: there is nothing a
+   * child can do with it, and the chore staying due already says what happens next.
+   */
+  const snapPhotoTap = useCallback(async (after: (taken: TakenPhoto) => void) => {
+    let taken: TakenPhoto | null;
+    try {
+      taken = await takePhoto();
+    } catch (e) {
+      console.error('camera failed', e);
+      return;
+    }
+    if (!taken) return;
+    after(taken);
+  }, []);
+
+  /**
+   * The child photographs a waiting chore again: the queued bytes are swapped, the waiting
+   * moment plays again, and the next refresh uploads the new photo. When the photo already
+   * left there is nothing to replace, so the list is simply re-read.
+   */
+  const retakeWaiting = useCallback(
+    (item: { id: string }, taken: TakenPhoto) => {
+      void (async () => {
+        try {
+          const db = await openDeviceDb();
+          if (!(await retakePhotoForInstance(db, item.id, taken.local_uri, new Date()))) {
+            await readLocal(db, state.offline);
+            return;
+          }
+          playDoneHaptic({ completed: true, dayComplete: false });
+          setReaction({
+            key: (taps.current += 1),
+            coins: 0,
+            pendingPhoto: true,
+            at: Date.now(),
+            grew: false,
+            settled: true,
+          });
+          await refresh();
+        } catch (e) {
+          console.error('retake failed to write', e);
+        }
+      })();
+    },
+    [readLocal, refresh, state.offline],
+  );
+
   const toggle = useCallback(
     (item: TodayItem) => {
+      // A photo chore never toggles: a due one opens the camera, and one already waiting offers
+      // a retake of the queued photo. Anything else is the ordinary tap below.
+      if (item.requires_photo) {
+        void snapPhotoTap((taken) =>
+          item.status === 'pending_photo'
+            ? retakeWaiting(item, taken)
+            : runTap({ completed: true, dayComplete: false, pendingPhoto: true }, (db) =>
+                tapPhotoDone(db, tapContext(child), item, taken),
+              ),
+        );
+        return;
+      }
       // Whether this is the tap that finished the day, read off the list the child is looking at
       // — the same answer the ledger reaches a moment later, but available now, which is what the
       // phone needs to answer the stronger way at the instant of the tap rather than after a
@@ -308,17 +405,27 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         tapToggle(db, tapContext(child), item),
       );
     },
-    [child, runTap, state.items],
+    [child, runTap, snapPhotoTap, retakeWaiting, state.items],
   );
 
   const redo = useCallback(
     (item: RedoItem) => {
+      // A rejected photo chore is photographed again for its own Chore Date, inside the Redo
+      // Window like any redo — and waits on a grown-up like any photo.
+      if (item.requires_photo) {
+        void snapPhotoTap((taken) =>
+          runTap({ completed: true, dayComplete: false, pendingPhoto: true }, (db) =>
+            tapPhotoRedo(db, tapContext(child), item, taken),
+          ),
+        );
+        return;
+      }
       // Whether the redo finishes its own Chore Date is a question about a day this screen does
       // not hold, so the tap buzzes as a plain completion; the ledger still pays the bonus a
       // moment later, and the moment's coins are corrected to it when the write reports.
       runTap({ completed: true, dayComplete: false }, (db) => tapRedo(db, tapContext(child), item));
     },
-    [child, runTap],
+    [child, runTap, snapPhotoTap],
   );
 
   // How long the child waited for the pet: the reaction is created in the tap's own tick, so the

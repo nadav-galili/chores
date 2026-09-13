@@ -1,10 +1,13 @@
 import { useAuth } from '@clerk/expo';
+import type { Gate } from '@chores/shared';
+import { useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { openDeviceDb } from '@/db/client';
 import { refreshFlags, startParentAnalytics } from '@/lib/analytics';
 import { createApi, type Api, type Me } from '@/lib/api';
 import { setParentErrorContext } from '@/lib/error-reporting';
 import { registerParentPush } from '@/lib/notifications';
+import { configurePurchases } from '@/lib/purchases';
 
 type State =
   | { status: 'loading'; me: null }
@@ -23,6 +26,11 @@ const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 async function reportParent(me: Me): Promise<void> {
   if (!me.parent) return;
   setParentErrorContext(me.parent.clerk_user_id);
+  void configurePurchases(me.parent.clerk_user_id).catch((e) => {
+    // Purchase configuration is retried when the paywall opens; a missing dashboard key must not
+    // keep the rest of the parent app from loading.
+    console.error('RevenueCat configuration failed', e);
+  });
   try {
     await startParentAnalytics(me.parent.clerk_user_id, me.household?.id ?? null);
     await refreshFlags(await openDeviceDb());
@@ -37,7 +45,12 @@ async function reportParent(me: Me): Promise<void> {
 /** Loads `/me` for the signed-in parent and keeps household + children in memory. */
 export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
-  const api = useMemo(() => createApi(() => getToken()), [getToken]);
+  const router = useRouter();
+  const onGate = useCallback(
+    (gate: Gate) => router.push({ pathname: '/(parent)/paywall', params: { gate } }),
+    [router],
+  );
+  const api = useMemo(() => createApi(() => getToken(), onGate), [getToken, onGate]);
   const [state, setState] = useState<State>({ status: 'loading', me: null });
 
   const refresh = useCallback(async () => {

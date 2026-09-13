@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChildForm } from '@/components/child-form';
-import { Button } from '@/components/ui';
+import { Body, Button, Screen, Title } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
@@ -12,6 +12,26 @@ export default function EditChild() {
   const householdId = state.me.household.id;
   const child = state.me.children.find((c) => c.id === id);
   if (!child) return null;
+  const locked =
+    state.me.household.entitlement === 'free' &&
+    child.read_only_after !== null &&
+    Date.parse(child.read_only_after) <= Date.now();
+
+  if (locked) {
+    return (
+      <Screen>
+        <Title>{t('childForm.edit', { name: child.first_name })}</Title>
+        <Body>{t('paywall.childLocked')}</Body>
+        <Button
+          title={t('paywall.lockedPrice')}
+          onPress={() =>
+            router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } })
+          }
+        />
+        <Button title={t('common.back')} onPress={() => router.back()} secondary />
+      </Screen>
+    );
+  }
 
   return (
     <ChildForm

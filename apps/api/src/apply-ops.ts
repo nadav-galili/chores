@@ -36,7 +36,7 @@ import {
   xpEvents,
 } from './db/schema.ts';
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Household = typeof households.$inferSelect;
 
 /** Whose rows a reconciliation recomputes, when, and whose name goes on what it writes. */
@@ -105,7 +105,13 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
   }
 
   if (op.type === 'complete') {
-    const { chore_id, completion_id, completed_at, chore_date: claimed } = op.payload;
+    const {
+      chore_id,
+      completion_id,
+      completed_at,
+      chore_date: claimed,
+      photo_key: photoKey,
+    } = op.payload;
     // A deleted chore still pays (docs/spec/03-sync.md); one that was never this child's does not.
     const [chore] = await tx
       .select()
@@ -180,6 +186,19 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
       return reject('unknown_chore');
     }
 
+    // Photo proof (ADR-0017, M3.12): a `requires_photo` chore never pays on a keyless tap —
+    // without the presigned key there is no proof, so it waits on a parent instead of paying.
+    // This is never a gate — the photo_proof entitlement gates the parent's chore upsert, never
+    // the child's tap — so a key on a chore that does not ask for one keeps the accepted path.
+    // A key on a photo chore must be the server-named presign answer echoed back
+    // (`children/{childId}/completions/{completionId}`); anything else is a forged key.
+    const canonicalPhotoKey = `children/${ctx.childId}/completions/${completion_id}`;
+    if (chore.requiresPhoto && typeof photoKey === 'string' && photoKey !== canonicalPhotoKey) {
+      return reject('invalid_payload');
+    }
+    const waitsOnPhoto = chore.requiresPhoto;
+    const doneStatus = waitsOnPhoto ? 'pending_photo' : 'done';
+    const completionStatus = waitsOnPhoto ? 'pending_photo' : 'accepted';
     await tx
       .insert(choreInstances)
       .values({
@@ -188,14 +207,14 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         childId: ctx.childId,
         householdId: ctx.householdId,
         choreDate: chore_date,
-        status: 'done',
+        status: doneStatus,
       })
       .onConflictDoNothing();
     // A redo is due again after a parent's rejection, so the child may complete it; a
     // `pending_photo` instance is waiting on a parent and is not theirs to flip.
     await tx
       .update(choreInstances)
-      .set({ status: 'done' })
+      .set({ status: doneStatus })
       .where(
         and(eq(choreInstances.id, instance_id), inArray(choreInstances.status, ['due', 'redo'])),
       );
@@ -210,7 +229,8 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
         choreDate: chore_date,
         completedAt,
         deviceId: ctx.deviceId,
-        status: 'accepted',
+        photoKey: waitsOnPhoto && typeof photoKey === 'string' ? photoKey : null,
+        status: completionStatus,
         createdAt: ctx.now,
       })
       .onConflictDoNothing();

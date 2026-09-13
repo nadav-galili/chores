@@ -87,8 +87,29 @@ describe('deviceSessionSchema', () => {
         id: '019906c0-0000-7000-8000-000000000003',
         tz: 'Asia/Jerusalem',
         day_boundary_hour: 0,
+        entitlement: 'premium',
       },
     };
     expect(deviceSessionSchema.parse(session)).toEqual(session);
+  });
+
+  it('loads an older stored session as free until /device/me refreshes it', () => {
+    const parsed = deviceSessionSchema.parse({
+      device_id: '019906c0-0000-7000-8000-000000000001',
+      device_token: 'tok',
+      analytics_anon_id: '4b7a9c1e-1234-4567-8901-abcdefabcdef',
+      child: {
+        id: '019906c0-0000-7000-8000-000000000002',
+        first_name: 'Noa',
+        ui_mode: 'little',
+        pet_name: 'Pip',
+      },
+      household: {
+        id: '019906c0-0000-7000-8000-000000000003',
+        tz: 'Asia/Jerusalem',
+        day_boundary_hour: 0,
+      },
+    });
+    expect(parsed.household.entitlement).toBe('free');
   });
 });

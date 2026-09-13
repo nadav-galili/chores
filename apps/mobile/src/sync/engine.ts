@@ -112,6 +112,8 @@ export type TodayItem = {
   title: string;
   icon: string | null;
   status: InstanceStatus;
+  /** Photo chores open the camera instead of toggling; the tap pays nothing until approval. */
+  requires_photo: boolean;
 };
 
 /**
@@ -138,6 +140,7 @@ export async function redoList(db: DeviceDb, childId: string, today: IsoDate): P
       title: chores.title,
       icon: chores.icon,
       status: choreInstances.status,
+      requires_photo: chores.requires_photo,
     })
     .from(choreInstances)
     .innerJoin(chores, eq(chores.id, choreInstances.chore_id))
@@ -174,6 +177,7 @@ export async function todayList(
       title: chores.title,
       icon: chores.icon,
       status: choreInstances.status,
+      requires_photo: chores.requires_photo,
     })
     .from(choreInstances)
     .innerJoin(chores, eq(chores.id, choreInstances.chore_id))

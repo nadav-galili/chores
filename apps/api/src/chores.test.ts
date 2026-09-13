@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { uuid7 } from '@chores/shared';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
-import { parents } from './db/schema.ts';
+import { households, parents } from './db/schema.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 
@@ -21,6 +21,7 @@ type Chore = {
   kind: string;
   weekday_mask: number | null;
   due_date: string | null;
+  requires_photo: boolean;
   assignees: string[];
   version: number;
   updated_at: string;
@@ -30,6 +31,8 @@ type Chore = {
 
 const t1 = '2026-09-09T10:00:00.000Z';
 const t2 = '2026-09-09T11:00:00.000Z';
+const t3 = '2026-09-09T12:00:00.000Z';
+const t4 = '2026-09-09T13:00:00.000Z';
 
 /** A household with two children and, optionally, a second parent added straight to the table. */
 async function setup(clerkUserId: string, secondParent?: string) {
@@ -164,6 +167,55 @@ describe('upsert_chore', () => {
     const res = await s.put('user_fay', uuid7(), daily([other.childIds[0]!]));
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe('unknown_assignee');
+  });
+
+  it('gates only the free household transition from no photo proof to requiring it', async () => {
+    const s = await setup('user_free_photo');
+    const id = uuid7();
+    await s.put('user_free_photo', id, daily(s.childIds));
+
+    const set = await s.put('user_free_photo', id, { requires_photo: true }, t2);
+    expect(set.status).toBe(402);
+    expect(await set.json()).toEqual({ error: 'gated', gate: 'photo_proof' });
+    expect((await s.list())[0]).toMatchObject({ requires_photo: false, version: 1 });
+
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, s.household.id));
+    expect((await s.put('user_free_photo', id, { requires_photo: true }, t2)).status).toBe(200);
+    await db
+      .update(households)
+      .set({ entitlement: 'free' })
+      .where(eq(households.id, s.household.id));
+
+    const keep = await s.put('user_free_photo', id, { requires_photo: true }, t3);
+    expect(keep.status).toBe(200);
+    expect((await keep.json()) as Chore).toMatchObject({ requires_photo: true, version: 3 });
+
+    const clear = await s.put('user_free_photo', id, { requires_photo: false }, t4);
+    expect(clear.status).toBe(200);
+    expect((await clear.json()) as Chore).toMatchObject({ requires_photo: false, version: 4 });
+  });
+
+  it('allows a premium household to set and clear photo proof', async () => {
+    const s = await setup('user_premium_photo');
+    await db
+      .update(households)
+      .set({ entitlement: 'premium' })
+      .where(eq(households.id, s.household.id));
+    const id = uuid7();
+
+    const set = await s.put('user_premium_photo', id, {
+      ...daily(s.childIds),
+      requires_photo: true,
+    });
+    expect(set.status).toBe(201);
+    expect((await set.json()) as Chore).toMatchObject({ requires_photo: true, version: 1 });
+
+    const clear = await s.put('user_premium_photo', id, { requires_photo: false }, t2);
+    expect(clear.status).toBe(200);
+    expect((await clear.json()) as Chore).toMatchObject({ requires_photo: false, version: 2 });
   });
 });
 

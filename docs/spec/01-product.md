@@ -33,7 +33,7 @@ Kinds: `once` (due_date), `daily`, `weekdays` (bit mask Mon=0…Sun=6). Start/en
 ## Tiers
 | | free | premium |
 |---|---|---|
-| children | 1 (+ grace: extra children added at onboarding, parent-read-only after 14 days) | unlimited |
+| children | 1 (+ grace: extra children added at onboarding, child row and assignment membership become parent-read-only after 14 days) | unlimited |
 | parents | 2 | unlimited |
 | chores | unlimited | unlimited |
 | pet, streak, coins | yes | yes |
@@ -43,6 +43,12 @@ Kinds: `once` (due_date), `daily`, `weekdays` (bit mask Mon=0…Sun=6). Start/en
 | photo proof | no | yes |
 
 Pricing: $39.99/yr · $6.99/mo · $79.99 lifetime. No trial, no credit card for free. Paywall only when a gate is hit. RevenueCat entitlement `premium`, webhook → `households.entitlement`. Child side is never gated.
+
+After an over-quota child's 14-day grace ends, a parent cannot edit that child's first name,
+`ui_mode`, pet name or reminder time, or add or remove that child as a chore assignee. Everything
+on the child's own side remains available: chores, pet, streak, coins, grove and shop. A shared
+chore belongs to neither child, so its title, icon and recurrence remain editable while its
+assignment membership is locked.
 
 Built-in reward catalog, copied into each household when it is created: 50 pick a snack · 150 30 min screen time / stay up 15 min · 400 pick Friday dinner / small toy. Each row carries a `builtin_key` and the title is rendered from i18n on the device, so the catalog is not seeded in a language. Coins leave a child's ledger when they ask, not when a parent approves (ADR-0014).
 

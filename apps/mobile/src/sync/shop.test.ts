@@ -71,6 +71,30 @@ describe('the catalog', () => {
     for (const reward of shop.rewards) expect(reward.builtin_key).not.toBeNull();
   });
 
+  it('renders a custom reward from the same catalog with the parent-written title unchanged', async () => {
+    await seedCatalog();
+    await db.insert(rewards).values({
+      id: uuid7(),
+      household_id: householdId,
+      builtin_key: null,
+      title: 'לבחור את הסרט',
+      icon: '🎬',
+      cost_coins: 225,
+      is_builtin: false,
+      active: true,
+      sort: 20,
+      updated_at: T,
+      deleted_at: null,
+    });
+
+    expect((await showShop(db, childId)).rewards.at(-1)).toMatchObject({
+      builtin_key: null,
+      title: 'לבחור את הסרט',
+      icon: '🎬',
+      cost_coins: 225,
+    });
+  });
+
   it('drops a built-in a parent hid, rather than leaving it on the shelf', async () => {
     await seedCatalog();
     await db.update(rewards).set({ active: false }).where(eq(rewards.builtin_key, 'snack'));

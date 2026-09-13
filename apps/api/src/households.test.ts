@@ -1,7 +1,9 @@
+import { uuid7 } from '@chores/shared';
+import { eq, sql } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { sql } from 'drizzle-orm';
 import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
+import { children } from './db/schema.ts';
 import { asParent, fakeVerifyToken } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 
@@ -151,6 +153,102 @@ describe('children', () => {
       pet_name: 'Pippa',
       reminder_time: null,
     });
+  });
+
+  it('makes only an over-quota child read-only for parent edits after grace', async () => {
+    const clerkUserId = 'user_child_quota';
+    const { household } = await createHousehold(clerkUserId);
+    const childBase = `/households/${household.id}/children`;
+    const createChild = async (first_name: string) => {
+      const response = await app.request(
+        childBase,
+        asParent(clerkUserId, {
+          method: 'POST',
+          body: JSON.stringify({ first_name, ui_mode: 'big', pet_name: 'Pip' }),
+        }),
+      );
+      expect(response.status).toBe(201);
+      return (await response.json()) as { id: string; read_only_after: string | null };
+    };
+
+    const first = await createChild('Noa');
+    const second = await createChild('Ori');
+    expect(first.read_only_after).toBeNull();
+    expect(Date.parse(second.read_only_after!)).toBeGreaterThan(Date.now() + 13 * 86_400_000);
+    expect(Date.parse(second.read_only_after!)).toBeLessThan(Date.now() + 15 * 86_400_000);
+
+    const sharedId = uuid7();
+    const soloId = uuid7();
+    const choreBase = `/households/${household.id}/chores`;
+    const putChore = (id: string, fields: Record<string, unknown>, updated_at: string) =>
+      app.request(
+        `${choreBase}/${id}`,
+        asParent(clerkUserId, {
+          method: 'PUT',
+          body: JSON.stringify({ fields, updated_at }),
+        }),
+      );
+    expect(
+      (
+        await putChore(
+          sharedId,
+          { title: 'Dishes', kind: 'daily', assignees: [first.id, second.id] },
+          '2026-09-09T10:00:00.000Z',
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await putChore(
+          soloId,
+          { title: 'Laundry', kind: 'daily', assignees: [first.id] },
+          '2026-09-09T10:00:00.000Z',
+        )
+      ).status,
+    ).toBe(201);
+
+    await db
+      .update(children)
+      .set({ readOnlyAfter: new Date('2020-01-01T00:00:00.000Z') })
+      .where(eq(children.id, second.id));
+
+    const childEdit = await app.request(
+      `${childBase}/${second.id}`,
+      asParent(clerkUserId, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          first_name: 'Or',
+          ui_mode: 'little',
+          pet_name: 'Zed',
+          reminder_time: '08:00',
+        }),
+      }),
+    );
+    expect(childEdit.status).toBe(402);
+    expect(await childEdit.json()).toEqual({ error: 'gated', gate: 'child_quota' });
+
+    const titleEdit = await putChore(
+      sharedId,
+      { title: 'Wash dishes', icon: '🍽️', kind: 'weekdays', weekday_mask: 31 },
+      '2026-09-09T11:00:00.000Z',
+    );
+    expect(titleEdit.status).toBe(200);
+    expect(await titleEdit.json()).toMatchObject({
+      title: 'Wash dishes',
+      icon: '🍽️',
+      kind: 'weekdays',
+      weekday_mask: 31,
+      assignees: [first.id, second.id],
+    });
+
+    for (const [id, assignees] of [
+      [sharedId, [first.id]],
+      [soloId, [first.id, second.id]],
+    ] as const) {
+      const assignmentEdit = await putChore(id, { assignees }, '2026-09-09T12:00:00.000Z');
+      expect(assignmentEdit.status).toBe(402);
+      expect(await assignmentEdit.json()).toEqual({ error: 'gated', gate: 'child_quota' });
+    }
   });
 
   it('rejects a child the household does not accept', async () => {

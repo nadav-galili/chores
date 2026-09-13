@@ -65,6 +65,10 @@ export default function Partner() {
   };
 
   const pending = people?.invites.filter((i) => i.accepted_at === null) ?? [];
+  const quotaReached =
+    state.status === 'ready' &&
+    state.me.household?.entitlement === 'free' &&
+    (people?.parents.length ?? 0) + pending.length >= 2;
 
   return (
     <Screen>
@@ -93,9 +97,13 @@ export default function Partner() {
       />
       <ErrorText>{error}</ErrorText>
       <Button
-        title={t('partner.add')}
-        onPress={submit}
-        disabled={busy || email.trim().length === 0}
+        title={quotaReached ? t('paywall.lockedPrice') : t('partner.add')}
+        onPress={
+          quotaReached
+            ? () => router.push({ pathname: '/(parent)/paywall', params: { gate: 'parent_quota' } })
+            : submit
+        }
+        disabled={busy || (!quotaReached && email.trim().length === 0)}
       />
       <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>

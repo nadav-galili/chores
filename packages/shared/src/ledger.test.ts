@@ -9,6 +9,7 @@ import {
   type LedgerInstance,
   type ReconcileInput,
 } from './ledger.ts';
+import type { MoneyLedgerEntry } from './money-ledger.ts';
 import { uuid5 } from './uuid5.ts';
 
 const household = '9d0b8a7c-1111-4222-8333-444455556666';
@@ -253,6 +254,50 @@ describe('reconcileLedger: rejection', () => {
       entries: [...paid.entries, ...clawed.entries],
     });
     expect(again.entries).toEqual([]);
+  });
+
+  it("claws back a day's earnings without touching payout or adjust entries", () => {
+    const a = inst('2026-09-09');
+    const c = completion(a);
+    const paid = reconcile({ instances: [a], completions: [c] });
+    const payout: MoneyLedgerEntry = {
+      id: '77777777-0000-4000-8000-000000000001',
+      household_id: household,
+      child_id: noa,
+      kind: 'payout',
+      coins: -20,
+      money_amount: 200,
+      note: null,
+      ref_type: null,
+      ref_id: null,
+      created_at: at,
+      created_by: device,
+    };
+    const adjust: MoneyLedgerEntry = {
+      id: '77777777-0000-4000-8000-000000000002',
+      household_id: household,
+      child_id: noa,
+      kind: 'adjust',
+      coins: 5,
+      money_amount: null,
+      note: 'Correction',
+      ref_type: null,
+      ref_id: null,
+      created_at: at,
+      created_by: device,
+    };
+
+    const out = reconcile({
+      instances: [a],
+      completions: [{ ...c, status: 'rejected' }],
+      entries: [...paid.entries, payout, adjust],
+    });
+
+    expect(out.entries.map((e) => [e.kind, e.ref_id])).toEqual([
+      ['clawback', paid.entries[0]!.id],
+      ['clawback', paid.entries[1]!.id],
+    ]);
+    expect(out.entries.some((e) => e.ref_id === payout.id || e.ref_id === adjust.id)).toBe(false);
   });
 });
 

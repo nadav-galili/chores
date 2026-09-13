@@ -98,7 +98,9 @@ describe('applyPull', () => {
         }),
       ]),
     );
-    expect(await db.select().from(children)).toMatchObject([{ id: childId, ui_mode: 'little' }]);
+    expect(await db.select().from(children)).toMatchObject([
+      { id: childId, ui_mode: 'little', read_only_after: null },
+    ]);
     expect(await db.select().from(chores)).toMatchObject([
       { id: choreId, title: 'Dishes', requires_photo: false, field_clocks: { title: T } },
     ]);
@@ -107,6 +109,28 @@ describe('applyPull', () => {
     ]);
     expect(await db.select().from(choreInstances)).toMatchObject([{ chore_date: TODAY }]);
     expect(await readCursor(db)).toBe(4);
+  });
+
+  it('stores a sibling read_only_after mirror without using it to filter the grove', async () => {
+    const siblingId = uuid7();
+    const readOnlyAfter = '2026-09-23T12:00:00.000Z';
+    await applyPull(
+      db,
+      page([
+        change('children', 'insert', childRow),
+        change('children', 'insert', {
+          ...childRow,
+          id: siblingId,
+          first_name: 'Ori',
+          read_only_after: readOnlyAfter,
+        }),
+      ]),
+    );
+
+    expect(await db.select().from(children)).toMatchObject([
+      { id: childId, read_only_after: null },
+      { id: siblingId, read_only_after: readOnlyAfter },
+    ]);
   });
 
   it('starts at cursor 0 and moves it only forward', async () => {
@@ -282,8 +306,22 @@ describe('todayList', () => {
     );
     const list = await todayList(db, childId, TODAY);
     expect(list).toEqual([
-      { id: instanceId(b, childId, TODAY), chore_id: b, title: 'Apple', icon: '🍽️', status: 'due' },
-      { id: instanceId(a, childId, TODAY), chore_id: a, title: 'Zebra', icon: '🦓', status: 'due' },
+      {
+        id: instanceId(b, childId, TODAY),
+        chore_id: b,
+        title: 'Apple',
+        icon: '🍽️',
+        status: 'due',
+        requires_photo: false,
+      },
+      {
+        id: instanceId(a, childId, TODAY),
+        chore_id: a,
+        title: 'Zebra',
+        icon: '🦓',
+        status: 'due',
+        requires_photo: false,
+      },
     ]);
   });
 });

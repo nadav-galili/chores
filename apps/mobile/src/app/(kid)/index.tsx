@@ -64,6 +64,7 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
   }, [router, device]);
 
   const today = useToday(session, () => void onRevoked());
+  const mode = useTheme().uiMode;
 
   return (
     <View style={styles.screen}>
@@ -93,7 +94,13 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
             title={item.title}
             icon={item.icon}
             done={item.status === 'done'}
-            coins={COINS_PER_CHORE}
+            // Waiting on a grown-up is not done and pays nothing yet: no strike-through, no
+            // coins, and the camera glyph with the waiting line for the screen reader.
+            waiting={item.requires_photo && item.status === 'pending_photo'}
+            waitingLabel={t(`kid.${mode}.waitingPhoto`)}
+            coins={
+              item.requires_photo && item.status === 'pending_photo' ? undefined : COINS_PER_CHORE
+            }
             onPress={() => today.toggle(item)}
           />
         )}
@@ -165,7 +172,8 @@ function RedoSection({ today }: { today: Today }) {
               title={item.title}
               icon={item.icon}
               done={false}
-              coins={COINS_PER_CHORE}
+              // A photo redo waits on a grown-up like any photo: no coins promised on the row.
+              coins={item.requires_photo ? undefined : COINS_PER_CHORE}
               onPress={() => today.redo(item)}
             />
           ))}

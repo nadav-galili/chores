@@ -42,8 +42,9 @@ export type LedgerEntry = {
   /** Signed. Balance is always SUM(coins); never stored. */
   coins: number;
   money_amount: number | null;
-  ref_type: LedgerRefType;
-  ref_id: string;
+  /** Payout and adjustment rows have no source fact to reference. */
+  ref_type: LedgerRefType | null;
+  ref_id: string | null;
   created_at: string;
   created_by: string;
 };
@@ -69,7 +70,7 @@ export type ReconcileInput = SummarizeOptions & {
   instances: readonly LedgerInstance[];
   /** Every completion of this child for those instances, whatever its status. */
   completions: readonly LedgerCompletion[];
-  /** Every earn/bonus/streak/clawback entry this child already has. */
+  /** Every entry this child already has; only grant kinds are reconciled. */
   entries: readonly ExistingEntry[];
   /** Stamped on every row produced. */
   created_at: string;
