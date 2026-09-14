@@ -254,7 +254,13 @@ else
 fi
 say ""
 note "Railway must be linked to the 'chores' project for stages 9 and 10."
-railway status 2>/dev/null | head -5 || warn "railway status failed — run 'railway link' in another terminal."
+# Captured rather than piped to head: under pipefail, head closing the pipe early
+# kills railway with SIGPIPE and a linked project reads as a failure.
+if railway_status=$(railway status 2>/dev/null); then
+  printf '%s\n' "$railway_status" | sed -n '1,6p'
+else
+  warn "railway status failed — run 'railway link' in another terminal."
+fi
 pause "Press Enter when the tooling looks right."
 
 # ── 2 ─────────────────────────────────────────────────────────────────────
