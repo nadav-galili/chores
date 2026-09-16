@@ -18,7 +18,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.mibokids.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "plugins": [
       "expo-router",
