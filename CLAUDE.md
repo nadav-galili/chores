@@ -26,6 +26,8 @@ One ticket per session, in this order:
 3. **Close out** — `git push origin main`, then `gh issue close N --comment` with the commit hash and one line per acceptance criterion that needed a judgement call. Done when the ticket shows closed and the next frontier is listed in the reply.
 4. **`/clear`** before the next ticket. The ticket is self-contained, so this session's context is disposable.
 
+**`ops` tickets are the exception to step 2.** A ticket labelled `ops` has no diff to write — its acceptance criteria live in RevenueCat, App Store Connect, Cloudflare or on a physical device (see `docs/agents/triage-labels.md`). Read the label before exploring: the deliverable is a wizard in `scripts/` that walks a human through the clicking, modelled on `scripts/setup-premium.sh`, not an implementation.
+
 When a ticket exposes a gap in the spec, resolve it in the ticket's comments and keep building; edit `docs/spec/` only if the gap changes a documented rule, and add an ADR only if the decision is hard to reverse.
 
 ## Layout and commands (per ADR-0007)
@@ -35,8 +37,11 @@ Three workspaces — `apps/mobile`, `apps/api`, `packages/shared` — laid out a
 ```
 pnpm dev                                               # concurrently: api (tsx watch) + expo start --dev-client
 pnpm --filter api db:generate                          # drizzle-kit generate after editing src/db/schema.ts
-railway up --service api --ci                          # from the repo root; service `api` in Railway project `chores`
+scripts/deploy-api.sh                                  # deploy apps/api, stamped with HEAD's commit
+scripts/check-deploy.sh                                # is the live API this commit? /health reports the sha
 ```
+
+A container that boots and passes its healthcheck says nothing about *which* build is in it: an API deployed before a milestone landed answers `/health` normally and silently 404s the routes it has never heard of. Nothing deploys automatically — CI runs typecheck, lint and test only — so run `scripts/check-deploy.sh` before trusting anything against the live API.
 
 Tooling: pnpm workspaces + Turborepo, Node 22, `node-linker=hoisted`, TypeScript 6 strict, ESLint flat config at the root, Prettier, Vitest per workspace, GitHub Actions (`.github/workflows/ci.yml`) running typecheck, lint, test on PR and on main.
 
@@ -62,4 +67,4 @@ Never stored, always derived: balance is `SUM(coins)`, grove stage is `COUNT(*)`
 
 ## Working style (from the brief)
 
-Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. App name "Mibo", bundle id and Android package `com.mibokids.app` (see `docs/spec/05-store-listing.md`). Pet name is per-child: a parent sets a starting name, the child may rename it. The npm scope `@chores/shared`, the repo, the Railway project and `NAMESPACE_CHORES` keep the original name — `NAMESPACE_CHORES` is frozen by ADR-0010 and must never change.
+Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. App name "Mibo" — "Kids" appears in the identifier only, never in the brand, and the store title is `Mibo: Chores Tracker` (`docs/spec/05-store-listing.md`). Bundle id and Android package `com.mibokids.app`. Pet name is per-child: a parent sets a starting name, the child may rename it. The npm scope `@chores/shared`, the repo, the Railway project and `NAMESPACE_CHORES` keep the original name — `NAMESPACE_CHORES` is frozen by ADR-0010 and must never change.

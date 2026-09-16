@@ -50,9 +50,13 @@ export function createApp(
 ) {
   const app = new Hono();
 
+  // The commit is reported because a healthy container says nothing about *which* build is in it:
+  // an API that predates a milestone answers `/health` exactly like one that does not, and the
+  // routes it is missing only 404 for whoever happens to call them. `scripts/check-deploy.sh`
+  // reads this. `unknown` means the image was built without the argument, not that it is current.
   app.get('/health', async (c) => {
     await db.execute(sql`select 1`);
-    return c.json({ ok: true });
+    return c.json({ ok: true, sha: process.env.GIT_SHA ?? 'unknown' });
   });
 
   app.use('/me', requireClerkUser(verifyToken));

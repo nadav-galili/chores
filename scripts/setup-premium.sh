@@ -277,6 +277,14 @@ else
   confirm "Continue anyway?" || exit 1
 fi
 say ""
+say "Checking the live API is *this* commit:"
+# Answering /health proves a container is up, not that it knows the webhook route. A deploy that
+# predates M3 404s every delivery, and a 404 on a webhook is a silence, not an alarm.
+if ! "$REPO_ROOT/scripts/check-deploy.sh" "$API_BASE"; then
+  warn "The live API is behind this working tree — the webhook route may not exist yet."
+  confirm "Continue anyway?" || exit 1
+fi
+say ""
 note "Railway must be linked to the 'chores' project for stages 9 and 10."
 # Captured rather than piped to head: under pipefail, head closing the pipe early
 # kills railway with SIGPIPE and a linked project reads as a failure.

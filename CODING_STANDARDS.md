@@ -63,6 +63,16 @@ The two banned shapes are the two a linter can see, so `no-empty` and `no-empty-
 
 This rule is evidence rather than an ADR: four bugs in one session — a discarded OAuth error, two discarded `uuid7()` failures and one with no `catch` at all — each cost a ten-minute instrumented device build to learn something the device already knew. (#36)
 
+## A shell script's failures are real failures
+
+`scripts/*.sh` all run `set -euo pipefail`, which makes every command in a pipeline load-bearing — including the reader.
+
+**A command whose output is truncated is captured first, then sliced.** Violation: piping a long-running or chatty command into a filter that stops reading early — `head`, `sed -n '1,5p'`, `grep -q`, `jq -e` with `--exit-status` on a stream. The filter exits, the writer gets SIGPIPE, `pipefail` reports the pipeline as failed, and the `|| warn` fires on a perfectly healthy command. Write `out=$(cmd)` and then `printf '%s\n' "$out" | head -5`.
+
+Shellcheck does not see this one, which is why it is here. It cost a session a false "railway status failed" against a correctly linked project (#75).
+
+**An interactive checklist offers three answers, not two.** Violation: a `[y/n]` prompt over work the person may not have been able to attempt yet — the only way to avoid recording a FAILED for untried work is to abandon the run. Default the bare Enter to *not yet run* and keep it out of both columns.
+
 ## Frozen identifiers
 
 **`NAMESPACE_CHORES` must never change** — deterministic ids are derived from it, so changing it silently breaks every existing id. Violation: any edit to its value. (ADR-0010)

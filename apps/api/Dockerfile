@@ -12,6 +12,11 @@ COPY apps/api apps/api
 RUN pnpm --filter api... build
 
 FROM base AS runtime
+# `/health` reports this so a deploy can be told apart from the commit it was meant to be. Railway
+# passes service variables to a Dockerfile build as build arguments, and `scripts/deploy-api.sh`
+# sets `GIT_SHA` to the working tree's commit right before it uploads.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 ENV NODE_ENV=production
 COPY --from=build /repo /repo
 WORKDIR /repo/apps/api
