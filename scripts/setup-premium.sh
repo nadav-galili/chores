@@ -184,7 +184,25 @@ finish() {
 # STAGES — M3 premium ops (GitHub issue #75).
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=15
+TOTAL_STAGES=16
+
+# open_url override — the library opens the default browser, which here is Arc.
+# These dashboards are worked in Chrome, so target it by name and fall back to
+# the library's behaviour if it is not installed.
+BROWSER_APP="${BROWSER_APP:-Google Chrome}"
+open_url() {
+  local url="$1"
+  printf '  %s↗ opening%s %s %s(%s)%s\n' "$GREEN" "$RESET" "$url" "$DIM" "$BROWSER_APP" "$RESET"
+  if [[ "$OSTYPE" == darwin* ]] && open -a "$BROWSER_APP" "$url" >/dev/null 2>&1; then
+    return
+  fi
+  { if   command -v wslview      >/dev/null 2>&1; then wslview "$url"
+    elif command -v explorer.exe >/dev/null 2>&1; then explorer.exe "$url"
+    elif command -v xdg-open     >/dev/null 2>&1; then xdg-open "$url"
+    elif command -v open         >/dev/null 2>&1; then open "$url"
+    else warn "couldn't open a browser - visit it manually: $url"; fi
+  } >/dev/null 2>&1 || warn "couldn't open a browser - visit it manually: $url"
+}
 
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 API_ENV="$REPO_ROOT/apps/api/.env"
@@ -228,7 +246,7 @@ check() {
 
 banner "Mibo premium setup — RevenueCat, App Store Connect, R2, device tests"
 
-# ── 1 ─────────────────────────────────────────────────────────────────────
+# ── 1 ───────────────────────────────────────────────────────────────────
 stage "Preflight"
 say "Checking the tools the later stages shell out to."
 missing=0
@@ -263,7 +281,36 @@ else
 fi
 pause "Press Enter when the tooling looks right."
 
-# ── 2 ─────────────────────────────────────────────────────────────────────
+# ── 2 ───────────────────────────────────────────────────────────────────
+stage "Apple — bundle ID, app record, agreements"
+say "RevenueCat cannot validate its purchase key until Apple knows this bundle id,"
+say "and no product can be fetched until the paid agreement is active."
+open_url "https://developer.apple.com/account/resources/identifiers/list"
+step "+ → App IDs → App → Explicit Bundle ID: $BUNDLE_ID"
+step "Leave the In-App Purchase capability checked, then Register."
+pause "Press Enter once the identifier exists."
+say ""
+open_url "https://appstoreconnect.apple.com/apps"
+step "+ → New App → iOS, then pick $BUNDLE_ID from the Bundle ID dropdown."
+note "  It appears only once the identifier above has propagated — usually seconds."
+step "SKU: any private string, e.g. mibo-ios-001. Never shown publicly."
+step "Name: must be unique across the whole App Store, so plain 'Mibo' may be taken."
+note "  It need not match expo.name in app.json and is editable until you ship."
+pause "Press Enter once the app record exists."
+say ""
+open_url "https://appstoreconnect.apple.com/business"
+step "Agreements, Tax, and Banking → Paid Applications must read Active,"
+step "with tax and banking details filled in."
+warn "Until it is active, products exist but no device can fetch them. The paywall"
+warn "then fails as 'current offering is missing' and reads like a RevenueCat fault"
+warn "rather than Apple paperwork. Bank verification can take a day or two."
+if ! confirm "Is the Paid Applications agreement Active?"; then
+  SKIPPED+=("Paid Applications agreement — the products in stage 5 stay unfetchable until it is Active")
+  warn "Noted. Carry on configuring; the device stages cannot pass until it clears."
+fi
+pause
+
+# ── 3 ───────────────────────────────────────────────────────────────────
 stage "RevenueCat — project and apps"
 say "One RevenueCat project holds both store apps for Mibo."
 open_url "https://app.revenuecat.com/projects"
@@ -274,7 +321,7 @@ step "Then Apps → + New → Play Store. Package name: $BUNDLE_ID"
 note "The Play Store app can wait if you are only hand-testing on iOS today."
 pause "Press Enter once the project and at least the App Store app exist."
 
-# ── 3 ─────────────────────────────────────────────────────────────────────
+# ── 4 ───────────────────────────────────────────────────────────────────
 stage "RevenueCat — SDK API keys"
 ENV_FILE="$MOBILE_ENV"
 say "The app reads these at build time (apps/mobile/src/lib/purchases.ts)."
@@ -290,7 +337,7 @@ note "These are public SDK keys — safe in the client, not secrets."
 warn "EXPO_PUBLIC_* are inlined at build time: rebuild the dev client after this."
 pause
 
-# ── 4 ─────────────────────────────────────────────────────────────────────
+# ── 5 ───────────────────────────────────────────────────────────────────
 stage "App Store Connect — the three products"
 say "Three products, one offering. Prices are fixed by ADR-0005."
 open_url "https://appstoreconnect.apple.com/apps"
@@ -309,7 +356,7 @@ say ""
 step "Give all three a cleared-for-sale price and at least one localization."
 pause "Press Enter once all three exist and are 'Ready to Submit'."
 
-# ── 5 ─────────────────────────────────────────────────────────────────────
+# ── 6 ───────────────────────────────────────────────────────────────────
 stage "App Store Connect — sandbox testers"
 say "You need two: one buys premium, the other checks the partner path."
 open_url "https://appstoreconnect.apple.com/access/users/sandbox"
@@ -320,7 +367,7 @@ note "Both testers must map to parents in the same household — the webhook res
 note "the buyer by Clerk user id and writes the entitlement on their household."
 pause "Press Enter once both sandbox testers exist."
 
-# ── 6 ─────────────────────────────────────────────────────────────────────
+# ── 7 ───────────────────────────────────────────────────────────────────
 stage "RevenueCat — Product catalog → Products"
 say "Import the three App Store Connect ids so RevenueCat can price them."
 open_url "https://app.revenuecat.com/projects"
@@ -331,7 +378,7 @@ step "Add: $RC_PRODUCT_LIFETIME"
 note "Each must attach to the App Store app you created in stage 2."
 pause "Press Enter once all three products show in the catalog."
 
-# ── 7 ─────────────────────────────────────────────────────────────────────
+# ── 8 ───────────────────────────────────────────────────────────────────
 stage "RevenueCat — the 'premium' entitlement"
 say "The identifier is not a free choice — the server compares it literally."
 open_url "https://app.revenuecat.com/projects"
@@ -344,7 +391,7 @@ note "'premium'; apps/mobile/src/lib/purchases.ts reads entitlements.active.prem
 note "Any other identifier means purchases succeed and nothing unlocks."
 pause "Press Enter once the entitlement exists with all three products."
 
-# ── 8 ─────────────────────────────────────────────────────────────────────
+# ── 9 ───────────────────────────────────────────────────────────────────
 stage "RevenueCat — the current offering"
 say "The paywall renders exactly the current offering's three packages."
 open_url "https://app.revenuecat.com/projects"
@@ -359,7 +406,7 @@ note "and 'must contain three products' unless exactly Annual + Monthly + Lifeti
 note "resolve. A fourth package type is filtered out; a missing one is fatal."
 pause "Press Enter once the offering is current with all three packages."
 
-# ── 9 ─────────────────────────────────────────────────────────────────────
+# ── 10 ──────────────────────────────────────────────────────────────────
 stage "RevenueCat — webhook and signing secret"
 ENV_FILE="$API_ENV"
 say "The webhook is the only thing that may write an entitlement (ADR-0016)."
@@ -384,7 +431,7 @@ note "PRODUCT_CHANGE and NON_RENEWING_PURCHASE. Send all event types — the res
 note "are stored for the audit trail and change nothing."
 pause
 
-# ── 10 ────────────────────────────────────────────────────────────────────
+# ── 11 ──────────────────────────────────────────────────────────────────
 stage "R2 — bucket, credentials, lifecycle"
 say "scripts/setup-r2.sh does the whole thing: bucket, CORS, the 30-day rule"
 say "(ADR-0017), bucket-scoped credentials, and the four Railway variables."
@@ -412,7 +459,7 @@ else
 fi
 pause
 
-# ── 11 ────────────────────────────────────────────────────────────────────
+# ── 12 ──────────────────────────────────────────────────────────────────
 stage "Device test — M3.4 purchase, restore, partner"
 warn "From here on you need a real device, a dev client built AFTER stage 3,"
 warn "and the sandbox tester from stage 5 signed in."
@@ -424,7 +471,7 @@ check "M3.4 restore on reinstall" "Delete the app, reinstall, sign in, Restore P
 check "M3.4 partner sees premium" "The second parent, who bought nothing, sees the household as premium."
 pause
 
-# ── 12 ────────────────────────────────────────────────────────────────────
+# ── 13 ──────────────────────────────────────────────────────────────────
 stage "Device test — M3.12 photo proof"
 say "Needs stage 10 to have completed, and a chore with photo proof required."
 check "M3.12 camera opens" "Tapping done on a photo-proof chore opens the camera from the done moment."
@@ -432,13 +479,13 @@ check "M3.12 waiting copy" "After the snap the card reads as waiting for a paren
 check "M3.12 offline upload" "In airplane mode the snap is accepted, and it uploads once the network returns."
 pause
 
-# ── 13 ────────────────────────────────────────────────────────────────────
+# ── 14 ──────────────────────────────────────────────────────────────────
 stage "Device test — M3.8 allowance screen and RTL"
 check "M3.8 allowance screen" "The allowance screen renders correctly on the device."
 check "M3.8 Hebrew RTL" "With the device language set to Hebrew the screen mirrors properly — no clipped or reversed numbers."
 pause
 
-# ── 14 ────────────────────────────────────────────────────────────────────
+# ── 15 ──────────────────────────────────────────────────────────────────
 stage "Device test — the M3 exit criterion"
 say "One pass, end to end, on a free household."
 check "quota shows a price" "A free household adding a second child hits the quota and sees a price."
@@ -449,7 +496,7 @@ check "history past 7 days" "The grid scrolls past 7 days."
 check "photo chore pays" "A photo chore is completed, approved, and pays."
 pause
 
-# ── 15 ────────────────────────────────────────────────────────────────────
+# ── 16 ──────────────────────────────────────────────────────────────────
 stage "Report back to issue #$ISSUE"
 say "Posting the hand-test results as a comment."
 if (( ${#RESULTS[@]} == 0 )); then
