@@ -330,7 +330,9 @@ stage "RevenueCat — SDK API keys"
 ENV_FILE="$MOBILE_ENV"
 say "The app reads these at build time (apps/mobile/src/lib/purchases.ts)."
 open_url "https://app.revenuecat.com/projects"
-step "Project settings → API keys → Public app-specific SDK keys."
+step "API keys — a top-level item in the left sidebar, low down, above"
+note "  Integrations and Project settings. It is NOT a Project settings tab."
+note "  The same key also sits on Apps → your App Store app."
 step "Copy the App Store key — it starts with 'appl_'."
 ask EXPO_PUBLIC_REVENUECAT_IOS_KEY "Paste the iOS (appl_) key:"
 step "Copy the Play Store key — it starts with 'goog_'. Leave blank to skip Android."
@@ -352,6 +354,12 @@ step "Add a second Auto-Renewable Subscription in the same group at \$6.99 / mon
 ask RC_PRODUCT_MONTHLY "Product ID you gave the monthly subscription:"
 step "Then Monetization → In-App Purchases → + → Non-Consumable, at \$79.99."
 ask RC_PRODUCT_LIFETIME "Product ID you gave the lifetime purchase:"
+
+# Strip whitespace: these are pasted from App Store Connect and a trailing space
+# survives the paste, then fails to match in RevenueCat with no visible cause.
+RC_PRODUCT_ANNUAL="${RC_PRODUCT_ANNUAL//[[:space:]]/}"
+RC_PRODUCT_MONTHLY="${RC_PRODUCT_MONTHLY//[[:space:]]/}"
+RC_PRODUCT_LIFETIME="${RC_PRODUCT_LIFETIME//[[:space:]]/}"
 say ""
 note "Lifetime must be Non-Consumable: RevenueCat sends it as NON_RENEWING_PURCHASE"
 note "with no expiry, which is the only shape the server treats as permanent"
