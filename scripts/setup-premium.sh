@@ -233,15 +233,21 @@ railway_set() {
 
 # check "M3.x" "what the tester should see" — record a pass/fail for the issue comment.
 check() {
-  local label="$1" expectation="$2"
+  local label="$1" expectation="$2" reply=""
   step "$expectation"
-  if confirm "$label — did that happen?"; then
-    RESULTS+=("- [x] $label — $expectation")
-    printf '  %s✓ recorded as passing%s\n' "$GREEN" "$RESET"
-  else
-    RESULTS+=("- [ ] $label — FAILED: $expectation")
-    printf '  %s✗ recorded as failing%s\n' "$RED" "$RESET"
-  fi
+  printf '  %s? %s — did that happen? [y/n/Enter = not yet]%s ' "$YELLOW" "$label" "$RESET"
+  read -r reply || true
+  case "$reply" in
+    [Yy]*)
+      RESULTS+=("- [x] $label — $expectation")
+      printf '  %s✓ recorded as passing%s\n' "$GREEN" "$RESET" ;;
+    [Nn]*)
+      RESULTS+=("- [ ] $label — FAILED: $expectation")
+      printf '  %s✗ recorded as failing%s\n' "$RED" "$RESET" ;;
+    *)
+      RESULTS+=("- [ ] $label — not yet run: $expectation")
+      printf '  %s· recorded as not yet run%s\n' "$DIM" "$RESET" ;;
+  esac
 }
 
 banner "Mibo premium setup — RevenueCat, App Store Connect, R2, device tests"
@@ -449,8 +455,10 @@ say "scripts/setup-r2.sh does the whole thing: bucket, CORS, the 30-day rule"
 say "(ADR-0017), bucket-scoped credentials, and the four Railway variables."
 say ""
 step "You need one bootstrap Cloudflare API token with two permissions:"
-note "  Workers R2 Storage → Write"
-note "  Account API Tokens → Write"
+note "  Account → Workers R2 Storage → Edit"
+note "  Account → API Tokens → Edit"
+note "  Scope it to your account under Account Resources. Cloudflare says Edit"
+note "  where its docs say Write — same permission."
 open_url "https://dash.cloudflare.com/profile/api-tokens"
 say ""
 if confirm "Run scripts/setup-r2.sh now?"; then
@@ -474,7 +482,7 @@ pause
 # ── 12 ──────────────────────────────────────────────────────────────────
 stage "Device test — M3.4 purchase, restore, partner"
 warn "From here on you need a real device, a dev client built AFTER stage 3,"
-warn "and the sandbox tester from stage 5 signed in."
+warn "and the sandbox tester from stage 6 signed in."
 say ""
 say "Sign in as a parent whose Clerk account exists in this household."
 check "M3.4 sandbox purchase" "Hitting a gate shows the paywall with all three prices, and buying one succeeds."
