@@ -94,7 +94,7 @@ export function ParentSignIn({
     if (finalizeError) setError(finalizeError.message);
   };
 
-  const google = async () => {
+  const sso = async (provider: 'google' | 'apple') => {
     setError(null);
     try {
       // The path is load-bearing twice over. `sso-callback` is a real screen, so the browser
@@ -104,7 +104,7 @@ export function ParentSignIn({
       // expo-web-browser ends the auth session on — so the flow resolved `dismiss` and threw
       // away a sign-in that had actually succeeded.
       const { authSessionResult } = await startSSOFlow({
-        strategy: 'oauth_google',
+        strategy: provider === 'google' ? 'oauth_google' : 'oauth_apple',
         redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo', path: 'sso-callback' }),
       });
       // A parent who closed the browser themselves has said everything they mean to; the screen
@@ -122,18 +122,22 @@ export function ParentSignIn({
       // Back with no session and no cancel: the browser opened and never handed back. Reported,
       // because this branch went silent once already and cost MIBO-1 its diagnosis.
       const kind = authSessionResult?.type ?? 'none';
-      reportError(new Error(`SSO returned no session (${kind})`), 'parent-sign-in.google');
-      setError(t('signIn.googleUnfinished'));
+      reportError(new Error(`SSO returned no session (${kind})`), `parent-sign-in.${provider}`);
+      setError(provider === 'google' ? t('signIn.googleUnfinished') : t('signIn.appleUnfinished'));
     } catch (e) {
       // The screen says what went wrong, and so does the dashboard: this is the catch that went
       // silent on a real device and cost an instrumented build to read (#35).
-      reportError(e, 'parent-sign-in.google');
+      reportError(e, `parent-sign-in.${provider}`);
       // The one failure the parent can act on: this phone has no browser at all, and the email
       // code below needs none. Every other cause reads as itself.
       if (isMissingBrowser(e)) return setError(t('signIn.googleNoBrowser'));
-      setError(e instanceof Error ? e.message : t('signIn.googleFailed'));
+      const fallback = provider === 'google' ? t('signIn.googleFailed') : t('signIn.appleFailed');
+      setError(e instanceof Error ? e.message : fallback);
     }
   };
+
+  const google = () => sso('google');
+  const apple = () => sso('apple');
 
   if (step.kind === 'code') {
     return (
@@ -165,6 +169,9 @@ export function ParentSignIn({
   return (
     <Screen>
       <Title>{title}</Title>
+      {Platform.OS === 'ios' && (
+        <Button title={t('signIn.apple')} onPress={apple} disabled={busy} />
+      )}
       <Button title={t('signIn.google')} onPress={google} disabled={busy} />
       <Field
         label={t('signIn.emailLabel')}
