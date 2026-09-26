@@ -9,6 +9,7 @@ import { joinRoutes } from './join.ts';
 import { moneyLedgerRoutes } from './money-ledger.ts';
 import { parentDeviceRoutes } from './parent-devices.ts';
 import { pinRoutes } from './pin.ts';
+import { privacyRoutes } from './privacy.ts';
 import { photoApprovalRoutes } from './photo-approval.ts';
 import type { RateLimit } from './rate-limit.ts';
 import { redemptionRoutes } from './redemptions.ts';
@@ -58,6 +59,10 @@ export function createApp(
     await db.execute(sql`select 1`);
     return c.json({ ok: true, sha: process.env.GIT_SHA ?? 'unknown' });
   });
+
+  // Mounted above the auth middleware: the privacy policy is what a parent or a store reviewer
+  // reads before there is an account at all (COPPA, App Review).
+  app.route('/', privacyRoutes());
 
   app.use('/me', requireClerkUser(verifyToken));
   app.use('/households/*', requireClerkUser(verifyToken));
