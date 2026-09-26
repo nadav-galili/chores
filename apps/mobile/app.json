@@ -7,6 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mibo",
     "userInterfaceStyle": "light",
+    "updates": {
+      "url": "https://u.expo.dev/c30aef04-dd9a-4408-995d-0a1d439d030c",
+      "enabled": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "android": {
       "package": "com.mibokids.app",
       "adaptiveIcon": {

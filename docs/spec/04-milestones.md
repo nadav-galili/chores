@@ -49,7 +49,7 @@ Not in M2: custom rewards, the money ledger and photo proof stay behind their M3
 - **Push token rot** — re-register on open; null on `DeviceNotRegistered`.
 
 ## Dependencies (approved once, here)
-- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto, @sentry/react-native
+- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto, @sentry/react-native, expo-updates
 - api: hono, @hono/node-server, drizzle-orm, postgres, zod, @clerk/backend, posthog-node, expo-server-sdk, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 - tooling: turbo, vitest, tsx, drizzle-kit, eslint, prettier, typescript
 

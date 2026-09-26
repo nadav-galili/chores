@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { easJson, profileNames, resolveEnv } from '@/test/config';
 
 /**
  * The Sentry config plugin is added unconditionally (see `app.config.ts`), and passing it no org
@@ -25,32 +24,8 @@ const UPLOADS_SOURCE_MAPS = new Set([
   'production', // Same, and a store build is the one whose stack traces have to be readable.
 ]);
 
-type Profile = {
-  extends?: string;
-  distribution?: string;
-  environment?: string;
-  env?: Record<string, string>;
-};
-
-const easJson = JSON.parse(
-  readFileSync(path.resolve(import.meta.dirname, '../../eas.json'), 'utf8'),
-) as { build: Record<string, Profile> };
-
-/** Follows `extends` the way EAS does: the nearest definition of a variable wins. */
-function resolveEnv(name: string): Record<string, string> {
-  const chain: Profile[] = [];
-  for (let current: string | undefined = name; current;) {
-    const profile: Profile | undefined = easJson.build[current];
-    if (!profile)
-      throw new Error(`eas.json profile "${name}" extends unknown profile "${current}"`);
-    chain.unshift(profile);
-    current = profile.extends;
-  }
-  return Object.assign({}, ...chain.map((profile) => profile.env ?? {}));
-}
-
 describe('eas.json build profiles', () => {
-  const names = Object.keys(easJson.build);
+  const names = profileNames;
 
   it('has profiles to check', () => {
     expect(names.length).toBeGreaterThan(0);
