@@ -485,3 +485,30 @@ The four identity renders came in from `~/Downloads/mimbo-assets` and `android-i
 The splash is 44 KB over its own line and the group is 255 KB under, which is the trade worth making: the egg is the first thing the app ever shows and the three icon assets had room. The bundle is 1.28 MB for all twenty-one assets, under the ~1.5 MB ceiling.
 
 **Still open.** The last acceptance criterion on the ticket is a real device — home screen, launcher, app switcher and cold start — and that needs a dev build, which no post-process can stand in for.
+
+---
+
+## The favicon, and the check that keeps the six honest — 2026-09-26
+
+**`favicon.png` is derived, not generated.** It is `icon` at 48×48, Lanczos, alpha off, quantised to
+128 colours — 1.1 KB. It is not in the manifest above because it is not a painting: a twenty-second
+render of the bird at favicon scale would be a twenty-second chance for the style to drift, and the
+icon already survives 48 points, which is exactly the size being asked for. `app.json` gains a `web`
+block to point at it. Nothing in the app is a web build today, so the favicon ships unread; it is
+here because the store-assets ticket asks for the full Expo slot set, and an empty slot is the kind
+of thing that is discovered on the day web matters.
+
+**`apps/mobile/scripts/check-assets.ts` counts what this document says to count.** Run it with
+`pnpm --filter mobile check:assets`; CI runs it after the test suite. It reads every path out of
+`app.json` rather than listing them itself, so an asset renamed without the config fails as missing.
+Per asset it checks the canvas (1024×1024 for the identity five, 48×48 for the favicon) and the
+alpha channel — present on the splash mark and the two masked layers, absent on the iOS icon, which
+the App Store rejects outright if it is transparent, and absent on the adaptive background.
+
+Then it does **Export and post-process** step 5 as a number: it decodes the foreground and the
+monochrome silhouette and counts the painted pixels falling outside the centred 61% circle. Both are
+0, which is what the identity swap left them at. This is the one check this document records failing
+twice — once in pass 1 by not running it, once in the identity swap by fitting the 60% box and
+assuming the circle followed — so it is now a thing that fails a build rather than a thing someone
+remembers to look at. Re-scaling the foreground to 1400 px before centring it puts 33,952 pixels
+outside the circle and the script exits 1; that is how it was verified to be checking anything.

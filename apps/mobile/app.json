@@ -30,6 +30,9 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",

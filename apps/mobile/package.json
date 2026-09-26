@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate && tsx scripts/bundle-migrations.ts"
+    "db:generate": "drizzle-kit generate && tsx scripts/bundle-migrations.ts",
+    "check:assets": "tsx scripts/check-assets.ts"
   },
   "dependencies": {
     "@chores/shared": "workspace:*",

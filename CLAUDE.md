@@ -41,9 +41,9 @@ scripts/deploy-api.sh                                  # deploy apps/api, stampe
 scripts/check-deploy.sh                                # is the live API this commit? /health reports the sha
 ```
 
-A container that boots and passes its healthcheck says nothing about *which* build is in it: an API deployed before a milestone landed answers `/health` normally and silently 404s the routes it has never heard of. Nothing deploys automatically — CI runs typecheck, lint and test only — so run `scripts/check-deploy.sh` before trusting anything against the live API.
+A container that boots and passes its healthcheck says nothing about *which* build is in it: an API deployed before a milestone landed answers `/health` normally and silently 404s the routes it has never heard of. Nothing deploys automatically — CI runs typecheck, lint, test and the asset check only — so run `scripts/check-deploy.sh` before trusting anything against the live API.
 
-Tooling: pnpm workspaces + Turborepo, Node 22, `node-linker=hoisted`, TypeScript 6 strict, ESLint flat config at the root, Prettier, Vitest per workspace, GitHub Actions (`.github/workflows/ci.yml`) running typecheck, lint, test on PR and on main.
+Tooling: pnpm workspaces + Turborepo, Node 22, `node-linker=hoisted`, TypeScript 6 strict, ESLint flat config at the root, Prettier, Vitest per workspace, GitHub Actions (`.github/workflows/ci.yml`) running typecheck, lint, test and `pnpm --filter mobile check:assets` on PR and on main.
 
 Live API: https://api-production-c5c7.up.railway.app/health
 
