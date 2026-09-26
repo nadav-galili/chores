@@ -83,7 +83,10 @@ the raw payload — run it once per Sentry project:
 ./scripts/setup-sentry.sh
 ```
 
-It sets these in the `preview` environment (`eas env:set`, so re-running just updates them):
+It sets these in the `preview` **and** `production` environments (`eas env:set`, so re-running just
+updates them). Both, because EAS picks a build's environment from the profile's shape rather than
+its name — `distribution: "store"` reads `production`, `developmentClient` reads `development`,
+everything else reads `preview` — so a value present in only one of them fails the other build:
 
 - `EXPO_PUBLIC_SENTRY_DSN` is read at runtime by `src/lib/error-reporting.ts`. With no DSN the
   reporter is a no-op and the app behaves exactly as before — which is why nothing breaks before

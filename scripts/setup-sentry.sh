@@ -248,30 +248,36 @@ ask_secret SENTRY_AUTH_TOKEN "Paste the auth token (hidden):"
 note "not written to $ENV_FILE — it goes straight to EAS in the next stage"
 if [[ -z "$SENTRY_AUTH_TOKEN" ]]; then
   warn "no token given — source maps will not upload"
-  SKIPPED+=("SENTRY_AUTH_TOKEN in EAS (re-run this wizard, or: eas env:set preview --name SENTRY_AUTH_TOKEN --visibility secret)")
+  SKIPPED+=("SENTRY_AUTH_TOKEN in EAS (re-run this wizard, or: eas env:set preview production --name SENTRY_AUTH_TOKEN --visibility secret)")
 fi
 
 # ── 4 ─────────────────────────────────────────────────────────────────────
 stage "EAS — push the four values"
-say "These go to the 'preview' environment, which is the profile that builds"
-say "the internal APK. eas.json holds no Sentry values on purpose: the auth"
-say "token must not be committed, so all four live here together."
+say "These go to the 'preview' and 'production' environments — the internal APK"
+say "and the App Store build. EAS picks the environment from the profile, not"
+say "its name: 'distribution: store' reads 'production', everything else reads"
+say "'preview', so a value in only one of them fails the other build. eas.json"
+say "holds no Sentry values on purpose: the auth token must not be committed,"
+say "so all four live here together."
 if ! command -v eas >/dev/null 2>&1; then
   warn "the eas CLI is not on PATH — install it with: npm i -g eas-cli"
   SKIPPED+=("all four EAS variables (install eas-cli, then re-run this wizard)")
 else
   eas whoami >/dev/null 2>&1 || { step "Signing you in to Expo."; eas login; }
   set_eas() {
-    local name="$1" value="$2" visibility="$3"
+    local name="$1" value="$2" visibility="$3" environment
     [[ -z "$value" ]] && return 0
-    if (cd apps/mobile && eas env:set preview \
-          --name "$name" --value "$value" \
-          --visibility "$visibility" --scope project --non-interactive >/dev/null 2>&1); then
-      printf '  %s✓ set%s EAS preview variable %s (%s)\n' "$GREEN" "$RESET" "$name" "$visibility"
-    else
-      warn "could not set $name"
-      SKIPPED+=("EAS variable $name")
-    fi
+    for environment in preview production; do
+      if (cd apps/mobile && eas env:set "$environment" \
+            --name "$name" --value "$value" \
+            --visibility "$visibility" --scope project --non-interactive >/dev/null 2>&1); then
+        printf '  %s✓ set%s EAS %s variable %s (%s)\n' \
+          "$GREEN" "$RESET" "$environment" "$name" "$visibility"
+      else
+        warn "could not set $name in $environment"
+        SKIPPED+=("EAS variable $name in $environment")
+      fi
+    done
   }
   # EXPO_PUBLIC_* is inlined into the bundle at build time, so it cannot be
   # 'secret' — a secret variable is write-only and the build could not read it.
