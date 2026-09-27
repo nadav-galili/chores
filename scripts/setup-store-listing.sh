@@ -203,6 +203,11 @@ REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SPEC="$REPO_ROOT/docs/spec/05-store-listing.md"
 API_BASE="${API_BASE:-https://mibokids.app}"
 PRIVACY_URL="$API_BASE/privacy"
+# The store needs three URLs and the API serves all three (#84). The apex is the
+# Support URL: it names an address a parent can write to and links the other two,
+# which is the whole of what Apple asks a support page to do.
+TERMS_URL="$API_BASE/terms"
+SUPPORT_URL="$API_BASE"
 BUNDLE_ID="com.mibokids.app"
 ISSUE=82
 
@@ -215,11 +220,52 @@ KEYWORDS="behavior,reward,routine,task,family,habit,star,job,checklist,pocket,mo
 # Held in reserve for a 2.3.8 rejection on the word "Kids" — see stage 3. 30 of 30.
 SUBTITLE_FALLBACK="Chore Chart & Family Allowance"
 
+# The guideline 3.1.2 paragraph, built from the prices ADR-0005 fixes ($39.99/yr,
+# $6.99/mo, $79.99 lifetime, no trial) — the same three scripts/setup-premium.sh
+# creates. Only the two auto-renewable products carry a renewal sentence; Lifetime
+# is Non-Consumable, and describing it as renewing would be the opposite of true.
+SUBSCRIPTION_BLURB="Mibo Premium is an auto-renewable subscription: \$6.99 per month or \$39.99 per year. \
+Payment is charged to your Apple Account at confirmation of purchase. The subscription renews \
+automatically unless it is cancelled at least 24 hours before the end of the current period, and your \
+account is charged for renewal within 24 hours of the end of that period. Manage or cancel it in your \
+Apple Account settings after purchase. Mibo Premium is also available as a one-time purchase of \
+\$79.99, which does not renew. Terms of Use: $TERMS_URL  Privacy Policy: $PRIVACY_URL"
+
 # Section-by-section verification, reported to issue #82 by the last stage.
 RESULTS=()
-# Set by stage 1 and read by stage 4; set by stage 2 and read by stages 5 and 13.
+# Set by stage 1 and read by stages 4 and 11; set by stage 2 and read by stages 5 and 13.
 privacy_live=0
+terms_live=0
+support_live=0
 MADE_FOR_KIDS="no"
+
+# url_serves URL "marker" — is this URL live and serving the page we mean? Captured
+# whole rather than piped into grep -q: under `set -o pipefail` a reader that closes
+# on the first match kills curl with SIGPIPE, and a live page reads as a dead one.
+# Prints the verdict and returns success, so a caller can record it.
+url_serves() {
+  local url="$1" marker="$2" body=""
+  if body=$(curl -fsS --max-time 15 "$url" 2>/dev/null) && [[ "$body" == *"$marker"* ]]; then
+    printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$url"
+    return 0
+  fi
+  printf '  %s✗%s %s does not serve the page App Review expects\n' "$RED" "$RESET" "$url"
+  return 1
+}
+
+# live_or_warn FLAG "warn line" ["second warn line"] — report a URL stage 1 already
+# probed. Three stages paste a URL and then say the same two things about it, and
+# the consequence of a dead one differs per URL, which is what the warn lines carry.
+live_or_warn() {
+  local flag="$1"
+  if (( flag )); then
+    note "  Verified live in stage 1."
+    return
+  fi
+  shift
+  local line
+  for line in "$@"; do warn "  $line"; done
+}
 
 # copy "what" "value" — put a value on the clipboard so it goes into the App Store
 # Connect form character-for-character. Typing a 100-character keyword field by
@@ -318,13 +364,28 @@ else
   printf '  %s✗%s no clipboard tool — every value will have to be typed by hand\n' "$YELLOW" "$RESET"
 fi
 say ""
-say "2. This script still agrees with docs/spec/05-store-listing.md:"
+say "2. This script still agrees with the copy in docs/spec/05-store-listing.md"
+say "   and the prices in ADR-0005:"
 drift=0
 for literal in "$TITLE" "$SUBTITLE" "$KEYWORDS"; do
   if grep -Fq -- "$literal" "$SPEC" 2>/dev/null; then
     printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$literal"
   else
     printf '  %s✗%s %s — not in the spec any more\n' "$RED" "$RESET" "$literal"
+    drift=1
+  fi
+done
+# The 3.1.2 paragraph quotes money at Apple, so its prices are checked against the
+# ADR that fixes them rather than trusted. A store Description promising a price the
+# products do not charge is both a 3.1.2 rejection and a lie to a parent.
+PRICING_ADR="$REPO_ROOT/docs/adr/0005-free-tier-one-child-with-grace-period.md"
+# shellcheck disable=SC2016  # a literal dollar sign, not a variable to expand
+for price in '$39.99' '$6.99' '$79.99'; do
+  if grep -Fq -- "$price" "$PRICING_ADR" 2>/dev/null \
+    && [[ "$SUBSCRIPTION_BLURB" == *"$price"* ]]; then
+    printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$price"
+  else
+    printf '  %s✗%s %s — the subscription paragraph and ADR-0005 disagree\n' "$RED" "$RESET" "$price"
     drift=1
   fi
 done
@@ -345,22 +406,21 @@ if [[ "$KEYWORDS" == *", "* ]]; then
 fi
 (( fields_ok )) || { warn "Fix the copy before continuing."; exit 1; }
 say ""
-say "4. The privacy policy URL App Review will open:"
-# Captured whole rather than piped into grep -q: under `set -o pipefail` a reader
-# that closes on the first match kills curl with SIGPIPE, and a live policy page
-# then reads as a dead one.
-if policy=$(curl -fsS --max-time 15 "$PRIVACY_URL" 2>/dev/null) \
-  && [[ "$policy" == *"Mibo — Privacy Policy"* ]]; then
-  printf '  %s✓%s %s serves the policy\n' "$GREEN" "$RESET" "$PRIVACY_URL"
-  privacy_live=1
-else
-  printf '  %s✗%s %s does not serve the policy\n' "$RED" "$RESET" "$PRIVACY_URL"
-  warn "The route exists in this working tree (apps/api/src/privacy.ts, #80) but the"
-  warn "live container predates it, so it 404s. Deploy before submitting:"
+say "4. The three URLs the store record points at, all served by the API (#84):"
+# Matched on each page's <h1> rather than its <title>: the title of the apex is the
+# store title, which the spec expects ASO to keep changing, and a check that breaks
+# on a rename is a check that gets deleted.
+url_serves "$PRIVACY_URL" "<h1>Mibo — Privacy Policy</h1>" && privacy_live=1
+url_serves "$TERMS_URL"   "<h1>Mibo — Terms of Service</h1>" && terms_live=1
+url_serves "$SUPPORT_URL" "<h1>Mibo</h1>" && support_live=1
+if (( ! privacy_live || ! terms_live || ! support_live )); then
+  say ""
+  warn "The routes exist in this working tree (apps/api/src/{privacy,terms,landing}.ts)"
+  warn "but a live container that predates them 404s. Deploy before submitting:"
   note "    scripts/deploy-api.sh"
   say ""
   "$REPO_ROOT/scripts/check-deploy.sh" "$API_BASE" || true
-  SKIPPED+=("deploy the API so $PRIVACY_URL resolves — App Review rejects a dead policy URL")
+  SKIPPED+=("deploy the API so the store's URLs resolve — App Review rejects a dead one")
 fi
 say ""
 if [[ -f "$REPO_ROOT/apps/mobile/app.json" ]] \
@@ -442,12 +502,9 @@ say "an account, which is why it is served by the API and not by the app."
 open_url_chrome "https://appstoreconnect.apple.com/apps"
 step "General → App Information → Privacy Policy URL:"
 copy "Privacy Policy URL" "$PRIVACY_URL"
-if (( privacy_live )); then
-  note "  Verified live in stage 1."
-else
-  warn "  This URL is 404 right now. Paste it, but deploy before submitting —"
-  warn "  App Review opens it, and a dead policy URL is a rejection."
-fi
+live_or_warn "$privacy_live" \
+  "This URL is 404 right now. Paste it, but deploy before submitting —" \
+  "App Review opens it, and a dead policy URL is a rejection."
 say ""
 step "Leave 'User Privacy Choices URL' empty."
 note "  It is for an in-page control that lets a user exercise privacy rights."
@@ -651,14 +708,52 @@ note "  Apple forms phrases across title, subtitle and keywords, so nothing in t
 note "  first two repeats here. 'app' is omitted because Apple indexes it anyway,"
 note "  and 'ADHD' deliberately — out of scope, and Joon owns the term."
 say ""
-step "Promotional text, Description, Support URL, Marketing URL, Copyright."
+step "Promotional text, Description and Copyright."
 warn "docs/spec/05-store-listing.md specifies the title, subtitle and keywords"
 warn "only. The description is not spec'd, so write it as the parent-facing pitch"
 warn "and keep it out of 2.3.8 territory: describe what the app does for a family"
 warn "rather than claiming children as the audience."
-step "Support URL is required and must resolve. The spec does not name one, so"
-step "any page that answers a parent will do — the repo's issues page works today:"
-copy "Support URL" "https://github.com/nadav-galili/chores/issues"
+step "Support URL is required and must resolve. It is the apex of our own domain,"
+step "which names an address a parent can write to and links both documents:"
+copy "Support URL" "$SUPPORT_URL"
+live_or_warn "$support_live" \
+  "This URL does not answer right now — deploy before submitting."
+note "  Marketing URL is optional and there is no marketing site; leave it empty"
+note "  rather than pointing it at the same page twice."
+say ""
+step "Guideline 3.1.2 — the auto-renewable subscription disclosures. This is the"
+step "one the submission is rejected on, and it is metadata rather than code:"
+note "  The Description must state the subscription's title, its length, the price"
+note "  per period, and that it renews unless cancelled at least 24 hours before"
+note "  the period ends. Paste this paragraph at the end of the Description —"
+note "  the prices are the ones ADR-0005 fixes and setup-premium.sh creates:"
+copy "3.1.2 paragraph" "$SUBSCRIPTION_BLURB"
+say ""
+note "  A functional link to the Terms of Use must be in the Description — the"
+note "  paragraph above carries it — and the EULA field has to hold either"
+note "  Apple's standard EULA or that same link:"
+copy "Terms of Use URL" "$TERMS_URL"
+live_or_warn "$terms_live" \
+  "This URL does not answer right now — deploy before submitting. Apple" \
+  "clicks it, and a dead Terms link is a 3.1.2 rejection."
+say ""
+# 3.1.2 wants the disclosure on the paywall as well as in the store metadata, and
+# that half is a diff rather than a form — it belongs to #83. Read the file rather
+# than asserting what is in it: hardcoding "the paywall lacks this" would keep
+# reporting it long after #83 lands, which is how a wizard starts lying.
+PAYWALL="$REPO_ROOT/apps/mobile/src/app/(parent)/paywall.tsx"
+if grep -qi 'renew' "$PAYWALL" 2>/dev/null && grep -qi 'terms' "$PAYWALL" 2>/dev/null; then
+  note "3.1.2 wants the same disclosure ON the paywall, and $(basename "$PAYWALL") now"
+  note "mentions both renewal and terms — read it once to confirm it reads as Apple"
+  note "wants, then treat this as done."
+else
+  warn "3.1.2 wants the same disclosure ON the paywall, and Mibo's does not carry it:"
+  warn "apps/mobile/src/app/(parent)/paywall.tsx shows RevenueCat's price string and"
+  warn "nothing else — no renewal sentence, no Terms or Privacy link. Store metadata"
+  warn "cannot cover for that. It is a diff, so it belongs to the submission ticket"
+  warn "#83; this wizard only records that it is outstanding."
+  SKIPPED+=("add the 3.1.2 renewal sentence and the Terms/Privacy links to the in-app paywall (#83)")
+fi
 say ""
 step "Pricing and Availability — Mibo is free with a subscription, so price"
 step "tier Free, and pick the territories. A version cannot be submitted without it."
@@ -709,7 +804,8 @@ check "Age rating" "The questionnaire is complete, the rating reads 4+, and the 
 check "App Privacy" "All six data-type groups are answered, every one reads 'not used for tracking', and the section is PUBLISHED."
 check "Privacy and policy agree" "The published labels say nothing the policy at $PRIVACY_URL does not."
 check "Keywords" "The keyword field holds all 100 characters, with no space after any comma."
-check "Description and URLs" "Description, promotional text, Support URL and Copyright are saved."
+check "Description and URLs" "Description, promotional text, Copyright and a Support URL of $SUPPORT_URL are saved."
+check "Subscription disclosures" "The Description states the subscription's length, price and renewal terms and links $TERMS_URL, and the EULA field is answered."
 check "Pricing and Availability" "The price is Free, territories are chosen, and the version no longer reports it as missing."
 check "Export compliance" "The version page does not ask for an encryption answer, because the build carries ITSAppUsesNonExemptEncryption."
 check "App Review Information" "A working parent demo account, the Parent PIN, and how a child device joins are in the review notes."
