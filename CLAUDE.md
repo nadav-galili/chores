@@ -45,7 +45,7 @@ A container that boots and passes its healthcheck says nothing about *which* bui
 
 Tooling: pnpm workspaces + Turborepo, Node 22, `node-linker=hoisted`, TypeScript 6 strict, ESLint flat config at the root, Prettier, Vitest per workspace, GitHub Actions (`.github/workflows/ci.yml`) running typecheck, lint, test and `pnpm --filter mobile check:assets` on PR and on main.
 
-Live API: https://api-production-c5c7.up.railway.app/health
+Live API: https://mibokids.app/health
 
 Local Postgres: `docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`, then `createdb chores_test` inside it.
 

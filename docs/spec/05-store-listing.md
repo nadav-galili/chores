@@ -41,6 +41,6 @@ The **title is a growth lever** and is expected to change with ASO iteration; ke
 
 ## Outstanding
 
-- `mibokids.app` is unregistered and costs about $15 to hand-register. Worth taking to hold the name; the bundle id does not depend on it. (`mibo.app` was $8,999 BIN on Afternic — not needed under this identifier.)
+- ~~`mibokids.app` is unregistered~~ — registered at Cloudflare, and since #84 it is the API's own hostname: `https://mibokids.app` serves the landing page, the privacy policy and the terms of service, and is what the store's Privacy Policy and Support URLs point at. (`mibo.app` was $8,999 BIN on Afternic — not needed under this identifier.)
 - A trademark clearance search on MIBO before first store submission. The screen found zero live US class 9 or 42 registrations and no in-niche store collision, but TMview is not an official register and absence of a hit is not clearance.
 - Icons and the pet's placeholder art.

@@ -22,7 +22,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-production-c5c7.up.railway.app",
+        "EXPO_PUBLIC_API_URL": "https://mibokids.app",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWlib2tpZHMuYXBwJA",
         "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
       }
@@ -32,7 +32,7 @@
       "environment": "production",
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-production-c5c7.up.railway.app",
+        "EXPO_PUBLIC_API_URL": "https://mibokids.app",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWlib2tpZHMuYXBwJA",
         "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
       }

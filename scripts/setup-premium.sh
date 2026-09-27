@@ -207,7 +207,7 @@ open_url() {
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 API_ENV="$REPO_ROOT/apps/api/.env"
 MOBILE_ENV="$REPO_ROOT/apps/mobile/.env"
-API_BASE="https://api-production-c5c7.up.railway.app"
+API_BASE="https://mibokids.app"
 WEBHOOK_URL="$API_BASE/webhooks/revenuecat"
 BUNDLE_ID="com.mibokids.app"
 ISSUE=75

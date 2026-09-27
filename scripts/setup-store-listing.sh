@@ -201,7 +201,7 @@ open_url_chrome() {
 
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 SPEC="$REPO_ROOT/docs/spec/05-store-listing.md"
-API_BASE="${API_BASE:-https://api-production-c5c7.up.railway.app}"
+API_BASE="${API_BASE:-https://mibokids.app}"
 PRIVACY_URL="$API_BASE/privacy"
 BUNDLE_ID="com.mibokids.app"
 ISSUE=82

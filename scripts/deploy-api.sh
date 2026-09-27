@@ -25,5 +25,8 @@ echo "deploy-api: deploying ${sha:0:12}"
 railway variable set "GIT_SHA=$sha" --service api --skip-deploys >/dev/null
 railway up --service api --ci
 
+# Railway's own hostname, explicitly, rather than `check-deploy.sh`'s default. The default is the
+# custom domain now (#84), and this script's job is to say whether the upload took — a question the
+# origin answers whether or not DNS in front of it has been cut over yet.
 echo "deploy-api: verifying"
-scripts/check-deploy.sh
+scripts/check-deploy.sh https://api-production-c5c7.up.railway.app

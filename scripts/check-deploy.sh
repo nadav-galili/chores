@@ -9,7 +9,11 @@
 # Usage: scripts/check-deploy.sh [api-base-url]
 set -euo pipefail
 
-API_BASE="${1:-${API_BASE:-https://api-production-c5c7.up.railway.app}}"
+# The apex of the domain we own, not the Railway-generated hostname (#84). Railway's own name still
+# answers and every build already in TestFlight still calls it, so it stays usable as an argument:
+#   scripts/check-deploy.sh https://api-production-c5c7.up.railway.app
+API_BASE="${1:-${API_BASE:-https://mibokids.app}}"
+RAILWAY_BASE="https://api-production-c5c7.up.railway.app"
 
 command -v jq >/dev/null 2>&1 || { echo "check-deploy: jq is required" >&2; exit 1; }
 
@@ -19,6 +23,13 @@ local_sha=$(git rev-parse HEAD)
 # closes early kills the writer with SIGPIPE and a healthy deploy reads as a failed one.
 if ! health=$(curl -fsS --max-time 15 "$API_BASE/health"); then
   echo "check-deploy: $API_BASE/health did not answer" >&2
+  # The one failure that is not a broken deploy: the custom domain is the default now, so a DNS
+  # record or a certificate that is not there yet reads exactly like a dead API.
+  if [[ "$API_BASE" != "$RAILWAY_BASE" ]]; then
+    echo "  if the custom domain is not cut over yet, run scripts/setup-domain.sh," >&2
+    echo "  or ask Railway's own hostname instead:" >&2
+    echo "    scripts/check-deploy.sh $RAILWAY_BASE" >&2
+  fi
   exit 1
 fi
 

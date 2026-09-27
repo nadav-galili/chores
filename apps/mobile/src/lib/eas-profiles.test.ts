@@ -60,6 +60,13 @@ describe('eas.json build profiles', () => {
 });
 
 /**
+ * The apex of the domain we own, since #84. Spelled out rather than read from `eas.json` — a test
+ * that reads the value it is checking passes whatever is there, including the Railway-generated
+ * hostname this replaced, which App Review reads on the store listing.
+ */
+const PRODUCTION_API_URL = 'https://mibokids.app';
+
+/**
  * The store build is the one nobody gets to re-run cheaply: a wrong API URL or a missing analytics
  * key is found by the reviewer, not by us. So its environment is asserted here rather than trusted.
  *
@@ -80,14 +87,24 @@ describe('the production profile', () => {
   });
 
   it('points at the production API', () => {
-    expect(resolveEnv('production').EXPO_PUBLIC_API_URL).toBe(
-      'https://api-production-c5c7.up.railway.app',
-    );
+    expect(resolveEnv('production').EXPO_PUBLIC_API_URL).toBe(PRODUCTION_API_URL);
   });
 
   it('carries a Clerk publishable key and a PostHog key', () => {
     const env = resolveEnv('production');
     expect(env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY).toMatch(/^pk_(test|live)_/);
     expect(env.EXPO_PUBLIC_POSTHOG_KEY).toMatch(/^phc_/);
+  });
+});
+
+/**
+ * `preview` is the profile a device runs when a human checks something that only exists off the
+ * repo — the three links on Google's OAuth consent screen (#84) among them. A preview build calling
+ * a different API from the store build is a check that proved nothing, and until now nothing said
+ * which API it calls.
+ */
+describe('the preview profile', () => {
+  it('calls the same API as the store build', () => {
+    expect(resolveEnv('preview').EXPO_PUBLIC_API_URL).toBe(PRODUCTION_API_URL);
   });
 });

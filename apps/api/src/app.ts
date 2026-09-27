@@ -6,6 +6,7 @@ import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
 import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
+import { landingRoutes } from './landing.ts';
 import { moneyLedgerRoutes } from './money-ledger.ts';
 import { parentDeviceRoutes } from './parent-devices.ts';
 import { pinRoutes } from './pin.ts';
@@ -17,6 +18,7 @@ import { revenuecatRoutes } from './revenuecat.ts';
 import { rejectionRoutes } from './rejection.ts';
 import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
+import { termsRoutes } from './terms.ts';
 import { todayRoutes } from './today.ts';
 import { uploadRoutes, type R2Config } from './uploads.ts';
 import { weekRoutes } from './week.ts';
@@ -60,9 +62,12 @@ export function createApp(
     return c.json({ ok: true, sha: process.env.GIT_SHA ?? 'unknown' });
   });
 
-  // Mounted above the auth middleware: the privacy policy is what a parent or a store reviewer
-  // reads before there is an account at all (COPPA, App Review).
+  // Mounted above the auth middleware: these three are what a parent, a store reviewer or Google's
+  // OAuth consent screen reads before there is an account at all (COPPA, App Review, #84). All
+  // three are linked by absolute URL from records we do not control, so none of them may move.
   app.route('/', privacyRoutes());
+  app.route('/', termsRoutes());
+  app.route('/', landingRoutes());
 
   app.use('/me', requireClerkUser(verifyToken));
   app.use('/households/*', requireClerkUser(verifyToken));
