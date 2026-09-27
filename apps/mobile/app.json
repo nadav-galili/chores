@@ -55,7 +55,8 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to take a photo when a chore asks for one",
           "microphonePermission": false
         }
-      ]
+      ],
+      "./plugins/with-pods-project-uuids"
     ],
     "experiments": {
       "typedRoutes": true
