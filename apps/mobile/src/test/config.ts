@@ -35,9 +35,14 @@ export type BuildProfile = {
   env?: Record<string, string>;
 };
 
+export type SubmitProfile = {
+  ios?: { ascAppId?: string; appleTeamId?: string };
+};
+
 export type EasJson = {
   cli?: { appVersionSource?: string };
   build: Record<string, BuildProfile>;
+  submit?: Record<string, SubmitProfile>;
 };
 
 export const appJson = readJson<AppJson>('app.json');
