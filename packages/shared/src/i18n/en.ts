@@ -271,6 +271,13 @@ export const en = {
       photo_proof: 'Ask for and review a photo when a chore is finished.',
     },
     includes: 'Every Premium plan unlocks all of these features for the whole household.',
+    // App Store guideline 3.1.2 requires the length, the price and the renewal terms on the
+    // purchase screen itself, not only in the store listing. Lifetime is a Non-Consumable
+    // (ADR-0016), so it is named separately rather than described as renewing.
+    renewal:
+      'Monthly and annual plans renew automatically unless you cancel at least 24 hours before the current period ends. The store account you buy with is charged when the purchase is confirmed and again at each renewal, and you can manage or cancel the plan in that account’s settings. Lifetime is a one-time purchase and never renews.',
+    terms: 'Terms of Use',
+    privacy: 'Privacy Policy',
     annual: 'Annual',
     monthly: 'Monthly',
     lifetime: 'Lifetime',

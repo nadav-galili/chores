@@ -1,11 +1,11 @@
 import { paywallShown, gateSchema, type Gate } from '@chores/shared';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { Button, ErrorText, Loading, ScrollScreen, Title } from '@/components/ui';
 import { capture } from '@/lib/analytics';
-import type { Api } from '@/lib/api';
+import { LEGAL_URLS, type Api } from '@/lib/api';
 import { reportError } from '@/lib/error-reporting';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -178,6 +178,11 @@ function GatedPaywall({ gate }: { gate: Gate }) {
           })}
         </View>
       )}
+      <Text style={styles.renewal}>{t('paywall.renewal')}</Text>
+      <View style={styles.legal}>
+        <LegalLink label={t('paywall.terms')} url={LEGAL_URLS.terms} />
+        <LegalLink label={t('paywall.privacy')} url={LEGAL_URLS.privacy} />
+      </View>
       {status === 'purchasing' && <Text style={styles.status}>{t('paywall.purchasing')}</Text>}
       {status === 'restoring' && <Text style={styles.status}>{t('paywall.restoring')}</Text>}
       {status === 'verifying' && <Text style={styles.status}>{t('paywall.verifying')}</Text>}
@@ -200,6 +205,27 @@ function GatedPaywall({ gate }: { gate: Gate }) {
   );
 }
 
+/**
+ * One of the two documents guideline 3.1.2 wants reachable from the purchase screen. A failed
+ * `openURL` is reported rather than swallowed: a link App Review taps and nothing happens is the
+ * same rejection as no link at all, and on a parent's device it is the only trace we would get.
+ */
+function LegalLink({ label, url }: { label: string; url: string }) {
+  const styles = useThemedStyles(paywallStyles);
+  return (
+    <Pressable
+      onPress={() => {
+        Linking.openURL(url).catch((cause: unknown) => reportError(cause, 'paywall_legal_link'));
+      }}
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      style={styles.legalHit}
+    >
+      <Text style={styles.link}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const paywallStyles = (theme: Theme) => ({
   gate: { ...theme.type.heading, color: theme.colors.text, textAlign: 'center' as const },
   includes: { ...theme.type.body, color: theme.colors.muted, textAlign: 'center' as const },
@@ -219,6 +245,15 @@ const paywallStyles = (theme: Theme) => ({
   productTitle: { ...theme.type.body, color: theme.colors.text },
   price: { ...theme.type.heading, color: theme.colors.text },
   disabled: { opacity: 0.5 },
+  renewal: { ...theme.type.caption, color: theme.colors.muted, textAlign: 'center' as const },
+  legal: {
+    flexDirection: 'row' as const,
+    justifyContent: 'center' as const,
+    gap: theme.space.lg,
+  },
+  // The disclosure reads as fine print, but a link a parent has to hit is still a touch target.
+  legalHit: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
+  link: { ...theme.type.label, color: theme.colors.action, textAlign: 'center' as const },
   loading: { minHeight: 120, gap: theme.space.sm },
   status: { ...theme.type.label, color: theme.colors.muted, textAlign: 'center' as const },
 });

@@ -34,6 +34,17 @@ import { requireArrays } from '@/lib/payload';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
+/**
+ * The two pages the API serves for people rather than for devices (#84): the same origin as the
+ * API, because that is where `apps/api/src/{terms,privacy}.ts` answer. The paywall has to link
+ * both — App Store guideline 3.1.2 wants them on the purchase screen, and a store build points at
+ * `https://mibokids.app`, so the links resolve wherever the build's API does.
+ */
+export const LEGAL_URLS = Object.freeze({
+  terms: `${BASE_URL}/terms`,
+  privacy: `${BASE_URL}/privacy`,
+});
+
 export type Me = { parent: Parent | null; household: Household | null; children: Child[] };
 
 export class ApiError extends Error {
