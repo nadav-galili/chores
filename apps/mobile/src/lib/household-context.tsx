@@ -1,7 +1,15 @@
 import { useAuth } from '@clerk/expo';
 import type { Gate } from '@chores/shared';
 import { useRouter } from 'expo-router';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { openDeviceDb } from '@/db/client';
 import { refreshFlags, startParentAnalytics } from '@/lib/analytics';
 import { createApi, type Api, type Me } from '@/lib/api';
@@ -54,7 +62,12 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
     (gate: Gate) => router.push({ pathname: '/paywall', params: { gate } }),
     [router],
   );
-  const api = useMemo(() => createApi(() => getToken(), onGate), [getToken, onGate]);
+  // Clerk hands back a new `getToken` on every render. Reading it through a ref keeps `api` (and
+  // so `refresh`) stable; keyed on `getToken` directly, every render rebuilt `api`, re-ran the
+  // `/me` effect, and reset any screen effect that depends on `api` before its timer could fire.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+  const api = useMemo(() => createApi(() => getTokenRef.current(), onGate), [onGate]);
   const [state, setState] = useState<State>({ status: 'loading', me: null });
 
   const refresh = useCallback(async () => {
