@@ -28,13 +28,11 @@ export default function ChildrenList() {
               }) +
               (item.reminder_time ? t('children.reminderMeta', { time: item.reminder_time }) : '')
             }
-            onPress={() =>
-              router.push({ pathname: '/(parent)/children/[id]', params: { id: item.id } })
-            }
+            onPress={() => router.push({ pathname: '/children/[id]', params: { id: item.id } })}
           />
         )}
       />
-      <Button title={t('children.add')} onPress={() => router.push('/(parent)/children/new')} />
+      <Button title={t('children.add')} onPress={() => router.push('/children/new')} />
     </Screen>
   );
 }

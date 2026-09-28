@@ -53,15 +53,13 @@ export default function ChoresList() {
               recurrence: recurrenceLabel(item),
               who: item.assignees.map(nameOf).join(', '),
             })}
-            onPress={() =>
-              router.push({ pathname: '/(parent)/chores/[id]', params: { id: item.id } })
-            }
+            onPress={() => router.push({ pathname: '/chores/[id]', params: { id: item.id } })}
           />
         )}
       />
       <Button
         title={t('chores.add')}
-        onPress={() => router.push('/(parent)/chores/new')}
+        onPress={() => router.push('/chores/new')}
         disabled={children.length === 0}
       />
       {children.length === 0 && <ErrorText>{t('chores.needAChild')}</ErrorText>}

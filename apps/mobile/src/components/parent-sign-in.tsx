@@ -116,7 +116,7 @@ export function ParentSignIn({
       if (clerk.session) {
         // The redirect left us on `/sso-callback`, which sits outside the `(parent)` group and
         // so has no gate to send a signed-in parent home. Say it explicitly.
-        router.replace('/(parent)');
+        router.replace('/(parent)/(tabs)/(today)');
         return;
       }
       // Back with no session and no cancel: the browser opened and never handed back. Reported,

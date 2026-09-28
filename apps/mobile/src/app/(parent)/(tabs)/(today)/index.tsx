@@ -1,4 +1,3 @@
-import { useAuth } from '@clerk/expo';
 import type {
   ApprovePhotoResult,
   DecideRedemptionResult,
@@ -12,16 +11,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
-import {
-  Card,
-  Coins,
-  EmptyState,
-  ErrorState,
-  FILL,
-  Loading,
-  NavList,
-  Screen,
-} from '@/components/ui';
+import { Card, Coins, EmptyState, ErrorState, FILL, Loading, Screen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
@@ -387,7 +377,6 @@ export default function ParentToday() {
   const router = useRouter();
   // Set only by a notification tap (`useNotificationTapRouting`), and only ever a uuid.
   const { redemption } = useLocalSearchParams<{ redemption?: string }>();
-  const { signOut } = useAuth();
   const styles = useThemedStyles(todayStyles);
   const household = state.status === 'ready' ? state.me.household : null;
   const today = useParentToday(household?.id ?? null);
@@ -544,7 +533,7 @@ export default function ParentToday() {
             <EmptyState
               title={t('parent.noChildren')}
               actionTitle={t('children.add')}
-              onAction={() => router.push('/(parent)/children/new')}
+              onAction={() => router.push('/children/new')}
             />
           )}
           {householdId !== null && waiting.length > 0 && (
@@ -574,25 +563,6 @@ export default function ParentToday() {
           ))}
         </ScrollView>
       )}
-      {/* Three groups: what the household has, how it is configured, and the way out. */}
-      <NavList
-        groups={[
-          [
-            { title: t('parent.nav.children'), onPress: () => router.push('/(parent)/children') },
-            { title: t('parent.nav.chores'), onPress: () => router.push('/(parent)/chores') },
-            { title: t('parent.nav.rewards'), onPress: () => router.push('/(parent)/rewards') },
-            {
-              title: t('parent.nav.allowance'),
-              onPress: () => router.push('/(parent)/allowance'),
-            },
-          ],
-          [
-            { title: t('parent.nav.partner'), onPress: () => router.push('/(parent)/partner') },
-            { title: t('parent.nav.pin'), onPress: () => router.push('/(parent)/pin') },
-          ],
-          [{ title: t('parent.nav.signOut'), onPress: () => void signOut(), destructive: true }],
-        ]}
-      />
     </Screen>
   );
 }

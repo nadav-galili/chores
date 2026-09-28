@@ -30,19 +30,25 @@ function HouseholdGate() {
     return <Redirect href="/(parent)/create-household" />;
   }
   if (state.status === 'ready' && state.me.household !== null && onCreate) {
-    return <Redirect href="/(parent)" />;
+    return <Redirect href="/(parent)/(tabs)/(today)" />;
   }
   return <ParentStack />;
 }
 
 /**
- * The parent's screens, with headers. The styling is theme-driven so it has to be read inside the
- * provider, and `HasHeaderProvider` is how `Screen` learns not to pay the top inset twice.
+ * Everything above the tabs. The tab bar is one screen of this stack, so the paywall, the
+ * household form and anything else pushed from here covers the bar rather than sitting inside a
+ * tab — which is what a paywall should do, and what keeps `create-household` from being escapable
+ * by tapping another tab before the household exists.
+ *
+ * `(tabs)` draws no header of its own; each tab's stack draws its own.
  */
 function ParentStack() {
   return (
     <HasHeaderProvider>
-      <Stack screenOptions={parentScreens(useTheme())} />
+      <Stack screenOptions={parentScreens(useTheme())}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
     </HasHeaderProvider>
   );
 }
@@ -67,7 +73,7 @@ function SignInGate() {
       <Redirect href="/(parent)/sign-in" />
     );
   }
-  if (pathname === '/sign-in') return <Redirect href="/(parent)" />;
+  if (pathname === '/sign-in') return <Redirect href="/(parent)/(tabs)/(today)" />;
   return (
     <HouseholdProvider>
       <HouseholdGate />

@@ -5,7 +5,7 @@ import { t } from '@/lib/i18n';
 import { getRole, setRole, type Role } from '@/lib/role';
 import { ThemeProvider } from '@/theme';
 
-const ROLE_HOME = { parent: '/(parent)', kid: '/(kid)' } as const;
+const ROLE_HOME = { parent: '/(parent)/(tabs)/(today)', kid: '/(kid)' } as const;
 
 /**
  * The first launch, and the one screen that runs before there is a role to theme for. It gets

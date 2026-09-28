@@ -138,7 +138,7 @@ export default function Devices() {
           actionTitle={t('devices.showJoinCode')}
           onAction={() =>
             router.push({
-              pathname: '/(parent)/children/[id]/join-code',
+              pathname: '/children/[id]/join-code',
               params: { id: child.id },
             })
           }
@@ -166,7 +166,7 @@ export default function Devices() {
         title={t('devices.showJoinCode')}
         secondary
         onPress={() =>
-          router.push({ pathname: '/(parent)/children/[id]/join-code', params: { id: child.id } })
+          router.push({ pathname: '/children/[id]/join-code', params: { id: child.id } })
         }
       />
     </Screen>

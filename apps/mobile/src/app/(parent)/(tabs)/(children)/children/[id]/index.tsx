@@ -24,9 +24,7 @@ export default function EditChild() {
         <Body>{t('paywall.childLocked')}</Body>
         <Button
           title={t('paywall.lockedPrice')}
-          onPress={() =>
-            router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } })
-          }
+          onPress={() => router.push({ pathname: '/paywall', params: { gate: 'child_quota' } })}
         />
       </Screen>
     );
@@ -52,7 +50,7 @@ export default function EditChild() {
             title={t('parent.week.open')}
             secondary
             onPress={() =>
-              router.push({ pathname: '/(parent)/children/[id]/week', params: { id: child.id } })
+              router.push({ pathname: '/children/[id]/week', params: { id: child.id } })
             }
           />
           <Button
@@ -60,7 +58,7 @@ export default function EditChild() {
             secondary
             onPress={() =>
               router.push({
-                pathname: '/(parent)/children/[id]/join-code',
+                pathname: '/children/[id]/join-code',
                 params: { id: child.id },
               })
             }
@@ -69,7 +67,7 @@ export default function EditChild() {
             title={t('childForm.devices')}
             secondary
             onPress={() =>
-              router.push({ pathname: '/(parent)/children/[id]/devices', params: { id: child.id } })
+              router.push({ pathname: '/children/[id]/devices', params: { id: child.id } })
             }
           />
         </>

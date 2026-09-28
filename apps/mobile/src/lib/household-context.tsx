@@ -47,7 +47,7 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
   const router = useRouter();
   const onGate = useCallback(
-    (gate: Gate) => router.push({ pathname: '/(parent)/paywall', params: { gate } }),
+    (gate: Gate) => router.push({ pathname: '/paywall', params: { gate } }),
     [router],
   );
   const api = useMemo(() => createApi(() => getToken(), onGate), [getToken, onGate]);

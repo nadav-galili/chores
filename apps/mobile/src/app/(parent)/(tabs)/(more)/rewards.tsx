@@ -103,7 +103,7 @@ export default function Rewards() {
 
   function edit(reward: Reward) {
     if (state.me?.household?.entitlement !== 'premium') {
-      router.push({ pathname: '/(parent)/paywall', params: { gate: 'custom_rewards' } });
+      router.push({ pathname: '/paywall', params: { gate: 'custom_rewards' } });
       return;
     }
     setConfirmDelete(false);
@@ -119,7 +119,7 @@ export default function Rewards() {
 
   function add() {
     if (state.me?.household?.entitlement !== 'premium') {
-      router.push({ pathname: '/(parent)/paywall', params: { gate: 'custom_rewards' } });
+      router.push({ pathname: '/paywall', params: { gate: 'custom_rewards' } });
       return;
     }
     setConfirmDelete(false);

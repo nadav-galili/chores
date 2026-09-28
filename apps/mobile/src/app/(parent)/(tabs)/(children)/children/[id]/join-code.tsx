@@ -50,7 +50,7 @@ export default function JoinCode() {
       if (e instanceof ApiError && e.code === 'pin_required') {
         issuedFor.current = null;
         setError(t('joinCode.pinRequired'));
-        router.push('/(parent)/pin');
+        router.push('/pin');
         return;
       }
       setError(withCause(t('joinCode.failed'), e));

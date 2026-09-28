@@ -56,7 +56,7 @@ export default function Paywall() {
     else reportError(new Error('paywall opened without a gate'), 'paywall_missing_gate');
   }, [gate]);
 
-  if (!gate) return <Redirect href="/(parent)" />;
+  if (!gate) return <Redirect href="/(parent)/(tabs)/(today)" />;
   return <GatedPaywall gate={gate} />;
 }
 

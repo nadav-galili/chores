@@ -198,8 +198,10 @@ export function useNotificationTapRouting(audience: 'parent' | 'kid'): void {
     // Nothing off the payload is interpolated into a route: the only thing that crosses is a
     // uuid the destination already validated, as a parameter. Routing writes nothing (#51).
     switch (destination.path) {
+      // `/(parent)` is the wire value — the server writes it and pushes already in flight carry
+      // it — so the allowlist keeps it while the route it resolves to moved under the tabs.
       case '/(parent)':
-        router.navigate({ pathname: '/(parent)', params: destination.params });
+        router.navigate({ pathname: '/(parent)/(tabs)/(today)', params: destination.params });
         return;
       case '/(kid)':
         router.navigate('/(kid)');

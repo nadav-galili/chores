@@ -100,7 +100,7 @@ export default function Partner() {
         title={quotaReached ? t('paywall.lockedPrice') : t('partner.add')}
         onPress={
           quotaReached
-            ? () => router.push({ pathname: '/(parent)/paywall', params: { gate: 'parent_quota' } })
+            ? () => router.push({ pathname: '/paywall', params: { gate: 'parent_quota' } })
             : submit
         }
         disabled={busy || (!quotaReached && email.trim().length === 0)}

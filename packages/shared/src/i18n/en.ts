@@ -233,6 +233,15 @@ export const en = {
       pin: 'Parent PIN',
       signOut: 'Sign out',
     },
+    // A tab's label is not the screen's title: it sits under an icon in a bar five wide, so it is
+    // the shortest word that still says where it goes.
+    tabs: {
+      today: 'Today',
+      children: 'Children',
+      chores: 'Chores',
+      allowance: 'Money',
+      more: 'More',
+    },
   },
   household: {
     title: 'Set up your household',

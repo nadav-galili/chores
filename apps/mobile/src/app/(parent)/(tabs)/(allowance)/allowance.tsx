@@ -271,9 +271,7 @@ export default function Allowance() {
         <Body>{t('allowance.lockedHint')}</Body>
         <Button
           title={t('allowance.lockedAction')}
-          onPress={() =>
-            router.push({ pathname: '/(parent)/paywall', params: { gate: 'money_ledger' } })
-          }
+          onPress={() => router.push({ pathname: '/paywall', params: { gate: 'money_ledger' } })}
         />
       </Screen>
     );

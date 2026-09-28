@@ -79,7 +79,7 @@ export default function Exit() {
   const leave = async () => {
     await device.clear();
     await setRole('parent');
-    router.replace('/(parent)');
+    router.replace('/(parent)/(tabs)/(today)');
   };
 
   if (!unlocked) {

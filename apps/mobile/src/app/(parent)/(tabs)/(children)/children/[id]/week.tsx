@@ -214,9 +214,7 @@ export default function ChildWeek() {
       {!premium && (
         <Button
           title={t('parent.week.seeMore')}
-          onPress={() =>
-            router.push({ pathname: '/(parent)/paywall', params: { gate: 'full_history' } })
-          }
+          onPress={() => router.push({ pathname: '/paywall', params: { gate: 'full_history' } })}
           secondary
         />
       )}

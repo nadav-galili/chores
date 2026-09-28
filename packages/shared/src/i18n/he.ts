@@ -217,6 +217,13 @@ export const he: Catalog = {
       pin: 'קוד הורה',
       signOut: 'התנתקות',
     },
+    tabs: {
+      today: 'היום',
+      children: 'ילדים',
+      chores: 'מטלות',
+      allowance: 'כסף',
+      more: 'עוד',
+    },
   },
   household: {
     title: 'הגדרת משק הבית',

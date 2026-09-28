@@ -88,7 +88,7 @@ export function ChoreForm({
     (child) => childIsLocked(child) && assignees.includes(child.id) !== allNext.includes(child.id),
   );
   const openChildGate = () =>
-    router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } });
+    router.push({ pathname: '/paywall', params: { gate: 'child_quota' } });
   /**
    * Photo Proof is premium (#70). A control a parent cannot use looks unavailable rather than
    * failing: turning it on on the free tier opens the paywall instead of submitting a form that
@@ -100,7 +100,7 @@ export function ChoreForm({
     household.me.household?.entitlement === 'free' &&
     !initial.requires_photo;
   const openPhotoGate = () =>
-    router.push({ pathname: '/(parent)/paywall', params: { gate: 'photo_proof' } });
+    router.push({ pathname: '/paywall', params: { gate: 'photo_proof' } });
 
   const submit = async () => {
     const parsed = choreFieldsSchema.safeParse({
