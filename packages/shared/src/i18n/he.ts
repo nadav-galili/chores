@@ -271,6 +271,14 @@ export const he: Catalog = {
       join_code: 'הקלידו את הקוד הזה במכשיר של הילד כדי לחבר אותו למשק הבית.',
     },
     finishLater: 'אסיים אחר כך',
+    appLink: {
+      send: 'שליחת קישור לאפליקציה',
+      message: 'הורידו את Mibo למכשיר של הילד:',
+    },
+    connected: {
+      title: 'המכשיר של %{name} מחובר',
+      body: '%{name} כבר רואה שם את המטלות של היום.',
+    },
   },
   partner: {
     title: 'בן/בת הזוג',

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { nextSetupStep, setupStepOnSignIn, type MeSetup, type SetupFacts } from './setup.ts';
+import {
+  APP_STORE_URL,
+  appLinkMessage,
+  connectedOnOpen,
+  nextSetupStep,
+  PLAY_STORE_URL,
+  setupStepOnSignIn,
+  type MeSetup,
+  type SetupFacts,
+} from './setup.ts';
 
 const nothing: SetupFacts = {
   hasHousehold: false,
@@ -72,5 +81,42 @@ describe('setupStepOnSignIn', () => {
   it('leaves a parent with no household to the household form', () => {
     const none = { ...unfinished, hasHousehold: false, childCount: 0, createdHousehold: false };
     expect(setupStepOnSignIn(none)).toBeNull();
+  });
+});
+
+describe('connectedOnOpen', () => {
+  const waiting = { setup: { deviceEverJoined: false }, children: [{ id: 'noa' }] };
+  const joined = { setup: { deviceEverJoined: true }, children: [{ id: 'noa' }] };
+
+  it('confirms the child this phone left waiting, once a Kid Device has joined', () => {
+    expect(connectedOnOpen('noa', joined)).toBe('noa');
+  });
+
+  it('confirms nothing while the device has still not joined', () => {
+    expect(connectedOnOpen('noa', waiting)).toBeNull();
+  });
+
+  it('confirms nothing without a record: another phone, a reinstall, or already confirmed', () => {
+    expect(connectedOnOpen(null, joined)).toBeNull();
+  });
+
+  it('confirms nothing for a child who is no longer in the household', () => {
+    expect(connectedOnOpen('gone', joined)).toBeNull();
+  });
+});
+
+describe('appLinkMessage', () => {
+  it('is the one line, then both store links', () => {
+    const message = appLinkMessage('Get Mibo on your child’s device:');
+    expect(message.split('\n')).toEqual([
+      'Get Mibo on your child’s device:',
+      `App Store: ${APP_STORE_URL}`,
+      `Google Play: ${PLAY_STORE_URL}`,
+    ]);
+  });
+
+  it('links the store listings of this app', () => {
+    expect(APP_STORE_URL).toBe('https://apps.apple.com/app/id6812645404');
+    expect(PLAY_STORE_URL).toBe('https://play.google.com/store/apps/details?id=com.mibokids.app');
   });
 });

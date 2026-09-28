@@ -295,6 +295,15 @@ export const en = {
       join_code: 'Type this code on your child’s device to connect it to your household.',
     },
     finishLater: 'I’ll finish later',
+    // The store links, for the child's device. Never the Join Code, which is single-use.
+    appLink: {
+      send: 'Send the app link',
+      message: 'Get Mibo on your child’s device:',
+    },
+    connected: {
+      title: '%{name}’s device is connected',
+      body: '%{name} can see today’s chores on it now.',
+    },
   },
   partner: {
     title: 'Your partner',
