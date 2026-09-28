@@ -10,4 +10,4 @@ export {
   type TextStyleToken,
   type TypeScale,
 } from './themes';
-export { type ColorTokens, type TypeStep } from './tokens';
+export { providerBrand, type ColorTokens, type TypeStep } from './tokens';

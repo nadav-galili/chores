@@ -15,7 +15,7 @@ import { CHEVRON, formatNumber, t } from '@/lib/i18n';
 import { useHasHeader } from '@/lib/page-chrome';
 import { usePop } from '@/lib/motion';
 import { useCountUp } from '@/lib/use-count-up';
-import { useTheme, useThemedStyles, type Theme } from '@/theme';
+import { providerBrand, useTheme, useThemedStyles, type Theme } from '@/theme';
 
 /**
  * The shared primitives. Every one of them reads colour, spacing, radius and type from the theme,
@@ -124,6 +124,54 @@ export function Button({
       accessibilityRole="button"
     >
       <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{title}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * A sign-in button in an identity provider's own clothes.
+ *
+ * Both of these used to be the app's `action` green with plain white text, which is wrong twice.
+ * Apple's Sign in with Apple guidelines allow black, white or white-with-outline and nothing
+ * else, and the button's appearance is checked at review — a green one is a rejection waiting to
+ * happen on a build we are about to submit. Google's identity guidelines are equally specific
+ * about their neutral button. Beyond compliance, a parent recognises these two shapes before they
+ * read either label, and that recognition is the whole point of offering the providers at all.
+ *
+ * The Apple mark is U+F8FF, the Apple logo glyph carried by the system font on Apple platforms.
+ * It costs no asset and no dependency, and it is safe precisely because this button only renders
+ * on iOS — the glyph is in Apple's private use area and is a hollow box anywhere else.
+ *
+ * Google's G is a four-colour path that cannot honestly be drawn from text or Views, and the app
+ * bundles no vector library, so the Google button ships as the correct neutral button without its
+ * mark. `mark` is the slot it drops into the moment the asset exists.
+ */
+export function ProviderButton({
+  provider,
+  title,
+  onPress,
+  disabled,
+  mark,
+}: {
+  provider: 'apple' | 'google';
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  /** The provider's logo, when there is an asset for it. Apple supplies its own from the font. */
+  mark?: React.ReactNode;
+}) {
+  const styles = useThemedStyles(providerButtonStyles);
+  const apple = provider === 'apple';
+  return (
+    <Pressable
+      style={[styles.button, apple ? styles.apple : styles.google, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+    >
+      {apple ? <Text style={[styles.mark, styles.appleText]}>{APPLE_LOGO}</Text> : mark}
+      <Text style={[styles.label, apple ? styles.appleText : styles.googleText]}>{title}</Text>
     </Pressable>
   );
 }
@@ -626,6 +674,36 @@ const chipStyles = (theme: Theme) => ({
   chipText: { ...theme.type.label, color: theme.colors.text },
   // The fill does most of the work; the weight is what the chip had before the theme arrived.
   chipTextActive: { color: theme.colors.onAction, fontWeight: '600' as const },
+});
+
+/** The Apple logo, as the system font draws it. iOS only — see `ProviderButton`. */
+const APPLE_LOGO = '\uF8FF';
+
+const providerButtonStyles = (theme: Theme) => ({
+  button: {
+    minHeight: theme.touchTarget,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: theme.space.sm,
+    paddingVertical: theme.space.md,
+    paddingHorizontal: theme.space.lg,
+    borderRadius: theme.radius.lg,
+  },
+  apple: { backgroundColor: providerBrand.appleBackground },
+  google: {
+    backgroundColor: providerBrand.googleBackground,
+    borderWidth: 1,
+    borderColor: providerBrand.googleBorder,
+  },
+  // The providers set the label's weight and size, not the app's type scale: these buttons are
+  // the two places on screen that are meant to look like somebody else's.
+  label: { fontSize: 17, fontWeight: '600' as const },
+  appleText: { color: providerBrand.appleForeground },
+  googleText: { color: providerBrand.googleForeground },
+  // The glyph sits slightly above the label's baseline in San Francisco, as Apple's own does.
+  mark: { fontSize: 19, lineHeight: 22 },
+  disabled: { opacity: 0.5 },
 });
 
 const buttonStyles = (theme: Theme) => ({

@@ -46,6 +46,30 @@ export const petMoodGrounds: Readonly<Record<PetMood, string>> = Object.freeze({
   sleepy: '#ECECF2',
 });
 
+/**
+ * The identity-provider buttons, in the providers' own colours.
+ *
+ * These are the one set of colours in the app that are not ours to choose. Apple's Sign in with
+ * Apple guidelines allow black, white or white-with-outline and nothing else; recolouring the
+ * button — which this app did, in `action` green — is a design requirement Apple checks at review.
+ * Google's identity guidelines specify the neutral button's fill, label and stroke just as
+ * exactly. Retuning the palette must not touch them, which is why they sit apart from
+ * `ColorTokens` rather than inside both themes: a brand mark is not a semantic role, and there is
+ * no parent-desaturated version of Apple's black.
+ *
+ * Same reasoning as `petMoodGrounds` above — not chrome, still colour values, so still here and
+ * nowhere else.
+ */
+export const providerBrand = Object.freeze({
+  /** Apple: the black button, which is the variant that reads on our off-white ground. */
+  appleBackground: '#000000',
+  appleForeground: '#FFFFFF',
+  /** Google: the light "neutral" button — white fill, near-black label, grey stroke. */
+  googleBackground: '#FFFFFF',
+  googleForeground: '#1F1F1F',
+  googleBorder: '#747775',
+});
+
 /** Calm & natural at full strength — the child's world. */
 export const kidColors: ColorTokens = {
   ground: '#F2F6F1',
