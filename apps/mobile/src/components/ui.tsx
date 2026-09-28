@@ -2,6 +2,7 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,7 +10,9 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CHEVRON, formatNumber, t } from '@/lib/i18n';
+import { useHasHeader } from '@/lib/page-chrome';
 import { usePop } from '@/lib/motion';
 import { useCountUp } from '@/lib/use-count-up';
 import { useTheme, useThemedStyles, type Theme } from '@/theme';
@@ -28,14 +31,35 @@ import { useTheme, useThemedStyles, type Theme } from '@/theme';
  */
 
 /**
- * The page. A form centres its handful of fields, which is what most of this app's screens are;
- * a list does not — `list` starts it at the top and tightens the gap, because the parent's
- * evening scan wants as many children on screen as will fit and a centred column with a
- * form's air around it wastes the half of the screen the scan is for.
+ * The page. Content starts at the top, because a screen that centres its content moves the first
+ * line to a different height on every screen and the eye has to find it again each time. `list`
+ * only tightens the gap now; it no longer changes the alignment, since nothing is centred.
+ *
+ * Padding is the theme's, plus whatever the hardware demands. The insets are added rather than
+ * substituted: `space.xl` is 24 and a Dynamic Island wants 59, so replacing would be a regression
+ * on a phone with no notch and ignoring them puts the first line under the status bar on one with.
+ * Where a native header is drawn it has already consumed the top inset, which is what
+ * `useHasHeader()` is for.
  */
 export function Screen({ children, list = false }: { children: React.ReactNode; list?: boolean }) {
   const styles = useThemedStyles(screenStyles);
-  return <View style={[styles.screen, list && styles.listScreen]}>{children}</View>;
+  const { space } = useTheme();
+  const insets = useSafeAreaInsets();
+  const hasHeader = useHasHeader();
+  return (
+    <View
+      style={[
+        styles.screen,
+        list && styles.listScreen,
+        {
+          paddingTop: (hasHeader ? 0 : insets.top) + space.xl,
+          paddingBottom: insets.bottom + space.xl,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function Loading() {
@@ -53,10 +77,20 @@ export function Title({ children }: { children: string }) {
   return <Text style={styles.title}>{children}</Text>;
 }
 
-/** A line of copy on a page. The `Title`'s counterpart, and the only body text a screen needs. */
-export function Body({ children }: { children: string }) {
+/**
+ * A line of copy on a page. The `Title`'s counterpart, and the only body text a screen needs.
+ *
+ * `selectable` is for the lines that carry a value rather than a sentence — a join code a parent
+ * is reading out, a balance, an id in a support message. It is off by default because a screen of
+ * selectable prose swallows taps meant for what is under it.
+ */
+export function Body({ children, selectable }: { children: string; selectable?: boolean }) {
   const styles = useThemedStyles(textStyles);
-  return <Text style={styles.body}>{children}</Text>;
+  return (
+    <Text style={styles.body} selectable={selectable}>
+      {children}
+    </Text>
+  );
 }
 
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
@@ -180,9 +214,14 @@ export function Chip({
   );
 }
 
+/** Always selectable: an error is the one line a parent may need to send to somebody else. */
 export function ErrorText({ children }: { children: string | null }) {
   const styles = useThemedStyles(textStyles);
-  return children ? <Text style={styles.error}>{children}</Text> : null;
+  return children ? (
+    <Text style={styles.error} selectable>
+      {children}
+    </Text>
+  ) : null;
 }
 
 /**
@@ -277,14 +316,40 @@ export function OfflineStrip({ message }: { message: string }) {
  * a scroll rather than a second page shape declared somewhere else, so there is one definition
  * of what a page looks like and a form cannot drift from it.
  */
-export function ScrollScreen({ children }: { children: React.ReactNode }) {
+export function ScrollScreen({
+  children,
+  refreshing,
+  onRefresh,
+}: {
+  children: React.ReactNode;
+  /** Supply both to give the page pull-to-refresh; supply neither and it has none. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
   const styles = useThemedStyles(screenStyles);
+  const { colors, space } = useTheme();
+  const insets = useSafeAreaInsets();
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.screen, styles.scrollContent]}
+      contentContainerStyle={[
+        styles.screen,
+        styles.scrollContent,
+        // `contentInsetAdjustmentBehavior` handles the top under a native header and does nothing
+        // without one, so the bottom inset is still ours to pay either way.
+        { paddingBottom: insets.bottom + space.xl },
+      ]}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing ?? false}
+            onRefresh={onRefresh}
+            tintColor={colors.muted}
+          />
+        ) : undefined
+      }
     >
       {children}
     </ScrollView>
@@ -321,23 +386,40 @@ export function ListRow({
 }
 
 /**
- * Several destinations in the height one Button would take. The parent's today screen is a scan,
- * and a stack of full-width buttons pushes the thing being scanned off the bottom of the phone;
- * these wrap instead, and still meet the theme's touch target.
+ * The parent's navigation, as grouped rows rather than a wrapped cloud of pills.
  *
- * It borrows the chip's pill rather than growing a third one beside `buttonSecondary` and
- * `chip` — the app has two tappable surfaces and a nav item is not a reason for a third. What it
- * does not borrow is the role: a chip announces a selection, and these go somewhere, so they
- * announce themselves as buttons. Keyed by position because the labels are translated copy.
+ * It used to borrow the chip's pill, and that was the mistake: a chip means "selected / not
+ * selected" everywhere else in the app, so seven of them in a row read as a filter rather than as
+ * a menu, and `Sign out` came out the same weight as `Children`. Rows carry the same chevron the
+ * children and chores lists already use, so the home screen now looks like the screens it opens.
+ *
+ * Groups are separated by a gap, iOS-style, which is what lets the destructive row sit apart
+ * without needing a rule or a heading. Keyed by position because the labels are translated copy.
  */
-export function NavRow({ items }: { items: { title: string; onPress: () => void }[] }) {
-  const chips = useThemedStyles(chipStyles);
+export function NavList({
+  groups,
+}: {
+  groups: { title: string; onPress: () => void; destructive?: boolean }[][];
+}) {
+  const styles = useThemedStyles(navListStyles);
   return (
-    <View style={chips.row}>
-      {items.map((item, i) => (
-        <Pressable key={i} style={chips.chip} onPress={item.onPress} accessibilityRole="button">
-          <Text style={chips.chipText}>{item.title}</Text>
-        </Pressable>
+    <View style={styles.groups}>
+      {groups.map((group, g) => (
+        <View key={g} style={styles.group}>
+          {group.map((item, i) => (
+            <Pressable
+              key={i}
+              style={[styles.item, i > 0 && styles.divided]}
+              onPress={item.onPress}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.label, item.destructive && styles.destructive]}>
+                {item.title}
+              </Text>
+              {item.destructive ? null : <Text style={styles.chevron}>{CHEVRON}</Text>}
+            </Pressable>
+          ))}
+        </View>
       ))}
     </View>
   );
@@ -476,25 +558,22 @@ const CHORE_GLYPH = '⭐';
 const WAITING_GLYPH = '📷';
 
 const screenStyles = (theme: Theme) => ({
+  // Vertical padding is supplied per-render with the safe-area insets, so it is not set here.
   screen: {
     flex: 1,
-    padding: theme.space.xl,
+    paddingHorizontal: theme.space.xl,
     gap: theme.space.lg,
-    justifyContent: 'center' as const,
+    justifyContent: 'flex-start' as const,
     backgroundColor: theme.colors.ground,
   },
-  listScreen: {
-    justifyContent: 'flex-start' as const,
-    gap: theme.space.md,
-    paddingVertical: theme.space.lg,
-  },
+  listScreen: { gap: theme.space.md },
   scroll: { flex: 1, backgroundColor: theme.colors.ground },
   scrollContent: { justifyContent: 'flex-start' as const, flexGrow: 1 },
   loading: { flex: 1, justifyContent: 'center' as const, backgroundColor: theme.colors.ground },
 });
 
 const textStyles = (theme: Theme) => ({
-  title: { ...theme.type.title, color: theme.colors.text, marginBottom: theme.space.sm },
+  title: { ...theme.type.title, color: theme.colors.text },
   body: { ...theme.type.body, color: theme.colors.text },
   error: { ...theme.type.label, color: theme.colors.danger },
 });
@@ -577,6 +656,29 @@ const cardStyles = (theme: Theme) => ({
     gap: theme.space.md,
   },
   tappable: { minHeight: theme.touchTarget, justifyContent: 'center' as const },
+});
+
+const navListStyles = (theme: Theme) => ({
+  groups: { gap: theme.space.lg },
+  group: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden' as const,
+  },
+  item: {
+    minHeight: theme.touchTarget,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+    gap: theme.space.sm,
+  },
+  // A hairline between rows, never above the first: the group's own edge is already the line.
+  divided: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.muted },
+  label: { ...theme.type.body, color: theme.colors.text },
+  destructive: { color: theme.colors.danger },
+  chevron: { ...theme.type.body, color: theme.colors.muted },
 });
 
 const listRowStyles = (theme: Theme) => ({

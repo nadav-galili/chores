@@ -1,7 +1,7 @@
 import { pinSchema } from '@chores/shared';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Button, ErrorText, Field, Screen, Title, Body } from '@/components/ui';
+import { Button, ErrorText, Field, Screen, Body } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -35,7 +35,7 @@ export default function Pin() {
 
   return (
     <Screen>
-      <Title>{t('pin.title')}</Title>
+      <Stack.Screen options={{ title: t('pin.title') }} />
       <Body>{t('pin.hint')}</Body>
       <Field
         label={t('pin.label')}
@@ -51,7 +51,6 @@ export default function Pin() {
         onPress={submit}
         disabled={busy || !pinSchema.safeParse(pin).success}
       />
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

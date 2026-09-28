@@ -7,19 +7,10 @@ import {
   type ChoreKind,
   type UpsertChoreOp,
 } from '@chores/shared';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
-import {
-  Button,
-  Chip,
-  ChipGroup,
-  Choice,
-  ErrorText,
-  Field,
-  ScrollScreen,
-  Title,
-} from '@/components/ui';
+import { Button, Chip, ChipGroup, Choice, ErrorText, Field, ScrollScreen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { fieldError, t, weekdayLabels } from '@/lib/i18n';
@@ -148,7 +139,7 @@ export function ChoreForm({
 
   return (
     <ScrollScreen>
-      <Title>{title}</Title>
+      <Stack.Screen options={{ title: title }} />
       <Field
         label={t('choreForm.title')}
         value={choreTitle}

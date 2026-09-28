@@ -1,17 +1,8 @@
 import type { Chore } from '@chores/shared';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { FlatList } from 'react-native';
 import { WEEKDAYS } from '@/components/chore-form';
-import {
-  Button,
-  EmptyState,
-  ErrorState,
-  ErrorText,
-  FILL,
-  ListRow,
-  Screen,
-  Title,
-} from '@/components/ui';
+import { Button, EmptyState, ErrorState, ErrorText, FILL, ListRow, Screen } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { useChores } from '@/lib/use-chores';
 import { formatChoreDate, t } from '@/lib/i18n';
@@ -39,7 +30,7 @@ export default function ChoresList() {
 
   return (
     <Screen list>
-      <Title>{t('chores.title')}</Title>
+      <Stack.Screen options={{ title: t('chores.title') }} />
       {chores.status === 'error' && (
         <ErrorState
           title={chores.message || t('parent.loadFailed')}
@@ -74,7 +65,6 @@ export default function ChoresList() {
         disabled={children.length === 0}
       />
       {children.length === 0 && <ErrorText>{t('chores.needAChild')}</ErrorText>}
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

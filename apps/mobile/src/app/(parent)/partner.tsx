@@ -1,8 +1,8 @@
 import type { Parent, ParentInvite } from '@chores/shared';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button, ErrorText, Field, Screen, Title } from '@/components/ui';
+import { Button, ErrorText, Field, Screen } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
@@ -72,7 +72,7 @@ export default function Partner() {
 
   return (
     <Screen>
-      <Title>{t('partner.title')}</Title>
+      <Stack.Screen options={{ title: t('partner.title') }} />
       <Text style={styles.hint}>{t('partner.hint')}</Text>
       <View style={styles.people}>
         {people?.parents.map((p) => (
@@ -105,7 +105,6 @@ export default function Partner() {
         }
         disabled={busy || (!quotaReached && email.trim().length === 0)}
       />
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

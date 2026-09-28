@@ -1,8 +1,8 @@
 import { customRewardInputSchema, uuid7, type Reward } from '@chores/shared';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
-import { Body, Button, Coins, ErrorState, FILL, Field, Screen, Title } from '@/components/ui';
+import { Body, Button, Coins, ErrorState, FILL, Field, Screen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -177,7 +177,7 @@ export default function Rewards() {
 
   return (
     <Screen list>
-      <Title>{t('rewards.title')}</Title>
+      <Stack.Screen options={{ title: t('rewards.title') }} />
       <Body>{t('rewards.hint')}</Body>
       <Button
         title={
@@ -260,7 +260,6 @@ export default function Rewards() {
           />
         )}
       />
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

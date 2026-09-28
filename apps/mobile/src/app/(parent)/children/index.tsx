@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { FlatList } from 'react-native';
-import { Button, EmptyState, FILL, ListRow, Screen, Title } from '@/components/ui';
+import { Button, EmptyState, FILL, ListRow, Screen } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
@@ -12,7 +12,7 @@ export default function ChildrenList() {
 
   return (
     <Screen list>
-      <Title>{t('children.title', { household: household.name })}</Title>
+      <Stack.Screen options={{ title: t('children.title', { household: household.name }) }} />
       <FlatList
         style={FILL}
         data={children}
@@ -35,7 +35,6 @@ export default function ChildrenList() {
         )}
       />
       <Button title={t('children.add')} onPress={() => router.push('/(parent)/children/new')} />
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

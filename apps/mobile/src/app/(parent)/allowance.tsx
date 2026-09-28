@@ -1,18 +1,8 @@
 import { uuid7 } from '@chores/shared';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import {
-  Body,
-  Button,
-  Card,
-  Coins,
-  ErrorState,
-  Field,
-  Loading,
-  Screen,
-  Title,
-} from '@/components/ui';
+import { Body, Button, Card, Coins, ErrorState, Field, Loading, Screen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, locale, t } from '@/lib/i18n';
@@ -256,7 +246,7 @@ export default function Allowance() {
   if (!premium) {
     return (
       <Screen>
-        <Title>{t('allowance.lockedTitle')}</Title>
+        <Stack.Screen options={{ title: t('allowance.lockedTitle') }} />
         <Body>{t('allowance.lockedHint')}</Body>
         <Button
           title={t('allowance.lockedAction')}
@@ -264,7 +254,6 @@ export default function Allowance() {
             router.push({ pathname: '/(parent)/paywall', params: { gate: 'money_ledger' } })
           }
         />
-        <Button title={t('common.back')} onPress={() => router.back()} secondary />
       </Screen>
     );
   }
@@ -292,7 +281,7 @@ export default function Allowance() {
 
   return (
     <Screen list>
-      <Title>{t('allowance.title')}</Title>
+      <Stack.Screen options={{ title: t('allowance.title') }} />
       <Body>{t('allowance.hint')}</Body>
       {view !== null && (
         <Card>
@@ -322,7 +311,6 @@ export default function Allowance() {
           onChanged={reload}
         />
       ))}
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }

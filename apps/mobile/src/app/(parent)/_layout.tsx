@@ -3,9 +3,10 @@ import { Redirect, Stack, usePathname } from 'expo-router';
 import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
-import { INSTANT_SCREENS } from '@/lib/navigation';
+import { INSTANT_SCREENS, parentScreens } from '@/lib/navigation';
+import { HasHeaderProvider } from '@/lib/page-chrome';
 import { useNotificationTapRouting } from '@/lib/notifications';
-import { ThemeProvider } from '@/theme';
+import { ThemeProvider, useTheme } from '@/theme';
 
 /** Signed in → needs a household → create-household; has one → the children list. */
 function HouseholdGate() {
@@ -31,7 +32,19 @@ function HouseholdGate() {
   if (state.status === 'ready' && state.me.household !== null && onCreate) {
     return <Redirect href="/(parent)" />;
   }
-  return <Stack screenOptions={INSTANT_SCREENS} />;
+  return <ParentStack />;
+}
+
+/**
+ * The parent's screens, with headers. The styling is theme-driven so it has to be read inside the
+ * provider, and `HasHeaderProvider` is how `Screen` learns not to pay the top inset twice.
+ */
+function ParentStack() {
+  return (
+    <HasHeaderProvider>
+      <Stack screenOptions={parentScreens(useTheme())} />
+    </HasHeaderProvider>
+  );
 }
 
 /** The parent's theme covers the whole group, sign-in and the loading state included. */

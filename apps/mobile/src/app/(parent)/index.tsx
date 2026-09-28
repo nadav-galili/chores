@@ -8,9 +8,9 @@ import type {
   RedemptionDecision,
   RejectCompletionResult,
 } from '@chores/shared';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
 import {
   Card,
@@ -19,9 +19,8 @@ import {
   ErrorState,
   FILL,
   Loading,
-  NavRow,
+  NavList,
   Screen,
-  Title,
 } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
@@ -392,6 +391,7 @@ export default function ParentToday() {
   const styles = useThemedStyles(todayStyles);
   const household = state.status === 'ready' ? state.me.household : null;
   const today = useParentToday(household?.id ?? null);
+  const [pulling, setPulling] = useState(false);
   const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
@@ -508,7 +508,7 @@ export default function ParentToday() {
 
   return (
     <Screen list>
-      <Title>{t('parent.todayTitle', { household: household.name })}</Title>
+      <Stack.Screen options={{ title: t('parent.todayTitle', { household: household.name }) }} />
       {notice && <Text style={[styles.notice, notice.bad && styles.noticeBad]}>{notice.text}</Text>}
       {today.status === 'error' && (
         <ErrorState
@@ -521,7 +521,25 @@ export default function ParentToday() {
       {today.status === 'loading' && today.today === null ? (
         <Loading />
       ) : (
-        <ScrollView style={FILL} contentContainerStyle={styles.listContent}>
+        <ScrollView
+          style={FILL}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            // The today poll already runs on a timer and on focus; what it never refetches is the
+            // household itself — children, and the entitlement a purchase on another device just
+            // changed. A pull asks for both, because a parent pulling means "you are out of date"
+            // and cannot be expected to know which of the two is.
+            <RefreshControl
+              refreshing={pulling}
+              onRefresh={() => {
+                setPulling(true);
+                void Promise.all([today.refresh(), state.refresh()]).finally(() =>
+                  setPulling(false),
+                );
+              }}
+            />
+          }
+        >
           {today.today?.children.length === 0 && (
             <EmptyState
               title={t('parent.noChildren')}
@@ -556,15 +574,23 @@ export default function ParentToday() {
           ))}
         </ScrollView>
       )}
-      <NavRow
-        items={[
-          { title: t('parent.nav.children'), onPress: () => router.push('/(parent)/children') },
-          { title: t('parent.nav.chores'), onPress: () => router.push('/(parent)/chores') },
-          { title: t('parent.nav.rewards'), onPress: () => router.push('/(parent)/rewards') },
-          { title: t('parent.nav.allowance'), onPress: () => router.push('/(parent)/allowance') },
-          { title: t('parent.nav.partner'), onPress: () => router.push('/(parent)/partner') },
-          { title: t('parent.nav.pin'), onPress: () => router.push('/(parent)/pin') },
-          { title: t('parent.nav.signOut'), onPress: () => void signOut() },
+      {/* Three groups: what the household has, how it is configured, and the way out. */}
+      <NavList
+        groups={[
+          [
+            { title: t('parent.nav.children'), onPress: () => router.push('/(parent)/children') },
+            { title: t('parent.nav.chores'), onPress: () => router.push('/(parent)/chores') },
+            { title: t('parent.nav.rewards'), onPress: () => router.push('/(parent)/rewards') },
+            {
+              title: t('parent.nav.allowance'),
+              onPress: () => router.push('/(parent)/allowance'),
+            },
+          ],
+          [
+            { title: t('parent.nav.partner'), onPress: () => router.push('/(parent)/partner') },
+            { title: t('parent.nav.pin'), onPress: () => router.push('/(parent)/pin') },
+          ],
+          [{ title: t('parent.nav.signOut'), onPress: () => void signOut(), destructive: true }],
         ]}
       />
     </Screen>

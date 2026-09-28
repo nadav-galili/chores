@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChildForm } from '@/components/child-form';
-import { Body, Button, Screen, Title } from '@/components/ui';
+import { Body, Button, Screen } from '@/components/ui';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
@@ -20,7 +20,7 @@ export default function EditChild() {
   if (locked) {
     return (
       <Screen>
-        <Title>{t('childForm.edit', { name: child.first_name })}</Title>
+        <Stack.Screen options={{ title: t('childForm.edit', { name: child.first_name }) }} />
         <Body>{t('paywall.childLocked')}</Body>
         <Button
           title={t('paywall.lockedPrice')}
@@ -28,7 +28,6 @@ export default function EditChild() {
             router.push({ pathname: '/(parent)/paywall', params: { gate: 'child_quota' } })
           }
         />
-        <Button title={t('common.back')} onPress={() => router.back()} secondary />
       </Screen>
     );
   }

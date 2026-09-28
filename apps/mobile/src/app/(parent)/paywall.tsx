@@ -1,9 +1,9 @@
 import { paywallShown, gateSchema, type Gate } from '@chores/shared';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import type { PurchasesPackage } from 'react-native-purchases';
-import { Button, ErrorText, Loading, ScrollScreen, Title } from '@/components/ui';
+import { Button, ErrorText, Loading, ScrollScreen } from '@/components/ui';
 import { capture } from '@/lib/analytics';
 import { LEGAL_URLS, type Api } from '@/lib/api';
 import { reportError } from '@/lib/error-reporting';
@@ -146,7 +146,7 @@ function GatedPaywall({ gate }: { gate: Gate }) {
 
   return (
     <ScrollScreen>
-      <Title>{t('paywall.title')}</Title>
+      <Stack.Screen options={{ title: t('paywall.title') }} />
       <Text style={styles.gate}>{t(`paywall.gate.${gate}`)}</Text>
       <Text style={styles.includes}>{t('paywall.includes')}</Text>
       {status === 'loading' ? (

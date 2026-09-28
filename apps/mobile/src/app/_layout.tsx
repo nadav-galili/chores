@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/react-native';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { startErrorReporting } from '@/lib/error-reporting';
 import { INSTANT_SCREENS } from '@/lib/navigation';
@@ -27,10 +28,15 @@ function RootLayout() {
   // nowhere at all on a cold start (docs/spec/01-product.md, digest open rate).
   useEffect(watchOpenedNotifications, []);
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <StatusBar style="auto" />
-      <Stack screenOptions={INSTANT_SCREENS} />
-    </ClerkProvider>
+    // The provider has to sit above every group, because `Screen` reads the insets and `Screen` is
+    // what both roles' pages are made of. Without it `useSafeAreaInsets()` reports zeros and the
+    // padding below a notch is the theme's 24 rather than the phone's 59.
+    <SafeAreaProvider>
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <StatusBar style="auto" />
+        <Stack screenOptions={INSTANT_SCREENS} />
+      </ClerkProvider>
+    </SafeAreaProvider>
   );
 }
 

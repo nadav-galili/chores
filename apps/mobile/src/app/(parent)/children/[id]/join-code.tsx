@@ -1,8 +1,8 @@
 import type { IssuedJoinCode } from '@chores/shared';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button, ErrorText, Screen, Title } from '@/components/ui';
+import { Button, ErrorText, Screen } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
@@ -78,13 +78,15 @@ export default function JoinCode() {
 
   return (
     <Screen>
-      <Title>{t('joinCode.title', { name: child.first_name })}</Title>
+      <Stack.Screen options={{ title: t('joinCode.title', { name: child.first_name }) }} />
       <Text style={styles.hint}>{t('joinCode.hint', { name: child.first_name })}</Text>
       <View style={styles.codeBox}>
+        {/* Selectable: the code is read out across a room, and sometimes sent instead. */}
         <Text
           style={[styles.code, expired && styles.codeExpired]}
           adjustsFontSizeToFit
           numberOfLines={1}
+          selectable
         >
           {issued ? issued.code : '······'}
         </Text>

@@ -1,8 +1,8 @@
 import type { ChildDevice } from '@chores/shared';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
-import { Body, Button, EmptyState, ErrorState, FILL, Screen, Title } from '@/components/ui';
+import { Body, Button, EmptyState, ErrorState, FILL, Screen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatWallClock, t } from '@/lib/i18n';
@@ -121,7 +121,7 @@ export default function Devices() {
 
   return (
     <Screen list>
-      <Title>{t('devices.title', { name: child.first_name })}</Title>
+      <Stack.Screen options={{ title: t('devices.title', { name: child.first_name }) }} />
       <Body>{t('devices.hint', { name: child.first_name })}</Body>
       {devices.status === 'error' && (
         <ErrorState
@@ -169,7 +169,6 @@ export default function Devices() {
           router.push({ pathname: '/(parent)/children/[id]/join-code', params: { id: child.id } })
         }
       />
-      <Button title={t('common.back')} onPress={() => router.back()} secondary />
     </Screen>
   );
 }
