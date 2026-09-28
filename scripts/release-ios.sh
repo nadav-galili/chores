@@ -222,6 +222,16 @@ CHANNEL="production"
 ENVIRONMENT="production"
 ISSUE=83
 
+# The production Clerk instance, named literally — the CLI otherwise picks one for
+# you, and #85 exists partly because a wizard did that and configured development
+# while production sat unconfigured behind a store build. The redirect is the URL
+# the app actually asks for, built by makeRedirectUri({ scheme: 'mibo', path:
+# 'sso-callback' }) in src/components/parent-sign-in.tsx — and the only one checked
+# below: `mibo://` and `mibo://parent` are also registered and are historical, so
+# asserting them would fail a healthy instance for URLs nothing redirects to.
+PROD_CLERK_INSTANCE="${PROD_CLERK_INSTANCE:-ins_3Ju3HWvao1YJ00AczgcGiG8Q9aI}"
+APP_REDIRECT_URL="mibo://sso-callback"
+
 # The four EAS environment variables a store build needs, and what each one is for.
 SENTRY_VARS=(SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_DSN)
 
@@ -233,6 +243,13 @@ preflight_ok=1
 # A subshell rather than a `cd`, so a failing stage does not leave the wizard in
 # another directory for the stages after it.
 eas_mobile() { (cd "$MOBILE" && eas "$@"); }
+
+# clerk_cli ARGS... — the Clerk CLI, global if installed, else through npx. Not a
+# `have` entry: check 8 is the only caller, and it degrades to a warning rather
+# than blocking a release on a CLI nobody needs installed to build an app.
+clerk_cli() {
+  if command -v clerk >/dev/null 2>&1; then clerk "$@"; else npx -y clerk@latest "$@"; fi
+}
 
 # have TOOL "why it matters" — report a tool's presence, and record what breaks
 # without it. A reporter rather than a predicate: a missing tool is already in
@@ -337,12 +354,12 @@ banner "Mibo — the production iOS build, and the TestFlight release"
 
 # ── 1 ───────────────────────────────────────────────────────────────────
 stage "Preflight — everything that kills a store build twenty minutes in"
-say "A store build is forty minutes of somebody else's computer. Seven things are"
+say "A store build is forty minutes of somebody else's computer. Eight things are"
 say "checked here because each one fails late, or silently, or both."
 say ""
 say "1. The tools the later stages shell out to:"
 have eas   "the build and the submit are eas commands"
-have jq    "stage 3 edits eas.json with it, and check-deploy.sh reads the deployed commit"
+have jq    "checks 7 and 8 read eas.json and Clerk with it, and stage 3 edits eas.json"
 have curl  "check 5 cannot tell a live privacy policy from a dead one without it"
 have git   "check 3 reads the tree this build would be cut from"
 have gh    "the last stage posts the result onto issue #$ISSUE"
@@ -509,6 +526,117 @@ else
 fi
 say ""
 
+say "8. Sign in with Apple, on the PRODUCTION Clerk instance:"
+# Criterion 3 of this ticket, and guideline 4.8 for the review after it: an app that
+# offers Google must also offer Apple. Both halves of that live on Clerk's production
+# instance rather than in the binary, and neither is visible from the app — which is
+# what makes this a preflight check and not a device step.
+#
+# #85 found the connection saved with all its credentials and never switched on, and
+# the redirect allowlist completely empty. Both were fixed with no rebuild, because
+# Clerk reads them server-side when the flow starts. That is the good news and the
+# whole argument for checking here: found now it is a dashboard click, found after the
+# build it is a tester deciding the app is broken and a second forty-minute build cut
+# to fix something that was never in the binary.
+#
+# The entitlement is deliberately not checked. @clerk/expo's config plugin adds
+# com.apple.developer.applesignin unconditionally (withClerkAppleSignIn), so a Mibo
+# build has always carried it — verified in #85 by stripping ios.usesAppleSignIn back
+# out and re-introspecting. An entitlement is the one thing here a rebuild is the only
+# fix for, and it has never been the fault.
+#
+# The connection object is pulled out once, and an unreadable one takes the same
+# branch as an unreachable instance: a jq that could not parse the reply has not
+# established that Apple is switched off, and saying so would send somebody to fix
+# a dashboard that is already right.
+# A check that cannot read is a check that protects nothing, so the Clerk login is
+# offered here rather than discovered as a failure below. `clerk` is deliberately not in
+# check 1's tool list: this is its only caller and npx supplies it.
+if ! clerk_cli whoami >/dev/null 2>&1; then
+  note "Not signed in to the Clerk CLI, which is how this check reads production."
+  if confirm "Sign in now? (a browser tab opens)"; then
+    clerk_cli auth login || warn "clerk auth login failed — the two checks below cannot run."
+  fi
+fi
+# jq names the faults itself, in one pass over the pulled config. The alternative — a
+# read per field — needs a `|| true` on each to survive `set -e`, and that turns a jq
+# that failed into a credential that is missing: the wizard then sends somebody to fix
+# a dashboard that is already right. Here a jq that cannot parse the reply produces no
+# output, fails the `&&`, and takes the "could not read" branch instead.
+#
+# Two toggles are read because #85 found only the inner one set. `enabled` is whether
+# Apple is a live SSO connection at all; `authenticatable` is whether a parent who has
+# never signed in may sign UP with it. Enabled without authenticatable is the quieter
+# version of the same 4.8 problem — it signs an existing account in and turns every new
+# parent away, so it passes the one test somebody is likely to run.
+if clerk_cfg=$(clerk_cli config pull --instance "$PROD_CLERK_INSTANCE" 2>/dev/null) \
+   && [[ -n "$clerk_cfg" ]] \
+   && apple_report=$(printf '%s' "$clerk_cfg" | jq -e -r '
+        .connection_oauth_apple as $a
+        | [ (if $a.enabled then empty
+             else "is not enabled — Apple is not a live SSO connection at all" end),
+            (if $a.authenticatable then empty
+             else "is not authenticatable — no parent can SIGN UP with Apple" end),
+            (["client_id", "team_id", "key_id"][]
+             | select(($a[.] // "") == "") | "has no " + .) ]
+        | join("\n")' 2>/dev/null); then
+  apple_faults=()
+  while IFS= read -r fault; do
+    [[ -n "$fault" ]] && apple_faults+=("$fault")
+  done <<<"$apple_report"
+  if (( ${#apple_faults[@]} == 0 )); then
+    printf '  %s✓%s the Apple connection is enabled and authenticatable, with custom credentials\n' \
+      "$GREEN" "$RESET"
+  else
+    for fault in "${apple_faults[@]}"; do
+      printf '  %s✗%s the Apple connection %s\n' "$RED" "$RESET" "$fault"
+    done
+    warn "The Apple button is dead on the shipped app, and an app offering Google"
+    warn "without Apple is a guideline 4.8 rejection. No rebuild fixes it and none is"
+    warn "needed — it is Clerk-side, and a saved connection reaches the build already"
+    warn "on the device."
+    note "  scripts/setup-apple-signin.sh walks the Apple and Clerk halves of it."
+    SKIPPED+=("enable the Apple SSO connection on the production Clerk instance (scripts/setup-apple-signin.sh)")
+    preflight_ok=0
+  fi
+else
+  warn "Could not read the production Clerk config, so nothing here has been checked."
+  warn "An unread check is not a passed one: the first store build shipped against an"
+  warn "instance nobody had looked at, and this is the look."
+  note "  Configure → SSO connections → Apple, with the instance selector on Production."
+  SKIPPED+=("confirm the Apple SSO connection is enabled on production Clerk")
+  preflight_ok=0
+fi
+# The allowlist is checked separately because it fails differently: the connection can
+# be perfect and every sign-in still stops at "the current redirect url ... does not
+# match an authorised url", which reads as an app bug and is not one.
+#
+# Matched as whole lines, and only once jq has parsed the reply into them. `mibo://` is
+# a prefix of the URL that matters and is registered in its own right, so a substring
+# match finds the allowlist healthy off an entry that does nothing — the fault #85 found
+# in scripts/clerk-setup.sh's own verification. The match runs in bash rather than
+# through `grep -q` because a reader that stops at the first line kills the writer with
+# SIGPIPE, and under `pipefail` a correct answer reads as a failed command.
+if redirect_json=$(clerk_cli api --instance "$PROD_CLERK_INSTANCE" /redirect_urls 2>/dev/null) \
+   && allowed=$(printf '%s' "$redirect_json" | jq -e -r '.[].url' 2>/dev/null); then
+  if [[ $'\n'"$allowed"$'\n' == *$'\n'"$APP_REDIRECT_URL"$'\n'* ]]; then
+    printf '  %s✓%s %s is on the production redirect allowlist\n' "$GREEN" "$RESET" "$APP_REDIRECT_URL"
+  else
+    printf '  %s✗%s %s is NOT on the production redirect allowlist\n' "$RED" "$RESET" "$APP_REDIRECT_URL"
+    warn "Every parent sign-in on the store build stops at Clerk, Apple and Google"
+    warn "alike. This is exactly what the first TestFlight build hit."
+    note "  scripts/setup-apple-signin.sh registers it, or add it under"
+    note "  Configure → Paths → Redirect URLs on the production instance."
+    SKIPPED+=("register $APP_REDIRECT_URL on the production Clerk redirect allowlist")
+    preflight_ok=0
+  fi
+else
+  warn "Could not read the production redirect allowlist — check it by hand."
+  SKIPPED+=("confirm $APP_REDIRECT_URL is on the production Clerk redirect allowlist")
+  preflight_ok=0
+fi
+say ""
+
 if (( preflight_ok )); then
   printf '  %s%s✓ preflight clean%s\n' "$BOLD" "$GREEN" "$RESET"
 else
@@ -615,9 +743,12 @@ note "signs a binary. EAS can use the same key for the upload in stage 6."
 say ""
 warn "Sign in with Apple is not a credential this stage sets. #77 implemented it"
 warn "through Clerk's SSO flow, which uses Apple's web OAuth and an Apple Services"
-warn "ID rather than the app's provisioning profile. Configuring that on the"
-warn "production Clerk instance is #85, and it is still open — which is why the"
-warn "Apple sign-in check in stage 9 may be 'not yet run' rather than passing."
+warn "ID rather than the app's provisioning profile — so nothing you do in"
+warn "'eas credentials' makes the Apple button work or stops it working."
+say ""
+note "That side was configured and verified on the production instance in #85, and"
+note "check 8 of stage 1 reads it back before every release. The Services ID, team"
+note "and key live on Clerk; scripts/setup-apple-signin.sh is the wizard for them."
 say ""
 note "There is no non-interactive way to list what EAS holds — 'eas credentials' is"
 note "a menu and has no :list subcommand — so this stage cannot check the"
@@ -793,6 +924,8 @@ say "records a step as not yet run, which is not the same as failing."
 say ""
 check "1. Fresh install" "TestFlight installs Mibo onto a device that had no Mibo on it, and it launches."
 check "Icon and splash" "The home screen shows the production icon, and the splash screen is Mibo's, not Expo's."
+note "Apple sign-in fails Clerk-side, not in the binary — the connection or the"
+note "redirect allowlist, both of check 8, and both fixable without a rebuild."
 check "2. Sign in with Apple" "A real Apple ID signs in as a parent, and lands in parent mode."
 check "2. Sign in with Google" "Google sign-in still works — Apple sign-in was added beside it, not over it."
 check "3. Household setup" "A household can be created, a Join Code issued, and a second device pairs with it as a Kid Device."
@@ -840,6 +973,7 @@ fi
 pause
 
 finish
-note "M4 is the last milestone before the store. #85 — Sign in with Apple on the"
-note "production Clerk instance — is the one sibling still open."
+note "M4 is the last milestone before the store, and every sibling of this ticket is"
+note "closed — #85 included, so Apple sign-in is live on production. What remains is"
+note "whatever stage 9 and stage 10 recorded above as failing or not yet run."
 printf '\n'
