@@ -23,6 +23,7 @@ export default function More() {
             { title: t('parent.nav.rewards'), onPress: () => router.push('/rewards') },
             { title: t('parent.nav.partner'), onPress: () => router.push('/partner') },
             { title: t('parent.nav.pin'), onPress: () => router.push('/pin') },
+            { title: t('language.title'), onPress: () => router.push('/language') },
           ],
           [{ title: t('parent.nav.signOut'), onPress: () => void signOut(), destructive: true }],
         ]}

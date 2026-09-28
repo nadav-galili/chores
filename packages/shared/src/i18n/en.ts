@@ -243,6 +243,14 @@ export const en = {
       more: 'More',
     },
   },
+  language: {
+    title: 'Language',
+    hint: 'Mibo restarts when you change this, because Hebrew lays the whole app out right to left.',
+    label: 'Language',
+    apply: 'Change language and restart',
+    restarting: 'Restarting…',
+    restartFailed: 'Could not restart. The language is saved and will apply next time Mibo opens.',
+  },
   household: {
     title: 'Set up your household',
     name: 'Household name',
