@@ -123,10 +123,32 @@ export async function startParentAnalytics(
   client?.identify(identity.distinct_id);
   for (const [type, key] of Object.entries(identity.groups)) client?.group(type, key);
   flushOpenedPush();
+  flushHeldParentEvents();
 }
 
 export function capture(event: AnalyticsEvent): void {
   client?.capture(event.event, event.properties);
+}
+
+/** Parent events that arrived while the parent client was not up yet, oldest first. */
+const heldParentEvents: AnalyticsEvent[] = [];
+const MAX_HELD_PARENT_EVENTS = 10;
+
+/**
+ * Captures a parent-side event, holding it until the parent client is up. The first setup step
+ * mounts in the same moment `/me` starts the parent client — and right after sign-in, while the
+ * welcome client is still flushing — so a plain `capture` would drop exactly the step views the
+ * onboarding funnel is counting. Never flushed into a kid client: these are the parent's.
+ */
+export function captureParentEvent(event: AnalyticsEvent): void {
+  if (mode === 'parent' && client) return capture(event);
+  if (!apiKey) return;
+  heldParentEvents.push(event);
+  if (heldParentEvents.length > MAX_HELD_PARENT_EVENTS) heldParentEvents.shift();
+}
+
+function flushHeldParentEvents(): void {
+  for (const event of heldParentEvents.splice(0)) capture(event);
 }
 
 /** A tap that arrived before either mode had a client, waiting for one. */

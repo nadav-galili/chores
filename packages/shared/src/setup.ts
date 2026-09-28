@@ -32,3 +32,14 @@ export function nextSetupStep(facts: SetupFacts): SetupStep {
   if (!facts.hasPin) return 'pin';
   return 'join_code';
 }
+
+/**
+ * The step a parent is routed into on the first navigation after sign-in, or null for none. Only
+ * the parent who created the household is walked through setup: a Partner only ever sees the
+ * Finish setup card, and a parent with no household is the household form's, not this.
+ */
+export function setupStepOnSignIn(setup: MeSetup): Exclude<SetupStep, 'household' | 'done'> | null {
+  if (!setup.createdHousehold) return null;
+  const step = nextSetupStep(setup);
+  return step === 'household' || step === 'done' ? null : step;
+}

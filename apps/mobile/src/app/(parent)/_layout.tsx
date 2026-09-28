@@ -1,20 +1,36 @@
 import { useAuth } from '@clerk/expo';
+import { nextSetupStep, setupStepOnSignIn } from '@chores/shared';
 import { Redirect, Stack, usePathname } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
 import { INSTANT_SCREENS, parentScreens } from '@/lib/navigation';
 import { HasHeaderProvider } from '@/lib/page-chrome';
 import { useNotificationTapRouting } from '@/lib/notifications';
+import { setupStepHref, TODAY } from '@/lib/setup';
 import { ThemeProvider, useTheme } from '@/theme';
 
-/** Signed in → needs a household → create-household; has one → the children list. */
+/**
+ * Signed in → needs a household → create-household; has one → guided setup or Today.
+ *
+ * The parent who created the household is routed into the first unfinished setup step on the
+ * first navigation after sign-in — once per mount of this gate, which is once per sign-in in an
+ * app session, so a killed app resumes at the step it stopped on and "I'll finish later" is not
+ * overruled by the next render. A Partner, and any household a Kid Device has joined, is never
+ * routed; the Finish setup card on Today covers both.
+ */
 function HouseholdGate() {
   const state = useHousehold();
   const pathname = usePathname();
+  const [entered, setEntered] = useState(false);
   // A tapped notification lands here rather than at the root, where `/`'s redirect to the role's
   // home would carry it straight back off its destination.
   useNotificationTapRouting('parent');
+  const ready = state.status === 'ready';
+  useEffect(() => {
+    if (ready) setEntered(true);
+  }, [ready]);
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') {
     return (
@@ -25,12 +41,22 @@ function HouseholdGate() {
       </Screen>
     );
   }
+  const { me } = state;
   const onCreate = pathname === '/create-household';
-  if (state.status === 'ready' && state.me.household === null && !onCreate) {
+  if (me.household === null && !onCreate) {
     return <Redirect href="/(parent)/create-household" />;
   }
-  if (state.status === 'ready' && state.me.household !== null && onCreate) {
-    return <Redirect href="/(parent)/(tabs)/(today)" />;
+  if (me.household !== null && onCreate) {
+    // The household was just created (or already existed): straight on to the next step.
+    const next = me.setup.createdHousehold
+      ? setupStepHref(nextSetupStep(me.setup), me.children[0]?.id)
+      : null;
+    return <Redirect href={next ?? TODAY} />;
+  }
+  if (!entered && !pathname.startsWith('/setup/')) {
+    const step = setupStepOnSignIn(me.setup);
+    const href = step ? setupStepHref(step, me.children[0]?.id) : null;
+    if (href) return <Redirect href={href} />;
   }
   return <ParentStack />;
 }
