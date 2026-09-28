@@ -1,16 +1,22 @@
 import { appLinkMessage } from '@chores/shared';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback } from 'react';
 import { Share } from 'react-native';
 import { JoinCodeView } from '@/components/join-code-view';
 import { FinishLater, SetupPurpose, useSetupStep } from '@/components/setup-step';
 import { Button } from '@/components/ui';
-import { awaitDevice } from '@/lib/connected';
-import { useHousehold } from '@/lib/household-context';
+import { writeAwaitingDeviceRecord } from '@/lib/connected';
+import { useHousehold, useHouseholdId } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
 /** How often the step asks whether the child's device has joined, while it is on screen. */
 const WATCH_MS = 3000;
+
+/**
+ * Where the `409 pin_required` backstop sets the PIN: setup's own PIN step, told to come back here
+ * once saved rather than advance to a second Join Code step on top of this one.
+ */
+const PIN_BACKSTOP: Href = { pathname: '/setup/pin', params: { then: 'back' } };
 
 /**
  * Guided setup's Join Code step, above the tab bar (spec #86), for the child in `?id=`. Setup ends
@@ -21,15 +27,14 @@ const WATCH_MS = 3000;
 export default function SetupJoinCode() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { finishLater } = useSetupStep('join_code');
-  const state = useHousehold();
+  const { api } = useHousehold();
+  const householdId = useHouseholdId();
   const router = useRouter();
-  const householdId = state.status === 'ready' ? state.me.household?.id : undefined;
-  const { api } = state;
 
   useFocusEffect(
     useCallback(() => {
       if (!householdId || !id) return;
-      awaitDevice(id);
+      writeAwaitingDeviceRecord(id);
       let live = true;
       const check = async () => {
         try {
@@ -54,7 +59,7 @@ export default function SetupJoinCode() {
     <JoinCodeView
       id={id}
       intro={<SetupPurpose step="join_code" />}
-      pinHref="/setup/pin"
+      pinHref={PIN_BACKSTOP}
       footer={
         <>
           <Button title={t('setup.appLink.send')} onPress={() => void sendAppLink()} />

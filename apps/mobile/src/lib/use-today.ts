@@ -54,7 +54,7 @@ import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
 import { playDoneHaptic } from '@/lib/haptics';
-import { arrangeKidReminder, askForKidPush, canAskForKidPush } from '@/lib/notifications';
+import { arrangeKidReminder, askForKidPush, canAskForPush } from '@/lib/notifications';
 import { putPhoto, takePhoto, type TakenPhoto } from '@/lib/photo';
 
 export type TodayState = {
@@ -537,7 +537,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   useEffect(() => {
     if (!state.mayAskForPush) return;
     let live = true;
-    canAskForKidPush()
+    canAskForPush()
       .then((askable) => {
         if (live && askable) setPushAsk(true);
       })

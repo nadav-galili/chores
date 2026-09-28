@@ -3,11 +3,11 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { Body, Button, Screen, Title } from '@/components/ui';
 import { captureParentEvent } from '@/lib/analytics';
-import { stopAwaitingDevice } from '@/lib/connected';
-import { useHousehold } from '@/lib/household-context';
+import { clearAwaitingDeviceRecord } from '@/lib/connected';
+import { useHousehold, useHouseholdChild } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
-import { canAskForParentPush } from '@/lib/notifications';
-import { TODAY } from '@/lib/setup';
+import { canAskForPush } from '@/lib/notifications';
+import { TODAY_HREF } from '@/lib/setup';
 
 /**
  * "{name}'s device is connected": the end of guided setup, for the child in `?id=` (spec #86).
@@ -18,12 +18,13 @@ import { TODAY } from '@/lib/setup';
 export default function SetupConnected() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useHousehold();
+  const child = useHouseholdChild(id);
   const router = useRouter();
   // Once per mount, not once per `refresh` identity: that is rebuilt whenever Clerk hands back a
   // new token getter, and each rebuild would count another view.
   const refresh = useRef(state.refresh);
   useEffect(() => {
-    stopAwaitingDevice();
+    clearAwaitingDeviceRecord();
     captureParentEvent(onboardingStepViewed({ step: 'connected' }));
     // Re-read `/me` now, so Today's Finish setup card is already gone when the parent gets there.
     void refresh.current();
@@ -34,16 +35,15 @@ export default function SetupConnected() {
   const next = useCallback(async () => {
     let askable = false;
     try {
-      askable = await canAskForParentPush();
+      askable = await canAskForPush();
     } catch (e) {
       // Reading the permission is not something the parent can act on; setup simply ends.
       console.error('push permission read failed', e);
     }
     if (askable) router.replace({ pathname: '/setup/push', params: { id } });
-    else router.dismissTo(TODAY);
+    else router.dismissTo(TODAY_HREF);
   }, [id, router]);
 
-  const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
   if (!child) return null;
 
   return (

@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { Button, ErrorText, Screen } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { withCause } from '@/lib/errors';
-import { useHousehold } from '@/lib/household-context';
+import { useHousehold, useHouseholdChild, useHouseholdId } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -43,16 +43,14 @@ export function JoinCodeView({
   /** How the screen is left. */
   footer: React.ReactNode;
 }) {
-  const state = useHousehold();
+  const { api } = useHousehold();
+  const householdId = useHouseholdId();
+  const child = useHouseholdChild(id);
   const router = useRouter();
   const styles = useThemedStyles(joinCodeStyles);
   const [issued, setIssued] = useState<IssuedJoinCode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const now = useNow(1000);
-
-  const householdId = state.status === 'ready' ? state.me.household?.id : undefined;
-  const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
-  const api = state.api;
 
   // Issuing is refused while the household has no Parent PIN, because kid mode would have no way
   // out (ADR-0013). That answer is a destination, not a failure: the parent is sent to set one,

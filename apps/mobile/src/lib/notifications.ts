@@ -36,11 +36,12 @@ const REMINDER_ID = 'kid-reminder';
 const CHANNEL_ID = 'reminders';
 
 /**
- * Whether the OS would still show its prompt: nothing granted yet, and nothing the child (or the
- * OS) has already refused for good. The kid explanation screen is shown only while this holds —
- * otherwise "Allow" would lead nowhere.
+ * Whether the OS would still show its prompt: nothing granted yet, and nothing the person (or the
+ * OS) has already refused for good. Both explanation screens, the child's and the parent's, are
+ * shown only while this holds, otherwise "Allow" would lead nowhere; so is More's Evening summary
+ * row, the parent's way back to that explanation.
  */
-export async function canAskForKidPush(): Promise<boolean> {
+export async function canAskForPush(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   return !current.granted && current.canAskAgain;
 }
@@ -129,17 +130,8 @@ export async function arrangeKidReminder(
 }
 
 /**
- * Whether the parent explanation screen after "connected" has anything to lead to — the same test
- * as the child's. A parent who already allowed notifications goes straight on to Today; their
- * token is registered on every open regardless.
- */
-export async function canAskForParentPush(): Promise<boolean> {
-  return canAskForKidPush();
-}
-
-/**
  * The parent's OS prompt, raised only from the explanation screen's "Allow" (spec #86, Parent
- * push). A yes registers this phone at once rather than on the next open, so tonight's Digest
+ * push), reached after "connected" or from More's Evening summary row. A yes registers this phone at once rather than on the next open, so tonight's Digest
  * already has somewhere to go. Returns what the OS says the parent answered.
  */
 export async function askForParentPush(
@@ -153,8 +145,8 @@ export async function askForParentPush(
 /**
  * Registers this parent's phone for push, on every open: a token rots, and the language the phone
  * reads can change between opens, so the server is told both again rather than asked to remember.
- * Never asks: the OS prompt belongs to the explanation screen after "connected", so a phone not
- * granted permission there (or before) ends here quietly — as do a build with no push credentials
+ * Never asks: the OS prompt belongs to the explanation screen (after "connected", or from More),
+ * so a phone not granted permission there (or before) ends here quietly — as do a build with no push credentials
  * and a phone with no network. Nothing the parent is looking at depends on it.
  */
 export async function registerParentPush(

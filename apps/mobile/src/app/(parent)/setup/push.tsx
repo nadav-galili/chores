@@ -3,25 +3,35 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Body, Button, Screen, Title } from '@/components/ui';
 import { captureParentEvent } from '@/lib/analytics';
-import { useHousehold } from '@/lib/household-context';
+import { useHousehold, useHouseholdChild, useHouseholdId } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 import { askForParentPush } from '@/lib/notifications';
-import { TODAY } from '@/lib/setup';
+import { TODAY_HREF } from '@/lib/setup';
 
 /**
- * The parent-push explanation, between "connected" and Today (spec #86, Parent push): the parent
- * has just seen Mibo work, and is told the one thing notifications are for — the Digest. Only
- * "Allow" raises the OS prompt; "Not now" goes to Today and tells no one, the server included.
- * Reached only while the OS would still show its prompt, so "Allow" never leads nowhere.
+ * The parent-push explanation (spec #86, Parent push): the parent is told the one thing
+ * notifications are for — the Digest. Only "Allow" raises the OS prompt; "Not now" tells no one,
+ * the server included. Reached only while the OS would still show its prompt, so "Allow" never
+ * leads nowhere, and from two places:
+ *
+ * - between "connected" and Today, for the child in `?id=`: the parent has just seen Mibo work,
+ *   and either answer ends setup on Today;
+ * - from More's Evening summary row (`?from=more`), for a parent who said "Not now" here, a
+ *   Partner, or a parent whose child joined from the Children tab: either answer goes back to More.
  */
 export default function SetupPush() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const state = useHousehold();
+  const { id, from } = useLocalSearchParams<{ id?: string; from?: 'more' }>();
+  const { api } = useHousehold();
+  const householdId = useHouseholdId();
+  const child = useHouseholdChild(id);
   const router = useRouter();
   const [asking, setAsking] = useState(false);
 
-  const householdId = state.status === 'ready' ? state.me.household?.id : undefined;
-  const { api } = state;
+  const done = useCallback(() => {
+    if (from === 'more') router.back();
+    else router.dismissTo(TODAY_HREF);
+  }, [from, router]);
+
   const allow = useCallback(async () => {
     setAsking(true);
     try {
@@ -34,24 +44,20 @@ export default function SetupPush() {
       // the next open's registration retries it. Only the error goes to the console.
       console.error('parent push request failed', e);
     }
-    router.dismissTo(TODAY);
-  }, [api, householdId, router]);
+    done();
+  }, [api, householdId, done]);
 
-  const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
-  if (!child) return null;
+  if (!householdId || (id && !child)) return null;
 
   return (
     <Screen>
       <Stack.Screen options={{ title: '', headerBackVisible: false, gestureEnabled: false }} />
-      <Title>{t('setup.push.title', { name: child.first_name })}</Title>
+      <Title>
+        {child ? t('setup.push.title', { name: child.first_name }) : t('setup.push.titleHousehold')}
+      </Title>
       <Body>{t('setup.push.body')}</Body>
       <Button title={t('setup.push.allow')} onPress={() => void allow()} disabled={asking} />
-      <Button
-        title={t('setup.push.notNow')}
-        secondary
-        disabled={asking}
-        onPress={() => router.dismissTo(TODAY)}
-      />
+      <Button title={t('setup.push.notNow')} secondary disabled={asking} onPress={done} />
     </Screen>
   );
 }

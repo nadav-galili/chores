@@ -11,7 +11,7 @@ import * as SecureStore from 'expo-secure-store';
  */
 const KEY = 'mibo.awaitingDevice';
 
-export function awaitingDevice(): string | null {
+export function readAwaitingDeviceRecord(): string | null {
   try {
     return SecureStore.getItem(KEY);
   } catch {
@@ -21,7 +21,7 @@ export function awaitingDevice(): string | null {
   }
 }
 
-export function awaitDevice(childId: string): void {
+export function writeAwaitingDeviceRecord(childId: string): void {
   try {
     SecureStore.setItem(KEY, childId);
   } catch {
@@ -29,7 +29,7 @@ export function awaitDevice(childId: string): void {
   }
 }
 
-export function stopAwaitingDevice(): void {
+export function clearAwaitingDeviceRecord(): void {
   void SecureStore.deleteItemAsync(KEY).catch(() => {
     // As above. A record that survives is still read against `/me`, which says the device joined,
     // so at worst the confirmation shows once more.

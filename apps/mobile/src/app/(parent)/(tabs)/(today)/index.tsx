@@ -6,7 +6,6 @@ import type {
   ParentTodayRedemption,
   RedemptionDecision,
   RejectCompletionResult,
-  SetupStep,
 } from '@chores/shared';
 import { nextSetupStep } from '@chores/shared';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,9 +16,9 @@ import { Card, Coins, EmptyState, ErrorState, FILL, Loading, Screen } from '@/co
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
-import type { Api } from '@/lib/api';
+import type { Api, Me } from '@/lib/api';
 import { rewardTitle } from '@/lib/reward-title';
-import { setupStepHref } from '@/lib/setup';
+import { nextSetupHref, setupCardLabel } from '@/lib/setup';
 import { useParentToday } from '@/lib/use-parent-today';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -367,25 +366,12 @@ function ChildCard({
 }
 
 /** "Finish setup: {next step}", shown until a Kid Device has ever joined. */
-function SetupCard({
-  step,
-  firstChild,
-}: {
-  step: SetupStep;
-  firstChild?: { id: string; first_name: string };
-}) {
+function SetupCard({ me }: { me: Pick<Me, 'setup' | 'children'> | null }) {
   const styles = useThemedStyles(todayStyles);
   const router = useRouter();
-  const href = setupStepHref(step, firstChild?.id);
-  if (!href) return null;
-  const label =
-    step === 'child'
-      ? t('parent.setup.child')
-      : step === 'chore'
-        ? t('parent.setup.chore')
-        : step === 'pin'
-          ? t('parent.setup.pin')
-          : t('parent.setup.joinCode', { name: firstChild?.first_name ?? '' });
+  const href = me ? nextSetupHref(me) : null;
+  const label = me ? setupCardLabel(nextSetupStep(me.setup), me.children[0]) : null;
+  if (!href || !label) return null;
   const text = t('parent.setup.card', { step: label });
   return (
     <Card onPress={() => router.push(href)} accessibilityLabel={text}>
@@ -419,7 +405,6 @@ export default function ParentToday() {
   const { api } = state;
   const householdId = household?.id ?? null;
   const setupStep = state.status === 'ready' ? nextSetupStep(state.me.setup) : 'done';
-  const firstChild = state.status === 'ready' ? state.me.children[0] : undefined;
 
   // The step screens write chores and the PIN without re-reading `/me`, and a Kid Device joins
   // from another phone, so the card's facts are re-read whenever Today comes back into view —
@@ -573,7 +558,7 @@ export default function ParentToday() {
             />
           }
         >
-          <SetupCard step={setupStep} firstChild={firstChild} />
+          <SetupCard me={state.me} />
           {today.today?.children.length === 0 && (
             <EmptyState
               title={t('parent.noChildren')}

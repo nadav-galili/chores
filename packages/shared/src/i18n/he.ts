@@ -233,6 +233,7 @@ export const he: Catalog = {
       rewards: 'פרסים',
       allowance: 'דמי כיס',
       pin: 'קוד הורה',
+      eveningSummary: 'סיכום ערב',
       signOut: 'התנתקות',
     },
     tabs: {
@@ -292,6 +293,7 @@ export const he: Catalog = {
     },
     push: {
       title: 'קבלו הערב סיכום של היום של %{name}',
+      titleHousehold: 'קבלו הערב סיכום של מה שהילדים עשו היום',
       body: 'הודעה אחת בכל ערב, כשעוד יש זמן לסיים את מה שנשאר.',
       allow: 'לאפשר',
       notNow: 'לא עכשיו',
