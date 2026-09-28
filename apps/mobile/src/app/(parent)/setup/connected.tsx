@@ -6,6 +6,7 @@ import { captureParentEvent } from '@/lib/analytics';
 import { stopAwaitingDevice } from '@/lib/connected';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
+import { canAskForParentPush } from '@/lib/notifications';
 import { TODAY } from '@/lib/setup';
 
 /**
@@ -28,9 +29,19 @@ export default function SetupConnected() {
     void refresh.current();
   }, []);
 
-  // Where setup goes after "connected". The parent-push explanation (#92) belongs between this
-  // screen and Today: route there from here rather than straight to the tabs.
-  const next = useCallback(() => router.dismissTo(TODAY), [router]);
+  // Where setup goes after "connected": the parent-push explanation while the OS would still show
+  // its prompt, otherwise — already allowed, or refused for good — straight on to Today.
+  const next = useCallback(async () => {
+    let askable = false;
+    try {
+      askable = await canAskForParentPush();
+    } catch (e) {
+      // Reading the permission is not something the parent can act on; setup simply ends.
+      console.error('push permission read failed', e);
+    }
+    if (askable) router.replace({ pathname: '/setup/push', params: { id } });
+    else router.dismissTo(TODAY);
+  }, [id, router]);
 
   const child = state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
   if (!child) return null;
@@ -40,7 +51,7 @@ export default function SetupConnected() {
       <Stack.Screen options={{ title: '', headerBackVisible: false, gestureEnabled: false }} />
       <Title>{t('setup.connected.title', { name: child.first_name })}</Title>
       <Body>{t('setup.connected.body', { name: child.first_name })}</Body>
-      <Button title={t('common.continue')} onPress={next} />
+      <Button title={t('common.continue')} onPress={() => void next()} />
     </Screen>
   );
 }

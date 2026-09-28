@@ -304,6 +304,13 @@ export const en = {
       title: '%{name}’s device is connected',
       body: '%{name} can see today’s chores on it now.',
     },
+    // The parent's push ask, after "connected": the one evening message (the Digest) it is for.
+    push: {
+      title: 'Get tonight’s summary of what %{name} did',
+      body: 'One message each evening, while there’s still time to finish what’s left.',
+      allow: 'Allow',
+      notNow: 'Not now',
+    },
   },
   partner: {
     title: 'Your partner',
