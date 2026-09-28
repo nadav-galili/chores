@@ -516,7 +516,10 @@ pause
 # ── 15 ──────────────────────────────────────────────────────────────────
 stage "Device test — the M3 exit criterion"
 say "One pass, end to end, on a free household."
-check "quota shows a price" "A free household adding a second child hits the quota and sees a price."
+warn "Do this one from scripts/device-hand-tests.sh instead. Adding a second"
+warn "child does not show a price — it is admitted under a 14-day grace — and"
+warn "that wizard ends the grace for you so the price can appear at all."
+check "quota shows a price" "An over-quota child whose grace has ended is locked for editing and offers a price."
 check "webhook flips entitlement" "A sandbox purchase flips the household to premium via the webhook."
 check "custom reward" "A custom reward can be added and redeemed."
 check "payout drops coins" "A payout is recorded and the child's coins drop."

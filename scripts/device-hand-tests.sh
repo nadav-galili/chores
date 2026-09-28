@@ -213,6 +213,97 @@ SANDBOX_TESTER="donkeypoker2024@gmail.com"
 PARTNER_TESTER="donkeypoker2024+partner@gmail.com"
 RESULTS=()
 
+# ask_plain KEY "Prompt" — ask with no ENV_FILE default behind it. What this
+# wizard asks for are per-run facts about a test household, not configuration
+# worth remembering.
+ask_plain() {
+  local key="$1" input
+  printf '  %s%s%s ' "$BOLD" "$2" "$RESET"
+  read -r input || true
+  printf -v "$key" '%s' "$input"
+}
+
+# backdate_grace — the child quota is not reachable by adding a child, which is
+# what this wizard used to ask for and nobody could ever see. On the free tier
+# `add_child` never refuses: the second child is admitted and stamped with a
+# `read_only_after` fourteen days out (packages/shared/src/entitlement.ts,
+# docs/spec/01-product.md), and the price appears when that date passes, on the
+# child's own edit screen. So the only way to reach it today is to move the
+# date into the past.
+#
+# It runs against the live Railway Postgres because the device points at
+# https://mibokids.app — the one API the RevenueCat webhook writes into. It
+# touches only rows that already carry a non-null `read_only_after`, which is
+# to say over-quota children and nothing else.
+#
+# It updates exactly one row, named by the id the listing printed, and never by
+# anything typed free-hand. That is deliberate twice over: this is the live
+# production database, where a first name is not unique and a household you
+# have never met has children called what yours are called — matching on a name
+# would end a real customer's grace and lock them out of their own child. And
+# an id checked against [0-9a-f-] cannot carry SQL or shell syntax through the
+# two quoting layers between here and psql.
+_skip_backdate() {
+  warn "$1"
+  SKIPPED+=("backdating read_only_after for the child-quota check")
+  return 1
+}
+
+# The listing takes no input at all; the update takes one validated id.
+BACKDATE_LIST_SQL="select id, household_id, first_name, read_only_after from children where read_only_after is not null order by read_only_after desc;"
+
+# `railway run` injects the api service's own variables, and DATABASE_URL among
+# them points at postgres.railway.internal — a name that resolves inside
+# Railway's private network and nowhere else. From a laptop it fails with
+# "could not translate host name". DATABASE_PUBLIC_URL is the proxy address
+# that does resolve, so prefer it and keep DATABASE_URL as the fallback for
+# anywhere this runs inside Railway.
+_psql() {
+  railway run --service api -- sh -c "psql \"\${DATABASE_PUBLIC_URL:-\$DATABASE_URL}\" -c \"$1\""
+}
+
+backdate_grace() {
+  local child_id="" sql_update
+
+  if ! command -v railway >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
+    _skip_backdate "railway or psql missing — end the grace by hand on the api database"
+    return 1
+  fi
+
+  say "Children currently inside a grace window, newest first:"
+  if ! _psql "$BACKDATE_LIST_SQL"; then
+    warn "If that said it could not translate 'postgres.railway.internal', the"
+    warn "service has no DATABASE_PUBLIC_URL — open a shell with 'railway"
+    warn "connect Postgres' and run these there instead:"
+    note "  $BACKDATE_LIST_SQL"
+    note "  update children set read_only_after = now() - interval '1 day' where id = '<the id of your second child>';"
+    _skip_backdate "could not reach the database — check 'railway link' first"
+    return 1
+  fi
+
+  ask_plain child_id "Paste the id of YOUR second child from that list (Enter to skip):"
+  if [[ -z "$child_id" ]]; then
+    _skip_backdate "no id given — skipping the backdate"
+    return 1
+  fi
+  if [[ ! "$child_id" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+    _skip_backdate "'$child_id' is not a child id — copy one from the list above"
+    return 1
+  fi
+  warn "This is the production database. Check that id is yours before saying yes."
+  if ! confirm "End the grace on child $child_id?"; then
+    _skip_backdate "not confirmed — grace left alone"
+    return 1
+  fi
+
+  sql_update="update children set read_only_after = now() - interval '1 day' where read_only_after is not null and id = '$child_id';"
+  if ! _psql "$sql_update"; then
+    _skip_backdate "the update failed — the grace has NOT ended, so the next check would lie"
+    return 1
+  fi
+  printf '  %s✓ grace ended%s — now quit and reopen Mibo on the device\n' "$GREEN" "$RESET"
+}
+
 # check "M3.x" "what the tester should see" — record pass/fail for the comment.
 check() {
   local label="$1" expectation="$2" reply=""
@@ -300,7 +391,24 @@ warn "The household you have been testing on is premium now. Either use a"
 warn "fresh one, or wait out the sandbox expiry (~30 minutes from purchase),"
 warn "which re-locks it through the same webhook path #62 covers."
 say ""
-check "quota shows a price" "A free household adding a second child hits the quota and sees a price."
+say "The child quota does not fire when you add the child. Adding the second"
+say "child succeeds — it is admitted under a 14-day grace — and the price only"
+say "appears once that grace has ended, on that child's own edit screen."
+say ""
+step "Add a second child to the free household. It will be accepted; that is correct."
+backdate_grace || true   # skipping it is a choice, not a failure; set -e must not end the run here
+say ""
+note "Quit, not background. The household — and with it read_only_after — is"
+note "fetched when the provider mounts and after a write, and there is no"
+note "pull-to-refresh, so a backgrounded app keeps showing the old grace."
+check "quota shows a price" "Fully quit and reopen Mibo, then open that second child to edit them: the screen is locked and offers a price instead."
+note "Only that child's own row is locked. A shared chore stays editable —"
+note "that is the narrow scope canDo() gives edit_child, and a chore that has"
+note "become uneditable is a failure, not a pass."
+note "The backdated date is left as it is. It needs no undo: the purchase two"
+note "checks down flips the household to premium, and canDo() lets premium do"
+note "everything without ever reading read_only_after."
+say ""
 check "webhook flips entitlement" "A sandbox purchase flips the household to premium via the webhook — not via anything the client wrote."
 check "custom reward" "A custom reward can be added and redeemed."
 check "payout drops coins" "A payout is recorded and the child's coins drop. Balance is SUM(coins), so it must drop by the redemption, not be overwritten."
