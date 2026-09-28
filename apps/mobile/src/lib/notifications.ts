@@ -35,13 +35,6 @@ import {
 const REMINDER_ID = 'kid-reminder';
 const CHANNEL_ID = 'reminders';
 
-async function permitted(): Promise<boolean> {
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-  if (!current.canAskAgain) return false;
-  return (await Notifications.requestPermissionsAsync()).granted;
-}
-
 /**
  * Whether the OS would still show its prompt: nothing granted yet, and nothing the child (or the
  * OS) has already refused for good. The kid explanation screen is shown only while this holds —
@@ -136,16 +129,39 @@ export async function arrangeKidReminder(
 }
 
 /**
+ * Whether the parent explanation screen after "connected" has anything to lead to — the same test
+ * as the child's. A parent who already allowed notifications goes straight on to Today; their
+ * token is registered on every open regardless.
+ */
+export async function canAskForParentPush(): Promise<boolean> {
+  return canAskForKidPush();
+}
+
+/**
+ * The parent's OS prompt, raised only from the explanation screen's "Allow" (spec #86, Parent
+ * push). A yes registers this phone at once rather than on the next open, so tonight's Digest
+ * already has somewhere to go. Returns what the OS says the parent answered.
+ */
+export async function askForParentPush(
+  register: (input: ParentDeviceInput) => Promise<unknown>,
+): Promise<boolean> {
+  const { granted } = await Notifications.requestPermissionsAsync();
+  if (granted) await registerParentPush(register);
+  return granted;
+}
+
+/**
  * Registers this parent's phone for push, on every open: a token rots, and the language the phone
  * reads can change between opens, so the server is told both again rather than asked to remember.
- * A parent who says no to notifications, a build with no push credentials and a phone with no
- * network all end here quietly — nothing the parent is looking at depends on it.
+ * Never asks: the OS prompt belongs to the explanation screen after "connected", so a phone not
+ * granted permission there (or before) ends here quietly — as do a build with no push credentials
+ * and a phone with no network. Nothing the parent is looking at depends on it.
  */
 export async function registerParentPush(
   register: (input: ParentDeviceInput) => Promise<unknown>,
 ): Promise<void> {
   try {
-    if (!(await permitted())) return;
+    if (!(await Notifications.getPermissionsAsync()).granted) return;
     const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
     if (!projectId) return;
     const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
