@@ -2,7 +2,17 @@ import { uuid7 } from '@chores/shared';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Body, Button, Card, Coins, ErrorState, Field, Loading, Screen } from '@/components/ui';
+import {
+  Body,
+  Button,
+  Card,
+  Coins,
+  ErrorState,
+  Field,
+  Loading,
+  Screen,
+  ScrollScreen,
+} from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, locale, t } from '@/lib/i18n';
@@ -162,7 +172,8 @@ function ChildMoney({
         disabled={busy !== null}
         secondary
       />
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {/* Always a failure in here — the successes are shown by the numbers changing. */}
+      {notice ? <Text style={[styles.notice, styles.noticeBad]}>{notice}</Text> : null}
       <Text style={styles.historyTitle}>{t('allowance.history')}</Text>
       {history.length === 0 ? (
         <Text style={styles.historyEmpty}>{t('allowance.historyEmpty')}</Text>
@@ -189,7 +200,8 @@ export default function Allowance() {
   const [message, setMessage] = useState<string | null>(null);
   const [rate, setRate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; bad: boolean } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const householdId = state.me?.household?.id ?? null;
   const premium = state.me?.household?.entitlement === 'premium';
 
@@ -217,11 +229,20 @@ export default function Allowance() {
     void reload();
   }, [reload]);
 
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function saveRate() {
     if (!householdId || rate === null) return;
     const coinsPerUnit = Number(rate);
     if (!Number.isInteger(coinsPerUnit) || coinsPerUnit <= 0) {
-      setNotice(t('allowance.rateInvalid'));
+      setNotice({ text: t('allowance.rateInvalid'), bad: true });
       return;
     }
     setBusy(true);
@@ -233,9 +254,9 @@ export default function Allowance() {
           ? current
           : { ...current, coins_per_unit: saved.coins_per_unit, currency: saved.currency },
       );
-      setNotice(t('allowance.rateSaved'));
+      setNotice({ text: t('allowance.rateSaved'), bad: false });
     } catch (e) {
-      setNotice(withCause(t('allowance.rateFailed'), e));
+      setNotice({ text: withCause(t('allowance.rateFailed'), e), bad: true });
     } finally {
       setBusy(false);
     }
@@ -280,7 +301,10 @@ export default function Allowance() {
   const childName = (id: string) => children.find((c) => c.id === id)?.first_name ?? id;
 
   return (
-    <Screen list>
+    // A card per child, each with three fields, two buttons and a history — taller than any phone
+    // as soon as a household has two children. On the non-scrolling `Screen` this page used, the
+    // second child and every history below the fold were simply unreachable.
+    <ScrollScreen refreshing={refreshing} onRefresh={() => void refresh()}>
       <Stack.Screen options={{ title: t('allowance.title') }} />
       <Body>{t('allowance.hint')}</Body>
       {view !== null && (
@@ -299,7 +323,9 @@ export default function Allowance() {
           />
         </Card>
       )}
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {notice ? (
+        <Text style={[styles.notice, notice.bad && styles.noticeBad]}>{notice.text}</Text>
+      ) : null}
       {view?.children.map((child) => (
         <ChildMoney
           key={child.child_id}
@@ -311,7 +337,7 @@ export default function Allowance() {
           onChanged={reload}
         />
       ))}
-    </Screen>
+    </ScrollScreen>
   );
 }
 
@@ -325,7 +351,8 @@ const allowanceStyles = (theme: Theme) => ({
   name: { ...theme.type.heading, color: theme.colors.text, fontWeight: '600' as const },
   owed: { ...theme.type.body, color: theme.colors.text, fontWeight: '600' as const },
   balance: { ...theme.type.label, color: theme.colors.muted },
-  notice: { ...theme.type.label, color: theme.colors.danger },
+  notice: { ...theme.type.label, color: theme.colors.text },
+  noticeBad: { color: theme.colors.danger },
   historyTitle: { ...theme.type.heading, color: theme.colors.text },
   historyEmpty: { ...theme.type.label, color: theme.colors.muted },
   entry: {
