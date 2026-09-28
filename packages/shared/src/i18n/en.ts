@@ -51,6 +51,9 @@ export const en = {
       // A photo chore's done moment: the coins are waiting on a grown-up, so the card says who
       // holds them rather than paying. Nothing here blames the child — waiting is the state.
       waitingPhoto: 'Waiting on a grown-up to take a look!',
+      // The pet's one-time hello on this device's first open; it points at the first due row.
+      petHello: 'Hi %{name}! I’m %{pet}. Tap it when you’ve done it!',
+      petHelloNothingDue: 'Hi %{name}! I’m %{pet}!',
     },
     big: {
       greeting: 'Hi %{name}',
@@ -64,6 +67,8 @@ export const en = {
       doneMoment: 'Plus %{coins} coins',
       grew: 'Your tree grew 🌱',
       waitingPhoto: 'Waiting on a grown-up to take a look.',
+      petHello: 'Hi %{name}. I’m %{pet}. Tap it when you’ve done it.',
+      petHelloNothingDue: 'Hi %{name}. I’m %{pet}.',
     },
   },
   // The coin display's own strings: the glyph sits where the language wants it, which is why a

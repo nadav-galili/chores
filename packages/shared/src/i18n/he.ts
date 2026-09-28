@@ -40,6 +40,8 @@ export const he: Catalog = {
       doneMoment: 'יופי! עוד %{coins} מטבעות',
       grew: 'העץ שלכם צמח! 🌱',
       waitingPhoto: 'מחכים שמבוגר יעיף מבט!',
+      petHello: 'היי %{name}! אני %{pet}. כשתסיימו, הקישו עליה!',
+      petHelloNothingDue: 'היי %{name}! אני %{pet}!',
     },
     big: {
       greeting: 'היי %{name}',
@@ -53,6 +55,8 @@ export const he: Catalog = {
       doneMoment: 'עוד %{coins} מטבעות',
       grew: 'העץ שלכם צמח 🌱',
       waitingPhoto: 'מחכים שמבוגר יעיף מבט.',
+      petHello: 'היי %{name}. אני %{pet}. כשתסיימו, הקישו עליה.',
+      petHelloNothingDue: 'היי %{name}. אני %{pet}.',
     },
   },
   coins: {
