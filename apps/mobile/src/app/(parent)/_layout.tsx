@@ -1,8 +1,9 @@
 import { useAuth } from '@clerk/expo';
-import { nextSetupStep, setupStepOnSignIn } from '@chores/shared';
+import { connectedOnOpen, nextSetupStep, setupStepOnSignIn } from '@chores/shared';
 import { Redirect, Stack, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
+import { awaitingDevice } from '@/lib/connected';
 import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
 import { INSTANT_SCREENS, parentScreens } from '@/lib/navigation';
@@ -57,6 +58,11 @@ function HouseholdGate() {
     const step = setupStepOnSignIn(me.setup);
     const href = step ? setupStepHref(step, me.children[0]?.id) : null;
     if (href) return <Redirect href={href} />;
+    // A parent who left the Join Code step before the device joined sees "connected" once, now.
+    const connected = connectedOnOpen(awaitingDevice(), me);
+    if (connected) {
+      return <Redirect href={{ pathname: '/setup/connected', params: { id: connected } }} />;
+    }
   }
   return <ParentStack />;
 }

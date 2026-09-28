@@ -43,3 +43,32 @@ export function setupStepOnSignIn(setup: MeSetup): Exclude<SetupStep, 'household
   const step = nextSetupStep(setup);
   return step === 'household' || step === 'done' ? null : step;
 }
+
+/**
+ * The child whose "connected" confirmation a parent's phone should show on this open, or null.
+ *
+ * `awaitingChildId` is the phone's own "last seen" record: the child whose Join Code step it showed
+ * with no Kid Device joined yet, cleared once it has shown the confirmation. It is a UI convenience
+ * held on that phone, not onboarding state (spec #86), so a Partner's phone or a reinstall — which
+ * never saw the step — confirms nothing, and a record the confirmation cleared never shows again.
+ */
+export function connectedOnOpen(
+  awaitingChildId: string | null,
+  me: { setup: Pick<SetupFacts, 'deviceEverJoined'>; children: readonly { id: string }[] },
+): string | null {
+  if (awaitingChildId === null || !me.setup.deviceEverJoined) return null;
+  return me.children.some((c) => c.id === awaitingChildId) ? awaitingChildId : null;
+}
+
+/** Mibo's App Store listing, by App Store Connect's own numeric app id (`ascAppId` in eas.json). */
+export const APP_STORE_URL = 'https://apps.apple.com/app/id6812645404';
+/** Mibo's Google Play listing, by the Android package. */
+export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.mibokids.app';
+
+/**
+ * What "Send the app link" shares: one line, then both store links. It takes no Join Code and so
+ * can never carry one — a fifteen-minute, single-use code does not belong in a chat thread.
+ */
+export function appLinkMessage(line: string): string {
+  return [line, `App Store: ${APP_STORE_URL}`, `Google Play: ${PLAY_STORE_URL}`].join('\n');
+}
