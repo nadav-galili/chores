@@ -173,6 +173,14 @@ export const en = {
     loadFailed: 'Could not load today.',
     nothingDue: 'Nothing due today.',
     noChildren: 'No children yet. Add the first one.',
+    // The card Today shows until a Kid Device has joined, naming the next step of setup.
+    setup: {
+      card: 'Finish setup: %{step}',
+      child: 'add your child',
+      chore: 'add a first chore',
+      pin: 'set the Parent PIN',
+      joinCode: 'connect %{name}’s device',
+    },
     reject: 'Reject',
     rejecting: 'Rejecting…',
     // What came back from the rejection, said in the parent's terms rather than the protocol's.

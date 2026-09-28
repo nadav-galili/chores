@@ -90,7 +90,7 @@ describe('add partner by email', () => {
   it('does not let an uninvited user in, and keeps them out of the household', async () => {
     const owner = as('yael');
     const h = await household(owner, 'Bar');
-    expect(await me(as('stranger'))).toEqual({ parent: null, household: null, children: [] });
+    expect(await me(as('stranger'))).toMatchObject({ parent: null, household: null, children: [] });
     expect(
       (await app.request(`/households/${h.id}/children`, asParent(as('stranger')))).status,
     ).toBe(404);

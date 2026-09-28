@@ -5,13 +5,22 @@ import {
   householdCreated,
   parentInviteInputSchema,
   uuid7,
+  type MeSetup,
 } from '@chores/shared';
 import { and, asc, count, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Analytics } from './analytics.ts';
 import type { AuthVariables } from './auth.ts';
 import type { Db } from './db/client.ts';
-import { children, households, parentInvites, parents, rewards } from './db/schema.ts';
+import {
+  childDevices,
+  children,
+  chores,
+  households,
+  parentInvites,
+  parents,
+  rewards,
+} from './db/schema.ts';
 import { childToApi, householdToApi, parentInviteToApi, parentToApi } from './serialize.ts';
 import { parseBody } from './parse-body.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
@@ -61,11 +70,58 @@ export function householdRoutes(db: Db, analytics: Analytics) {
       orderBy: asc(children.sort),
     });
 
+  const NO_SETUP: MeSetup = {
+    hasHousehold: false,
+    childCount: 0,
+    choreCount: 0,
+    hasPin: false,
+    deviceEverJoined: false,
+    createdHousehold: false,
+  };
+
+  /**
+   * The facts `nextSetupStep` reads, counted from rows that exist for their own reasons — nothing
+   * here is onboarding state (spec #86). A parent created the household unless an accepted invite
+   * is what placed them in it.
+   */
+  const setupFacts = async (
+    householdId: string,
+    parentId: string,
+    hasPin: boolean,
+    childCount: number,
+  ): Promise<MeSetup> => {
+    const [[choreCount], [device], [invite]] = await Promise.all([
+      db
+        .select({ n: count() })
+        .from(chores)
+        .where(and(eq(chores.householdId, householdId), isNull(chores.deletedAt))),
+      // Revoked devices count: once any device has joined, setup is over for good.
+      db
+        .select({ id: childDevices.id })
+        .from(childDevices)
+        .where(eq(childDevices.householdId, householdId))
+        .limit(1),
+      db
+        .select({ email: parentInvites.email })
+        .from(parentInvites)
+        .where(eq(parentInvites.acceptedParentId, parentId))
+        .limit(1),
+    ]);
+    return {
+      hasHousehold: true,
+      childCount,
+      choreCount: choreCount?.n ?? 0,
+      hasPin,
+      deviceEverJoined: device !== undefined,
+      createdHousehold: invite === undefined,
+    };
+  };
+
   app.get('/me', async (c) => {
     const clerkUserId = c.get('clerkUserId');
     const parent =
       (await parentOf(clerkUserId)) ?? (await claimInvite(clerkUserId, c.get('email')));
-    if (!parent) return c.json({ parent: null, household: null, children: [] });
+    if (!parent) return c.json({ parent: null, household: null, children: [], setup: NO_SETUP });
     const [household, childRows] = await Promise.all([
       db.query.households.findFirst({ where: eq(households.id, parent.householdId) }),
       listChildren(parent.householdId),
@@ -75,6 +131,12 @@ export function householdRoutes(db: Db, analytics: Analytics) {
       parent: parentToApi(parent),
       household: householdToApi(household),
       children: childRows.map(childToApi),
+      setup: await setupFacts(
+        household.id,
+        parent.id,
+        household.pinHash !== null,
+        childRows.length,
+      ),
     });
   });
 
