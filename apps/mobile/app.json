@@ -26,6 +26,7 @@
     "ios": {
       "bundleIdentifier": "com.mibokids.app",
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

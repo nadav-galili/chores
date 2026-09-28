@@ -303,3 +303,37 @@ describe('sibling households', () => {
     expect(((await theirList.json()) as unknown[]).length).toBe(1);
   });
 });
+
+describe('a parent whose token carries no email', () => {
+  // Sign in with Apple lets the parent hide their address, and Apple then issues a token with no
+  // email claim at all — not a relay address, nothing. `parents.email` is nullable for exactly
+  // this reason, so the whole flow has to work with it null rather than treat it as broken.
+  it('creates a household and resolves to a parents row on the next /me', async () => {
+    const { household, parent } = await createHousehold('user_apple_private');
+    expect(parent).toMatchObject({ email: null });
+
+    const me = await app.request('/me', asParent('user_apple_private'));
+    expect(me.status).toBe(200);
+    expect(await me.json()).toMatchObject({
+      parent: { id: parent.id, email: null },
+      household: { id: household.id },
+    });
+  });
+
+  it('has no household, even while an invite is pending — an invite needs an address to match', async () => {
+    const { household } = await createHousehold('user_inviter_at_example.com');
+    const invited = await app.request(
+      `/households/${household.id}/parents`,
+      asParent('user_inviter_at_example.com', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'partner@example.com' }),
+      }),
+    );
+    expect(invited.status).toBe(201);
+
+    // No email claim means no address to match the invite against, so this is a parent with no
+    // household — the create-household screen — and never a silent join to someone else's.
+    const me = await app.request('/me', asParent('user_apple_private_two'));
+    expect(await me.json()).toEqual({ parent: null, household: null, children: [] });
+  });
+});

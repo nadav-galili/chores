@@ -191,6 +191,17 @@ cd "$ROOT"
 API_ENV="$ROOT/apps/api/.env"
 MOBILE_ENV="$ROOT/apps/mobile/.env"
 
+# Which Clerk instance every stage acts on. `dev` is the default because this wizard's
+# other half writes development keys into apps/*/.env and boots the local API against
+# them, and that only makes sense for development. Override it to configure production:
+#
+#   CLERK_INSTANCE=prod scripts/clerk-setup.sh
+#
+# Name it on every CLI call rather than letting the CLI choose. #85 found production's
+# redirect allowlist completely empty on a store build, having run this wizard more than
+# once — each run quietly reconfiguring development again.
+CLERK_INSTANCE="${CLERK_INSTANCE:-dev}"
+
 # clerk_cli — the Clerk CLI, installed globally if present, else via npx.
 clerk_cli() {
   if command -v clerk >/dev/null 2>&1; then clerk "$@"; else npx -y clerk@latest "$@"; fi
@@ -213,6 +224,12 @@ stage "Preflight"
 say "Checking the things this wizard needs before it touches Clerk."
 [[ -f "$ROOT/pnpm-workspace.yaml" ]] || { warn "not the chores repo root ($ROOT)"; exit 1; }
 note "repo root: $ROOT"
+note "Clerk instance: $CLERK_INSTANCE  (override with CLERK_INSTANCE=prod)"
+if [[ "$CLERK_INSTANCE" != dev ]]; then
+  warn "Stages 4 and 5 write keys into apps/*/.env and stage 10 boots the local API"
+  warn "against them. On a non-dev instance those are live keys in a local file."
+  confirm "Configure the '$CLERK_INSTANCE' instance?" || exit 1
+fi
 
 if command -v clerk >/dev/null 2>&1; then
   note "clerk CLI: $(clerk -v 2>/dev/null || echo installed)"
@@ -267,7 +284,7 @@ say "expects them — the secret key never leaves apps/api/.env."
 PULLED="$(mktemp)"
 trap 'rm -f "$PULLED"' EXIT
 PK=""; SK=""
-if clerk_cli env pull --instance dev --file "$PULLED" >/dev/null 2>&1; then
+if clerk_cli env pull --instance "$CLERK_INSTANCE" --file "$PULLED" >/dev/null 2>&1; then
   PK=$(grep -hoE 'pk_(test|live)_[A-Za-z0-9._$-]+' "$PULLED" | head -n1 || true)
   SK=$(grep -hoE 'sk_(test|live)_[A-Za-z0-9._$-]+' "$PULLED" | head -n1 || true)
 fi
@@ -346,7 +363,7 @@ stage "Sign-in method — email code"
 say "The parent sign-in screen calls signIn.emailCode, so the instance must offer"
 say "email address as an identifier with email-code verification."
 CFG="$(mktemp)"
-clerk_cli config pull --instance dev > "$CFG" 2>/dev/null || true
+clerk_cli config pull --instance "$CLERK_INSTANCE" > "$CFG" 2>/dev/null || true
 if [[ "$(cfg_flag "$CFG" '"email_code" in (c.get("auth_email") or {}).get("sign_in_strategies") or []')" == yes ]]; then
   note "auth_email.sign_in_strategies includes email_code — enabled"
 else
@@ -364,7 +381,7 @@ stage "Sign-in method — Google"
 say "The same screen offers 'Continue with Google' via startSSOFlow({ strategy:"
 say "'oauth_google' }). That needs the Google social connection switched on."
 CFG="$(mktemp)"
-clerk_cli config pull --instance dev > "$CFG" 2>/dev/null || true
+clerk_cli config pull --instance "$CLERK_INSTANCE" > "$CFG" 2>/dev/null || true
 if [[ "$(cfg_flag "$CFG" '(c.get("connection_oauth_google") or {}).get("enabled") is True')" == yes ]]; then
   note "connection_oauth_google.enabled is true — enabled"
 else
@@ -383,23 +400,48 @@ stage "Redirect URL for the native app"
 say "After Google sign-in the browser hands control back to the app through the"
 say "'mibo' scheme (app.json). Clerk only redirects to URLs on its allowlist, so"
 say "an unregistered scheme leaves the parent stuck in the browser tab."
-for url in "mibo://parent" "mibo://"; do
-  if clerk_cli api /redirect_urls 2>/dev/null | grep -qF "\"$url\""; then
+say ""
+note "mibo://sso-callback is the one the app actually asks for — parent-sign-in.tsx"
+note "builds it with makeRedirectUri({ scheme: 'mibo', path: 'sso-callback' }). This"
+note "wizard used to register only mibo://parent and mibo://, so a fresh instance"
+note "came out of it with sign-in still broken (#85). The other two stay registered:"
+note "they cost nothing and the app has redirected to mibo://parent in the past."
+say ""
+# Every call names the instance. Without --instance the CLI picks one for you, and
+# a wizard that silently configures development while you believe you are fixing
+# production is how #85's production allowlist came to be empty on a store build.
+note "targeting the $CLERK_INSTANCE instance explicitly on every call."
+# Captured, not piped into grep: `clerk api | grep -q` makes grep stop reading, the
+# CLI take SIGPIPE, and pipefail call a healthy command failed — so the `if` falls
+# through and the wizard re-POSTs a URL that was already there (CODING_STANDARDS.md).
+allowlist=$(clerk_cli api --instance "$CLERK_INSTANCE" /redirect_urls 2>/dev/null || true)
+for url in "mibo://sso-callback" "mibo://parent" "mibo://"; do
+  if printf '%s' "$allowlist" | grep -qF "\"$url\""; then
     note "already registered: $url"
-  elif clerk_cli api -X POST /redirect_urls -d "{\"url\":\"$url\"}" --yes >/dev/null 2>&1; then
+  elif clerk_cli api --instance "$CLERK_INSTANCE" -X POST /redirect_urls \
+      -d "{\"url\":\"$url\"}" --yes >/dev/null 2>&1; then
     printf '  %s✓ registered%s %s\n' "$GREEN" "$RESET" "$url"
   else
-    warn "couldn't register $url through the API — add it by hand."
+    printf '  %s✗%s %s\n' "$RED" "$RESET" "$url"
+    warn "couldn't register it through the API — add it by hand."
     clerk_cli open dashboard >/dev/null 2>&1 || open_url "https://dashboard.clerk.com"
-    step "Find the Redirect URLs / allowlist for this instance and add: $url"
+    step "Find the Redirect URLs / allowlist for the $CLERK_INSTANCE instance and add: $url"
     pause "Press Enter once it's registered"
   fi
 done
-if [[ "$(clerk_cli api /redirect_urls 2>/dev/null | grep -cF 'mibo://')" -ge 2 ]]; then
-  note "both mibo:// redirect URLs are on the allowlist"
+# Counted by exact URL, not by a 'mibo://' substring: the substring count reached its
+# threshold on mibo://parent and mibo:// alone, so the one URL that matters could be
+# missing and this check would still say the allowlist was fine.
+registered=$(clerk_cli api --instance "$CLERK_INSTANCE" /redirect_urls 2>/dev/null || true)
+missing_urls=()
+for url in "mibo://sso-callback" "mibo://parent" "mibo://"; do
+  printf '%s' "$registered" | grep -qF "\"$url\"" || missing_urls+=("$url")
+done
+if (( ${#missing_urls[@]} == 0 )); then
+  note "all three mibo:// redirect URLs are on the $CLERK_INSTANCE allowlist"
 else
-  warn "the allowlist still doesn't hold both mibo:// URLs — Google sign-in will hang."
-  SKIPPED+=("register mibo://parent and mibo:// as Clerk redirect URLs")
+  warn "still missing from the allowlist: ${missing_urls[*]} — SSO sign-in will hang."
+  SKIPPED+=("register ${missing_urls[*]} as Clerk redirect URLs on $CLERK_INSTANCE")
 fi
 warn "Google sign-in cannot work in Expo Go — it needs the dev client build."
 pause "Press Enter to continue"
