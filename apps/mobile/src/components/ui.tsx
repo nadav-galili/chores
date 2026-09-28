@@ -49,6 +49,7 @@ export function Screen({ children, list = false }: { children: React.ReactNode; 
   return (
     <View
       style={[
+        styles.page,
         styles.screen,
         list && styles.listScreen,
         {
@@ -381,7 +382,7 @@ export function ScrollScreen({
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={[
-        styles.screen,
+        styles.page,
         styles.scrollContent,
         // `contentInsetAdjustmentBehavior` handles the top under a native header and does nothing
         // without one, so the bottom inset is still ours to pay either way.
@@ -606,17 +607,23 @@ const CHORE_GLYPH = '⭐';
 const WAITING_GLYPH = '📷';
 
 const screenStyles = (theme: Theme) => ({
-  // Vertical padding is supplied per-render with the safe-area insets, so it is not set here.
-  screen: {
-    flex: 1,
+  // What a page looks like, with no opinion about how it sizes. Vertical padding is supplied
+  // per-render with the safe-area insets, so it is not set here either.
+  page: {
     paddingHorizontal: theme.space.xl,
     gap: theme.space.lg,
     justifyContent: 'flex-start' as const,
     backgroundColor: theme.colors.ground,
   },
+  // A `Screen` is a View that fills the space it is given.
+  screen: { flex: 1 },
   listScreen: { gap: theme.space.md },
   scroll: { flex: 1, backgroundColor: theme.colors.ground },
-  scrollContent: { justifyContent: 'flex-start' as const, flexGrow: 1 },
+  // A scroll's content is the opposite: it grows to fill a short page and is free to exceed the
+  // viewport on a long one. `flexGrow` alone, never `flex` — `flex: 1` sets `flexShrink: 1` and
+  // `flexBasis: 0` as well, which pins the content to the viewport's height and squashes anything
+  // taller instead of scrolling it. That is why the allowance screen would not scroll to its end.
+  scrollContent: { flexGrow: 1 },
   loading: { flex: 1, justifyContent: 'center' as const, backgroundColor: theme.colors.ground },
 });
 
