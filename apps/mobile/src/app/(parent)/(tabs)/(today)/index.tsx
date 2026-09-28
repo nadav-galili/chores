@@ -6,8 +6,10 @@ import type {
   ParentTodayRedemption,
   RedemptionDecision,
   RejectCompletionResult,
+  SetupStep,
 } from '@chores/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { nextSetupStep } from '@chores/shared';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
@@ -364,6 +366,55 @@ function ChildCard({
 }
 
 /**
+ * Where each unfinished setup step lives. The routes sit above the tab bar (`(parent)/setup/*`),
+ * so the step's existing screen covers the tabs; the Join Code is the first child's.
+ */
+function setupStepHref(step: SetupStep, firstChildId: string | undefined): Href | null {
+  switch (step) {
+    case 'child':
+      return '/setup/child';
+    case 'chore':
+      return '/setup/chore';
+    case 'pin':
+      return '/setup/pin';
+    case 'join_code':
+      return firstChildId ? { pathname: '/setup/join-code', params: { id: firstChildId } } : null;
+    // A parent on Today already has a household, and `done` has no card.
+    case 'household':
+    case 'done':
+      return null;
+  }
+}
+
+/** "Finish setup: {next step}", shown until a Kid Device has ever joined. */
+function SetupCard({
+  step,
+  firstChild,
+}: {
+  step: SetupStep;
+  firstChild?: { id: string; first_name: string };
+}) {
+  const styles = useThemedStyles(todayStyles);
+  const router = useRouter();
+  const href = setupStepHref(step, firstChild?.id);
+  if (!href) return null;
+  const label =
+    step === 'child'
+      ? t('parent.setup.child')
+      : step === 'chore'
+        ? t('parent.setup.chore')
+        : step === 'pin'
+          ? t('parent.setup.pin')
+          : t('parent.setup.joinCode', { name: firstChild?.first_name ?? '' });
+  const text = t('parent.setup.card', { step: label });
+  return (
+    <Card onPress={() => router.push(href)} accessibilityLabel={text}>
+      <Text style={styles.name}>{text}</Text>
+    </Card>
+  );
+}
+
+/**
  * The evening scan: every child of the household, what each of them owes today and what each of
  * them has done, read top to bottom in one pass. A parent still does not tick a child's chore
  * off for them; the one thing they write from here is a rejection.
@@ -387,6 +438,19 @@ export default function ParentToday() {
   const [decidingPhoto, setDecidingPhoto] = useState<string | null>(null);
   const { api } = state;
   const householdId = household?.id ?? null;
+  const setupStep = state.status === 'ready' ? nextSetupStep(state.me.setup) : 'done';
+  const firstChild = state.status === 'ready' ? state.me.children[0] : undefined;
+
+  // The step screens write chores and the PIN without re-reading `/me`, and a Kid Device joins
+  // from another phone, so the card's facts are re-read whenever Today comes back into view —
+  // only while setup is unfinished, since `done` never changes back.
+  const refreshMe = state.refresh;
+  const setupDone = setupStep === 'done';
+  useFocusEffect(
+    useCallback(() => {
+      if (!setupDone) void refreshMe();
+    }, [setupDone, refreshMe]),
+  );
 
   /**
    * Reject one completion and say what came back. `already_undone` is not a failure — the child
@@ -529,6 +593,7 @@ export default function ParentToday() {
             />
           }
         >
+          <SetupCard step={setupStep} firstChild={firstChild} />
           {today.today?.children.length === 0 && (
             <EmptyState
               title={t('parent.noChildren')}

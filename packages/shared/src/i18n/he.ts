@@ -157,6 +157,13 @@ export const he: Catalog = {
     loadFailed: 'לא הצלחנו לטעון את היום.',
     nothingDue: 'אין מטלות להיום.',
     noChildren: 'אין עדיין ילדים. הוסיפו את הראשון.',
+    setup: {
+      card: 'להשלמת ההגדרה: %{step}',
+      child: 'הוספת ילד',
+      chore: 'הוספת מטלה ראשונה',
+      pin: 'הגדרת קוד הורה',
+      joinCode: 'חיבור המכשיר של %{name}',
+    },
     reject: 'דחייה',
     rejecting: 'דוחים…',
     rejected: 'נדחה. %{title} חוזרת לביצוע חוזר.',

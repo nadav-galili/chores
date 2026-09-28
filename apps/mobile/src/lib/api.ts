@@ -7,6 +7,7 @@ import type {
   DecideRedemptionResult,
   Household,
   IssuedJoinCode,
+  MeSetup,
   ChildSummary,
   HouseholdSummary,
   DeviceSession,
@@ -45,7 +46,13 @@ export const LEGAL_URLS = Object.freeze({
   privacy: `${BASE_URL}/privacy`,
 });
 
-export type Me = { parent: Parent | null; household: Household | null; children: Child[] };
+export type Me = {
+  parent: Parent | null;
+  household: Household | null;
+  children: Child[];
+  /** How far through setup the household is, derived on the server (spec #86). */
+  setup: MeSetup;
+};
 
 export class ApiError extends Error {
   constructor(
