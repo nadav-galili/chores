@@ -160,6 +160,10 @@ _Avoid_: Paywall trigger, upsell point
 **Read-only Child**:
 A child beyond the free tier's quota after the grace period; still uses the app fully, but parents cannot edit that child's chores until premium.
 
+**Activation**:
+The first completion by a child on a kid device. Everything a household does before it is onboarding, and onboarding exists to reach it.
+_Avoid_: Signup, conversion, first chore created
+
 ### Sync
 
 **Op**:
