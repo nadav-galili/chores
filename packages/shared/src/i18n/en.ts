@@ -188,6 +188,14 @@ export const en = {
     },
     reject: 'Reject',
     rejecting: 'Rejecting…',
+    // One tap takes the chore's coins and the day's bonus back, so the tap is confirmed first.
+    rejectConfirm: {
+      title: 'Reject %{title}?',
+      body: '%{name} loses the coins for it, and the day bonus if the day was complete. The chore comes back for a redo.',
+      cancel: 'Keep it',
+      confirm: 'Reject',
+    },
+    addAnotherChild: 'Add another child',
     // What came back from the rejection, said in the parent's terms rather than the protocol's.
     rejected: 'Rejected. %{title} is back for a redo.',
     rejectAlreadyUndone: '%{title} was already undone. Nothing changed.',
@@ -431,6 +439,8 @@ export const en = {
     title: 'Parent PIN',
     hint: 'Four digits. Kid mode ends only with this PIN, so set one before a device joins.',
     label: 'PIN',
+    confirmLabel: 'PIN again',
+    mismatch: 'The two PINs don’t match.',
     save: 'Save PIN',
     failed: 'Could not save the PIN',
   },

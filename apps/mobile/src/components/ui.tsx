@@ -392,6 +392,8 @@ export function ScrollScreen({
         { paddingBottom: insets.bottom + space.xl },
       ]}
       contentInsetAdjustmentBehavior="automatic"
+      // A field low on the form scrolls up above the keyboard instead of sitting under it.
+      automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
       refreshControl={
         onRefresh ? (

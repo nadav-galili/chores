@@ -158,7 +158,11 @@ export function ParentSignIn({
         />
         <Button
           title={t('signIn.differentEmail')}
-          onPress={() => setStep({ kind: 'email' })}
+          onPress={() => {
+            setCode('');
+            setError(null);
+            setStep({ kind: 'email' });
+          }}
           secondary
         />
         {footer}

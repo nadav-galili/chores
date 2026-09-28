@@ -258,6 +258,8 @@ export function createDeviceApi(deviceToken: string) {
   return {
     me: () => call<DeviceMe>(getToken, '/device/me'),
     sync: (body: SyncRequest) => call<SyncResponse>(getToken, '/sync', json('POST', body)),
+    // The PIN exit: this device revokes itself, so a parent's device list stops calling it active.
+    leave: () => call<{ id: string; revoked_at: string }>(getToken, '/device/leave', { method: 'POST' }),
     // Photo proof (ADR-0017): the device names only the completion, and the key in the answer
     // is what the later `complete` op carries. The bytes go to R2, never through this client.
     presign: (completion_id: string, content_type: 'image/jpeg' | 'image/png' | 'image/webp') =>

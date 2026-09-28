@@ -22,6 +22,9 @@ export function PinForm({
 }) {
   const state = useHousehold();
   const [pin, setPin] = useState('');
+  // Typed twice: a mistyped PIN is the one way to lock a parent out of every kid device
+  // (ADR-0013), and there is no old PIN to fall back on because none is asked for.
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const householdId = state.status === 'ready' ? (state.me.household?.id ?? null) : null;
@@ -30,6 +33,7 @@ export function PinForm({
   if (!householdId) return null;
 
   const submit = () => {
+    if (confirm !== pin) return setError(t('pin.mismatch'));
     setBusy(true);
     setError(null);
     void (async () => {
@@ -56,11 +60,19 @@ export function PinForm({
         maxLength={4}
         secureTextEntry
       />
+      <Field
+        label={t('pin.confirmLabel')}
+        value={confirm}
+        onChangeText={setConfirm}
+        keyboardType="number-pad"
+        maxLength={4}
+        secureTextEntry
+      />
       <ErrorText>{error}</ErrorText>
       <Button
         title={t('pin.save')}
         onPress={submit}
-        disabled={busy || !pinSchema.safeParse(pin).success}
+        disabled={busy || !pinSchema.safeParse(pin).success || confirm.length !== pin.length}
       />
       {footer}
     </ScrollScreen>

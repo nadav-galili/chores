@@ -2,7 +2,7 @@ import type { IssuedJoinCode } from '@chores/shared';
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button, ErrorText, Screen } from '@/components/ui';
+import { Body, Button, ErrorText, Screen, Title } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { withCause } from '@/lib/errors';
 import { useHousehold, useHouseholdChild, useHouseholdId } from '@/lib/household-context';
@@ -33,6 +33,7 @@ export function JoinCodeView({
   intro,
   pinHref,
   footer,
+  connected = false,
 }: {
   /** The child whose code this is. */
   id: string | undefined;
@@ -42,6 +43,8 @@ export function JoinCodeView({
   pinHref: Href;
   /** How the screen is left. */
   footer: React.ReactNode;
+  /** The child's device has joined: the code is spent, and the screen says so instead. */
+  connected?: boolean;
 }) {
   const { api } = useHousehold();
   const householdId = useHouseholdId();
@@ -88,6 +91,16 @@ export function JoinCodeView({
   );
 
   if (!child) return null;
+  if (connected) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: t('joinCode.title', { name: child.first_name }) }} />
+        <Title>{t('setup.connected.title', { name: child.first_name })}</Title>
+        <Body>{t('setup.connected.body', { name: child.first_name })}</Body>
+        {footer}
+      </Screen>
+    );
+  }
   const remaining = issued ? new Date(issued.expires_at).getTime() - now : 0;
   const expired = issued !== null && remaining <= 0;
 

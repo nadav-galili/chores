@@ -10,7 +10,7 @@ import type {
 import { nextSetupStep } from '@chores/shared';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
 import { Card, Coins, EmptyState, ErrorState, FILL, Loading, Screen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
@@ -365,6 +365,21 @@ function ChildCard({
   );
 }
 
+/**
+ * "Add another child", once the first child is all the way through setup (spec #86, story 31):
+ * guided setup sets up one child, and this is where the second one starts.
+ */
+function AddChildCard() {
+  const styles = useThemedStyles(todayStyles);
+  const router = useRouter();
+  const text = t('parent.addAnotherChild');
+  return (
+    <Card onPress={() => router.push('/children/new')} accessibilityLabel={text}>
+      <Text style={styles.name}>{text}</Text>
+    </Card>
+  );
+}
+
 /** "Finish setup: {next step}", shown until a Kid Device has ever joined. */
 function SetupCard({ me }: { me: Pick<Me, 'setup' | 'children'> | null }) {
   const styles = useThemedStyles(todayStyles);
@@ -450,6 +465,34 @@ export default function ParentToday() {
     },
     [api, householdId, today],
   );
+
+  // One tap on Reject takes the chore's coins and, on a complete day, the bonus with it — so the
+  // tap is confirmed in the parent's terms before anything moves.
+  const confirmReject = useCallback(
+    (name: string, item: ParentTodayItem) => {
+      Alert.alert(
+        t('parent.rejectConfirm.title', { title: item.title }),
+        t('parent.rejectConfirm.body', { name }),
+        [
+          { text: t('parent.rejectConfirm.cancel'), style: 'cancel' },
+          {
+            text: t('parent.rejectConfirm.confirm'),
+            style: 'destructive',
+            onPress: () => void reject(item),
+          },
+        ],
+      );
+    },
+    [reject],
+  );
+
+  // A notice is about the moment it was made in. It leaves on its own, rather than staying on
+  // screen after the child has long since redone the chore it names.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 8000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   /**
    * Answer one request. A decision the server says was already made, or one the child cancelled
@@ -587,10 +630,13 @@ export default function ParentToday() {
               key={child.child_id}
               child={child}
               tz={household.tz}
-              onReject={(item) => void reject(item)}
+              onReject={(item) => confirmReject(child.first_name, item)}
               rejecting={rejecting}
             />
           ))}
+          {setupDone && today.today !== null && today.today.children.length > 0 && (
+            <AddChildCard />
+          )}
         </ScrollView>
       )}
     </Screen>

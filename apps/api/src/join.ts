@@ -208,6 +208,20 @@ export function joinRoutes(db: Db, redeemLimit: RateLimit, analytics: Analytics)
       household: householdSummaryToApi(household!),
     });
   });
+
+  /**
+   * The device leaving kid mode on its own (the Parent PIN exit). It revokes itself, so the
+   * parent's device list stops calling it active and the token stops working — the same
+   * outcome as a parent's DELETE, from the other end. Idempotent: a second call finds it revoked.
+   */
+  device.post('/device/leave', async (c) => {
+    const [row] = await db
+      .update(childDevices)
+      .set({ revokedAt: sql`coalesce(${childDevices.revokedAt}, now())` })
+      .where(eq(childDevices.id, c.get('deviceId')))
+      .returning();
+    return c.json({ id: row!.id, revoked_at: row!.revokedAt!.toISOString() });
+  });
   app.route('/', device);
 
   return app;

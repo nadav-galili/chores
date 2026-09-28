@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Body, Button, ErrorText, Field, Loading, Screen, Title } from '@/components/ui';
+import { createDeviceApi } from '@/lib/api';
 import { useDeviceSession } from '@/lib/device-session';
 import { t } from '@/lib/i18n';
 import { readPinAttempts, writePinAttempts } from '@/lib/pin-attempts';
@@ -77,6 +78,15 @@ export default function Exit() {
   };
 
   const leave = async () => {
+    // Best effort: a room with no signal still lets a parent out (ADR-0013), and the parent can
+    // revoke from their own phone. Online, the device list stops calling this device active.
+    if (device.session) {
+      try {
+        await createDeviceApi(device.session.device_token).leave();
+      } catch (e) {
+        console.error('device leave failed', e);
+      }
+    }
     await device.clear();
     await setRole('parent');
     router.replace('/(parent)/(tabs)/(today)');

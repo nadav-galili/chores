@@ -123,6 +123,28 @@ describe('redeeming a join code', () => {
     expect(code!.redeemedAt).not.toBeNull();
   });
 
+  it('lets the device leave: revoked for the parent, and its token stops working', async () => {
+    const { householdId, children } = await household('user_leave', 'Noa');
+    const issued = await issue('user_leave', householdId, children[0]!.id);
+    const session = (await (await redeem(issued.code)).json()) as DeviceSession;
+    const asDevice = { headers: { authorization: `Bearer ${session.device_token}` } };
+
+    const left = await app.request('/device/leave', { method: 'POST', ...asDevice });
+    expect(left.status).toBe(200);
+    expect(await left.json()).toMatchObject({ id: session.device_id });
+
+    const again = await app.request('/device/me', asDevice);
+    expect(again.status).toBe(401);
+    expect(await again.json()).toEqual({ error: 'device_revoked' });
+
+    const listed = await app.request(
+      `/households/${householdId}/children/${children[0]!.id}/devices`,
+      asParent('user_leave'),
+    );
+    const rows = (await listed.json()) as { id: string; revoked_at: string | null }[];
+    expect(rows.find((r) => r.id === session.device_id)?.revoked_at).not.toBeNull();
+  });
+
   it('fails for an unknown code', async () => {
     const res = await redeem('ZZZZZZ');
     expect(res.status).toBe(404);

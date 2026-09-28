@@ -51,6 +51,7 @@ import {
   markOpen,
 } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
+import { POLL_MS } from '@/lib/use-parent-today';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
 import { playDoneHaptic } from '@/lib/haptics';
@@ -510,9 +511,13 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     setKidErrorContext(session);
   }, [session.analytics_anon_id, session.child.ui_mode, session.household.id]);
 
+  // On focus, and then every minute while the screen is open: a chore a parent adds while the
+  // child is already looking at the list arrives without the child having to leave and return.
   useFocusEffect(
     useCallback(() => {
       void refresh();
+      const timer = setInterval(() => void refresh(), POLL_MS);
+      return () => clearInterval(timer);
     }, [refresh]),
   );
 

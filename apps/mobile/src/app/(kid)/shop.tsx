@@ -88,7 +88,7 @@ function RewardRow({ reward, onAsk }: { reward: ShopReward; onAsk: () => void })
         <Text style={styles.icon}>{reward.icon ?? REWARD_GLYPH}</Text>
         <View style={styles.rowText}>
           <Text style={[styles.rowTitle, !reward.affordable && styles.unaffordable]}>{title}</Text>
-          <Coins amount={reward.cost_coins} variant="pays" step="label" />
+          <Coins amount={reward.cost_coins} step="label" />
         </View>
         {reward.affordable ? (
           <Pressable
