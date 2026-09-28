@@ -14,7 +14,11 @@ type State =
   | { status: 'error'; me: null; message: string }
   | { status: 'ready'; me: Me };
 
-type HouseholdContextValue = State & { api: Api; refresh: () => Promise<void> };
+type HouseholdContextValue = State & {
+  api: Api;
+  /** Re-reads `/me`; resolves to what it read, or null when that failed (the state says why). */
+  refresh: () => Promise<Me | null>;
+};
 
 const HouseholdContext = createContext<HouseholdContextValue | null>(null);
 
@@ -62,8 +66,10 @@ export function HouseholdProvider({ children }: { children: React.ReactNode }) {
       // Every open re-registers this phone for push; `registerParentPush` swallows its own
       // failures, so a refusal never reaches the screen the parent is waiting on.
       if (householdId) void registerParentPush((input) => api.registerDevice(householdId, input));
+      return me;
     } catch (e) {
       setState({ status: 'error', me: null, message: e instanceof Error ? e.message : 'failed' });
+      return null;
     }
   }, [api]);
 

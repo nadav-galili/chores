@@ -10,11 +10,14 @@ export function ChildForm({
   title,
   initial = empty,
   onSubmit,
+  intro,
   footer,
 }: {
   title: string;
   initial?: ChildInput;
   onSubmit: (input: ChildInput) => Promise<void>;
+  /** Above the fields: guided setup's line on what this step is for. */
+  intro?: React.ReactNode;
   footer?: React.ReactNode;
 }) {
   const [firstName, setFirstName] = useState(initial.first_name);
@@ -47,6 +50,7 @@ export function ChildForm({
   return (
     <ScrollScreen>
       <Stack.Screen options={{ title: title }} />
+      {intro}
       <Field
         label={t('childForm.firstName')}
         value={firstName}

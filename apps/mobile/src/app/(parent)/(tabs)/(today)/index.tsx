@@ -9,7 +9,7 @@ import type {
   SetupStep,
 } from '@chores/shared';
 import { nextSetupStep } from '@chores/shared';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
@@ -19,6 +19,7 @@ import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
 import type { Api } from '@/lib/api';
 import { rewardTitle } from '@/lib/reward-title';
+import { setupStepHref } from '@/lib/setup';
 import { useParentToday } from '@/lib/use-parent-today';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -363,27 +364,6 @@ function ChildCard({
       )}
     </Card>
   );
-}
-
-/**
- * Where each unfinished setup step lives. The routes sit above the tab bar (`(parent)/setup/*`),
- * so the step's existing screen covers the tabs; the Join Code is the first child's.
- */
-function setupStepHref(step: SetupStep, firstChildId: string | undefined): Href | null {
-  switch (step) {
-    case 'child':
-      return '/setup/child';
-    case 'chore':
-      return '/setup/chore';
-    case 'pin':
-      return '/setup/pin';
-    case 'join_code':
-      return firstChildId ? { pathname: '/setup/join-code', params: { id: firstChildId } } : null;
-    // A parent on Today already has a household, and `done` has no card.
-    case 'household':
-    case 'done':
-      return null;
-  }
 }
 
 /** "Finish setup: {next step}", shown until a Kid Device has ever joined. */

@@ -55,12 +55,17 @@ export function ChoreForm({
   initial,
   onSubmit,
   onDelete,
+  intro,
+  footer,
 }: {
   title: string;
   children: Child[];
   initial: ChoreFields;
   onSubmit: (fields: ChoreFields) => Promise<void>;
   onDelete?: () => Promise<void>;
+  /** Above the fields: guided setup's line on what this step is for. */
+  intro?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const styles = useThemedStyles(choreFormStyles);
   const household = useHousehold();
@@ -140,6 +145,7 @@ export function ChoreForm({
   return (
     <ScrollScreen>
       <Stack.Screen options={{ title: title }} />
+      {intro}
       <Field
         label={t('choreForm.title')}
         value={choreTitle}
@@ -236,6 +242,7 @@ export function ChoreForm({
       {onDelete && (
         <Button title={t('choreForm.delete')} onPress={remove} disabled={busy} secondary />
       )}
+      {footer}
     </ScrollScreen>
   );
 }

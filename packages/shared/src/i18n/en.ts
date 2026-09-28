@@ -285,6 +285,17 @@ export const en = {
     create: 'Create household',
     failed: 'Could not create the household',
   },
+  // Guided setup: each step's one line on what it is for, and the way out of setup to Today.
+  setup: {
+    purpose: {
+      household: 'Your household is where your children, chores and coins live.',
+      child: 'Add your child so they get their own list and their own pet.',
+      chore: 'Give your child a first chore, so their list isn’t empty when their device joins.',
+      pin: 'The Parent PIN is the only way out of kid mode on your child’s device.',
+      join_code: 'Type this code on your child’s device to connect it to your household.',
+    },
+    finishLater: 'I’ll finish later',
+  },
   partner: {
     title: 'Your partner',
     hint: 'They sign in with this email and land in this household. Two parents on the free plan.',
