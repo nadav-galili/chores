@@ -1,5 +1,5 @@
 import type { IsoDate } from '@chores/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { analyticsState } from '@/db/schema';
 import type { DeviceDb } from '@/db/types';
 
@@ -22,7 +22,13 @@ async function held(db: DeviceDb) {
 
 async function record(
   db: DeviceDb,
-  fields: { opened_on?: string; completed_on?: string; grove_stage?: number },
+  fields: {
+    opened_on?: string;
+    completed_on?: string;
+    grove_stage?: number;
+    activated?: boolean;
+    first_completed?: boolean;
+  },
 ) {
   await db
     .insert(analyticsState)
@@ -68,4 +74,38 @@ export async function markGroveStage(db: DeviceDb, stage: number): Promise<boole
   if (reported != null && stage <= reported) return false;
   await record(db, { grove_stage: stage });
   return reported != null;
+}
+
+/**
+ * A child completed a chore on this device. Recorded on every completing tap, whether or not
+ * analytics is up: Activation is the first completion, so the fact has to be kept even when there
+ * is nowhere to say it yet (`markActivated` says it later). Offline is the same case — the tap is
+ * written locally and so is this.
+ */
+export async function markFirstCompletion(db: DeviceDb): Promise<void> {
+  if ((await held(db))?.first_completed) return;
+  await record(db, { first_completed: true });
+}
+
+/**
+ * Whether Activation is news: this device has a first completion on record and has not reported
+ * it yet. Asked only once analytics is up — after a tap and on every read — so a first tap made
+ * before the client came up is reported on the next read, a later launch included, and never
+ * waits for a later completion to carry it. One conditional write both checks and claims it, so
+ * two reads racing each other report it once. The answer lives in SQLite; a relaunch cannot
+ * report it twice.
+ */
+export async function markActivated(db: DeviceDb): Promise<boolean> {
+  const claimed = await db
+    .update(analyticsState)
+    .set({ activated: true })
+    .where(
+      and(
+        eq(analyticsState.id, STATE_ROW),
+        eq(analyticsState.first_completed, true),
+        eq(analyticsState.activated, false),
+      ),
+    )
+    .returning({ id: analyticsState.id });
+  return claimed.length > 0;
 }

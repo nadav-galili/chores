@@ -1,5 +1,6 @@
 import {
   COINS_PER_CHORE,
+  activation,
   choreCompleted,
   choreDate,
   currentStreak,
@@ -7,6 +8,7 @@ import {
   kidAppOpen,
   kidDayComplete,
   petReacted,
+  pushPromptAnswered,
   tapCompletesTheDay,
   type DeviceSession,
   type IsoDate,
@@ -34,18 +36,25 @@ import {
   tapPhotoRedo,
   type ChildContext,
 } from '@/sync/local';
-import { serverHoldsToken } from '@/sync/notifications';
+import { declinePush, mayAskForPush, serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { retakePhotoForInstance, uploadPendingPhotos, type PhotoTransfer } from '@/sync/photo';
+import { greetingFor, markGreetingSeen, type Greeting } from '@/sync/greeting';
 import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
-import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
+import {
+  markActivated,
+  markDayComplete,
+  markFirstCompletion,
+  markGroveStage,
+  markOpen,
+} from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
 import { playDoneHaptic } from '@/lib/haptics';
-import { arrangeKidReminder } from '@/lib/notifications';
+import { arrangeKidReminder, askForKidPush, canAskForPush } from '@/lib/notifications';
 import { putPhoto, takePhoto, type TakenPhoto } from '@/lib/photo';
 
 export type TodayState = {
@@ -73,6 +82,10 @@ export type TodayState = {
   reminderTime: string | null;
   /** The server holds this device's push token, so the reminder is a push and not a local one. */
   pushRegistered: boolean;
+  /** There is a reminder to deliver and the device has a completion: the push question may come. */
+  mayAskForPush: boolean;
+  /** The pet's one-time hello on this device's first open; null once it has been tapped away. */
+  greeting: Greeting | null;
 };
 
 /**
@@ -113,6 +126,12 @@ export type Today = TodayState & {
   reaction: DoneReaction | null;
   /** The animation has finished playing. */
   clearReaction: () => void;
+  /** Show the explanation screen that comes before the OS notification prompt. */
+  pushAsk: boolean;
+  /** "Allow" raises the OS prompt; "Not now" closes the explanation and asks nothing. */
+  answerPushAsk: (allow: boolean) => void;
+  /** The child tapped the greeting away; it never shows on this device again. */
+  dismissGreeting: () => void;
 };
 
 /** What the header draws before the first read lands; the name comes from the join. */
@@ -155,9 +174,13 @@ async function reportDay(
   db: DeviceDb,
   today: IsoDate,
   day: { complete: boolean; streak: number; stage: number },
+  kid: { ui_mode: DeviceSession['child']['ui_mode']; household_id: string },
 ): Promise<void> {
   if (!analyticsReady()) return;
   if (await markOpen(db, today)) capture(kidAppOpen());
+  // Activation is the first completion, recorded on its tap; it is said on the first read with
+  // analytics up, so a first tap that beat the client is still the one reported.
+  if (await markActivated(db)) capture(activation(kid));
   if (day.complete && (await markDayComplete(db, today))) {
     capture(kidDayComplete({ streak: day.streak }));
   }
@@ -182,13 +205,19 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     grove: grovePlaceholder(session.child.id),
     reminderTime: null,
     pushRegistered: false,
+    mayAskForPush: false,
+    greeting: null,
   });
+  const [pushAsk, setPushAsk] = useState(false);
   const [reaction, setReaction] = useState<DoneReaction | null>(null);
   const taps = useRef(0);
   // The child's own Grove Stage as of the last read. A tap that raises it planted a tree, which
   // is the only honest signal for the done moment: coins and trees are separate quantities from
   // one event (ADR-0004, ADR-0011), so a coin total cannot stand in for a Day Complete.
   const stage = useRef(0);
+  // Set on the tap that dismisses the greeting, so a read already in flight cannot bring it back
+  // before the dismissal is written.
+  const greeted = useRef(false);
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
 
@@ -223,7 +252,10 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           serverHoldsToken(db),
         ]);
       stage.current = grove.ownTree.stage;
+      const greeting = greeted.current ? null : await greetingFor(db, items);
       const streak = currentStreak(summaries, date);
+      const reminderTime = rows[0]?.reminder_time ?? null;
+      const mayAsk = await mayAskForPush(db, childId, reminderTime);
       setState({
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
@@ -235,16 +267,23 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         refused: refused.length,
         pet: { ...pet, name: pet.name ?? session.child.pet_name },
         grove,
-        reminderTime: rows[0]?.reminder_time ?? null,
+        reminderTime,
         pushRegistered,
+        mayAskForPush: mayAsk,
+        greeting,
       });
-      await reportDay(db, date, {
-        complete: summaries.some((s) => s.chore_date === date && s.complete),
-        streak,
-        stage: grove.ownTree.stage,
-      });
+      await reportDay(
+        db,
+        date,
+        {
+          complete: summaries.some((s) => s.chore_date === date && s.complete),
+          streak,
+          stage: grove.ownTree.stage,
+        },
+        { ui_mode: session.child.ui_mode, household_id: session.household.id },
+      );
     },
-    [childId, tz, boundary, joinedName],
+    [childId, tz, boundary, joinedName, session.child.ui_mode, session.household.id],
   );
 
   const refresh = useCallback(async () => {
@@ -311,6 +350,9 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           // The tap has counted, in SQLite, whether or not there is a network — which is the whole
           // offline promise, and why the event carries whether there was one.
           if (completed) capture(choreCompleted({ offline: state.offline }));
+          // Activation is this device's first completion: kept here whether or not analytics is
+          // up, and reported by the read below (`reportDay`) as soon as there is somewhere to.
+          if (completed) await markFirstCompletion(db);
           // The child sees the new coins, streak and tree before anything reaches the network.
           await readLocal(db, state.offline);
           // A tap that completed the day paid a bonus and planted a tree — the two are asked
@@ -437,6 +479,21 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
 
   const clearReaction = useCallback(() => setReaction(null), []);
 
+  // Hidden in this tick, written after: the tap that dismisses it must not wait on SQLite. A write
+  // that fails leaves the greeting to show once more on the next open, which the child survives;
+  // the device says why.
+  const dismissGreeting = useCallback(() => {
+    greeted.current = true;
+    setState((s) => ({ ...s, greeting: null }));
+    void (async () => {
+      try {
+        await markGreetingSeen(await openDeviceDb(), new Date());
+      } catch (e) {
+        console.error('greeting seen failed to write', e);
+      }
+    })();
+  }, []);
+
   const dismissRefused = useCallback(() => {
     void (async () => {
       const db = await openDeviceDb();
@@ -475,5 +532,63 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     })();
   }, [tz, state.reminderTime, state.pushRegistered]);
 
-  return { ...state, toggle, redo, dismissRefused, reaction, clearReaction };
+  // The push question, once there is a reminder and a completion — and only while the OS would
+  // still show its prompt, so "Allow" never leads nowhere (docs/spec/01-product.md, notifications).
+  useEffect(() => {
+    if (!state.mayAskForPush) return;
+    let live = true;
+    canAskForPush()
+      .then((askable) => {
+        if (live && askable) setPushAsk(true);
+      })
+      // Reading the permission is not something a child can act on; the screen stays as it is.
+      .catch((e: unknown) => console.error('push permission read failed', e));
+    return () => {
+      live = false;
+    };
+  }, [state.mayAskForPush]);
+
+  const answerPushAsk = useCallback(
+    (allow: boolean) => {
+      setPushAsk(false);
+      if (!allow) {
+        // Kept in SQLite, so no later launch explains again (`mayAskForPush`). A write that fails
+        // costs the child one more explanation on a later open, nothing else.
+        void (async () => declinePush(await openDeviceDb(), new Date()))().catch((e: unknown) =>
+          console.error('push decline not recorded', e),
+        );
+        return;
+      }
+      void (async () => {
+        try {
+          const granted = await askForKidPush();
+          // Only the answer; the anonymous kid properties ride along as they do on every event.
+          capture(pushPromptAnswered({ role: 'kid', granted }));
+          if (granted) {
+            await arrangeKidReminder(await openDeviceDb(), {
+              tz,
+              reminderTime: state.reminderTime,
+            });
+          }
+        } catch (e) {
+          // The child already said yes; a reminder that fails to arm is retried by the next open's
+          // arrangement, and nothing about it is theirs to fix.
+          console.error('kid push request failed', e);
+        }
+      })();
+    },
+    [tz, state.reminderTime],
+  );
+
+  return {
+    ...state,
+    toggle,
+    redo,
+    dismissRefused,
+    reaction,
+    clearReaction,
+    pushAsk,
+    answerPushAsk,
+    dismissGreeting,
+  };
 }

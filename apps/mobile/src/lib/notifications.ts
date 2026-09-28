@@ -35,10 +35,22 @@ import {
 const REMINDER_ID = 'kid-reminder';
 const CHANNEL_ID = 'reminders';
 
-async function permitted(): Promise<boolean> {
+/**
+ * Whether the OS would still show its prompt: nothing granted yet, and nothing the person (or the
+ * OS) has already refused for good. Both explanation screens, the child's and the parent's, are
+ * shown only while this holds, otherwise "Allow" would lead nowhere; so is More's Evening summary
+ * row, the parent's way back to that explanation.
+ */
+export async function canAskForPush(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-  if (!current.canAskAgain) return false;
+  return !current.granted && current.canAskAgain;
+}
+
+/**
+ * The OS prompt, raised only from the kid explanation screen's "Allow" (docs/spec/01-product.md,
+ * notifications). Returns what the OS says the child answered.
+ */
+export async function askForKidPush(): Promise<boolean> {
   return (await Notifications.requestPermissionsAsync()).granted;
 }
 
@@ -81,17 +93,19 @@ const localReminder =
   };
 
 /**
- * Arms this device's reminder the way the child row asks for, and re-registers its push token: a
- * token rots, so it is read on every open and sent on only the opens where it changed. Safe to
- * call whenever the child row is read — everything in here is a no-op once it agrees with what the
- * device has already arranged.
+ * Arms this device's reminder the way the child row asks for, once the child has allowed
+ * notifications, and re-registers its push token: a token rots, so it is read on every open and
+ * sent on only the opens where it changed. Safe to call whenever the child row is read —
+ * everything in here is a no-op once it agrees with what the device has already arranged.
  */
 export async function arrangeKidReminder(
   db: DeviceDb,
   child: { tz: string; reminderTime: string | null },
   now = new Date(),
 ): Promise<void> {
-  if (!(await permitted())) return;
+  // Never asks: the child is asked only from the explanation screen, and only once there is a
+  // reminder and a completion (`mayAskForPush`). Until then there is nothing to arrange.
+  if (!(await Notifications.getPermissionsAsync()).granted) return;
   await ensureChannel();
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
@@ -116,16 +130,30 @@ export async function arrangeKidReminder(
 }
 
 /**
+ * The parent's OS prompt, raised only from the explanation screen's "Allow" (spec #86, Parent
+ * push), reached after "connected" or from More's Evening summary row. A yes registers this phone at once rather than on the next open, so tonight's Digest
+ * already has somewhere to go. Returns what the OS says the parent answered.
+ */
+export async function askForParentPush(
+  register: (input: ParentDeviceInput) => Promise<unknown>,
+): Promise<boolean> {
+  const { granted } = await Notifications.requestPermissionsAsync();
+  if (granted) await registerParentPush(register);
+  return granted;
+}
+
+/**
  * Registers this parent's phone for push, on every open: a token rots, and the language the phone
  * reads can change between opens, so the server is told both again rather than asked to remember.
- * A parent who says no to notifications, a build with no push credentials and a phone with no
- * network all end here quietly — nothing the parent is looking at depends on it.
+ * Never asks: the OS prompt belongs to the explanation screen (after "connected", or from More),
+ * so a phone not granted permission there (or before) ends here quietly — as do a build with no push credentials
+ * and a phone with no network. Nothing the parent is looking at depends on it.
  */
 export async function registerParentPush(
   register: (input: ParentDeviceInput) => Promise<unknown>,
 ): Promise<void> {
   try {
-    if (!(await permitted())) return;
+    if (!(await Notifications.getPermissionsAsync()).granted) return;
     const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
     if (!projectId) return;
     const { data } = await Notifications.getExpoPushTokenAsync({ projectId });

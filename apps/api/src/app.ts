@@ -75,7 +75,7 @@ export function createApp(
   app.route('/', householdRoutes(db, analytics));
   app.route('/', choreRoutes(db, analytics));
   app.route('/', parentDeviceRoutes(db));
-  app.route('/', pinRoutes(db));
+  app.route('/', pinRoutes(db, analytics));
   app.route('/', todayRoutes(db));
   app.route('/', weekRoutes(db));
   app.route('/', rejectionRoutes(db));

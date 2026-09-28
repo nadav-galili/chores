@@ -22,7 +22,8 @@ export const en = {
     continue: 'Continue',
   },
   role: {
-    question: 'Who is using this device?',
+    headline: 'Chores your kid actually wants to do',
+    subline: 'They tap each chore when it’s done, earn coins and grow a pet that cheers them on.',
     parent: 'Parent',
     kid: 'Kid',
   },
@@ -33,6 +34,10 @@ export const en = {
       other: '%{count} taps didn’t save. Tap to hide.',
     }),
     petButton: '%{name}, level %{level}',
+    // The explanation before the OS notification prompt: shown only when a parent set a reminder
+    // time and the child has completed something, and it says the notification is that reminder.
+    pushAllow: 'Allow',
+    pushNotNow: 'Not now',
     // Voice is the third of the three differences between the modes (docs/spec/06-design.md):
     // celebratory for a 7-year-old, neutral for a 10-year-old. `big` carries no exclamation
     // mark anywhere — that is the whole of what "neutral" means here, and it is checkable.
@@ -51,6 +56,11 @@ export const en = {
       // A photo chore's done moment: the coins are waiting on a grown-up, so the card says who
       // holds them rather than paying. Nothing here blames the child — waiting is the state.
       waitingPhoto: 'Waiting on a grown-up to take a look!',
+      pushTitle: 'Want a reminder?',
+      pushBody: 'A grown-up picked a time to remind you about your chores. Tap Allow to get it!',
+      // The pet's one-time hello on this device's first open; it points at the first due row.
+      petHello: 'Hi %{name}! I’m %{pet}. Tap it when you’ve done it!',
+      petHelloNothingDue: 'Hi %{name}! I’m %{pet}!',
     },
     big: {
       greeting: 'Hi %{name}',
@@ -64,6 +74,11 @@ export const en = {
       doneMoment: 'Plus %{coins} coins',
       grew: 'Your tree grew 🌱',
       waitingPhoto: 'Waiting on a grown-up to take a look.',
+      pushTitle: 'Your chore reminder',
+      pushBody:
+        'A grown-up set a time to remind you about your chores. Allow notifications to get it on this device.',
+      petHello: 'Hi %{name}. I’m %{pet}. Tap it when you’ve done it.',
+      petHelloNothingDue: 'Hi %{name}. I’m %{pet}.',
     },
   },
   // The coin display's own strings: the glyph sits where the language wants it, which is why a
@@ -163,6 +178,14 @@ export const en = {
     loadFailed: 'Could not load today.',
     nothingDue: 'Nothing due today.',
     noChildren: 'No children yet. Add the first one.',
+    // The card Today shows until a Kid Device has joined, naming the next step of setup.
+    setup: {
+      card: 'Finish setup: %{step}',
+      child: 'add your child',
+      chore: 'add a first chore',
+      pin: 'set the Parent PIN',
+      joinCode: 'connect %{name}’s device',
+    },
     reject: 'Reject',
     rejecting: 'Rejecting…',
     // What came back from the rejection, said in the parent's terms rather than the protocol's.
@@ -231,6 +254,8 @@ export const en = {
       rewards: 'Rewards',
       allowance: 'Allowance',
       pin: 'Parent PIN',
+      // The way back to the parent-push explanation, shown while the phone can still be asked.
+      eveningSummary: 'Evening summary',
       signOut: 'Sign out',
     },
     // A tab's label is not the screen's title: it sits under an icon in a bar five wide, so it is
@@ -261,6 +286,48 @@ export const en = {
     tz: 'Timezone (from this phone)',
     create: 'Create household',
     failed: 'Could not create the household',
+  },
+  // Guided setup: each step's one line on what it is for, and the way out of setup to Today.
+  setup: {
+    purpose: {
+      household: 'Your household is where your children, chores and coins live.',
+      child: 'Add your child so they get their own list and their own pet.',
+      chore: 'Give your child a first chore, so their list isn’t empty when their device joins.',
+      pin: 'The Parent PIN is the only way out of kid mode on your child’s device.',
+      join_code: 'Type this code on your child’s device to connect it to your household.',
+    },
+    // The First chore step's suggestions: one tap makes a daily chore with that title. A list in
+    // the catalog, not seeded rows — add or drop one here, in every locale.
+    firstChore: {
+      pick: 'Tap one to add it as a daily chore',
+      suggestions: {
+        makeBed: 'Make your bed',
+        brushTeeth: 'Brush teeth',
+        feedPet: 'Feed the pet',
+        tidyToys: 'Tidy toys',
+        setTable: 'Set the table',
+      },
+      writeOwn: 'Write my own',
+    },
+    finishLater: 'I’ll finish later',
+    // The store links, for the child's device. Never the Join Code, which is single-use.
+    appLink: {
+      send: 'Send the app link',
+      message: 'Get Mibo on your child’s device:',
+    },
+    connected: {
+      title: '%{name}’s device is connected',
+      body: '%{name} can see today’s chores on it now.',
+    },
+    // The parent's push ask, after "connected": the one evening message (the Digest) it is for.
+    push: {
+      title: 'Get tonight’s summary of what %{name} did',
+      // The same ask from More, in a household with more than one child.
+      titleHousehold: 'Get tonight’s summary of what your children did',
+      body: 'One message each evening, while there’s still time to finish what’s left.',
+      allow: 'Allow',
+      notNow: 'Not now',
+    },
   },
   partner: {
     title: 'Your partner',
@@ -353,6 +420,8 @@ export const en = {
     uiMode: 'Screen mode',
     little: 'Little',
     big: 'Big',
+    littleHint: 'Larger text and buttons, for younger children',
+    bigHint: 'Regular text, for children who read',
     petName: 'Pet name',
     reminder: 'Reminder time (HH:MM, optional)',
     showJoinCode: 'Show join code',

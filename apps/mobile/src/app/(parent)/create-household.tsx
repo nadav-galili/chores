@@ -2,6 +2,7 @@ import type { Household } from '@chores/shared';
 import { Stack } from 'expo-router';
 import { getCalendars, getLocales } from 'expo-localization';
 import { useState } from 'react';
+import { SetupPurpose, useSetupStep } from '@/components/setup-step';
 import { Button, Choice, ErrorText, Field, ScrollScreen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
@@ -12,8 +13,13 @@ type Currency = Household['currency'];
 const phoneTz = getCalendars()[0]?.timeZone ?? 'UTC';
 const phoneCurrency: Currency = getLocales()[0]?.regionCode === 'IL' ? 'ILS' : 'USD';
 
+/**
+ * Guided setup's first step. There is no "I'll finish later" here: Today needs a household to
+ * exist. Once one does, the gate moves the parent on to the next step.
+ */
 export default function CreateHousehold() {
   const { api, refresh } = useHousehold();
+  useSetupStep('household');
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState<Currency>(phoneCurrency);
   const [busy, setBusy] = useState(false);
@@ -34,6 +40,7 @@ export default function CreateHousehold() {
   return (
     <ScrollScreen>
       <Stack.Screen options={{ title: t('household.title') }} />
+      <SetupPurpose step="household" />
       <Field
         label={t('household.name')}
         value={name}

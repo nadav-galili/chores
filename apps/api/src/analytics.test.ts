@@ -135,6 +135,102 @@ describe('activation events', () => {
   });
 });
 
+describe('setup events', () => {
+  /** A household with no PIN and no child yet: the state guided setup starts from. */
+  async function household(clerkUserId: string) {
+    const created = await app.request(
+      '/households',
+      asParent(clerkUserId, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Galili', tz: 'Asia/Jerusalem', currency: 'ILS' }),
+      }),
+    );
+    return ((await created.json()) as { household: { id: string } }).household.id;
+  }
+
+  const addChild = (clerkUserId: string, householdId: string, body: unknown) =>
+    app.request(
+      `/households/${householdId}/children`,
+      asParent(clerkUserId, { method: 'POST', body: JSON.stringify(body) }),
+    );
+
+  const issueCode = (clerkUserId: string, householdId: string, childId: string) =>
+    app.request(
+      `/households/${householdId}/children/${childId}/join-code`,
+      asParent(clerkUserId, { method: 'POST' }),
+    );
+
+  it('reports a child by its ui mode alone, under the parent, grouped by the household', async () => {
+    const who = 'user_setup_child_at_example.com';
+    const householdId = await household(who);
+    expect((await addChild(who, householdId, { ...CHILD, ui_mode: 'big' })).status).toBe(201);
+    expect(events('child_created')).toEqual([
+      {
+        distinctId: who,
+        event: { event: 'child_created', properties: { ui_mode: 'big' } },
+        groups: { household: householdId },
+      },
+    ]);
+  });
+
+  it('says nothing when a child is refused as invalid', async () => {
+    const who = 'user_setup_bad_child_at_example.com';
+    const householdId = await household(who);
+    const res = await addChild(who, householdId, { first_name: '', ui_mode: 'little' });
+    expect(res.status).toBe(400);
+    expect(events('child_created')).toHaveLength(0);
+  });
+
+  it('reports a PIN once it is set, and not when it is refused', async () => {
+    const who = 'user_setup_pin_at_example.com';
+    const householdId = await household(who);
+    const refused = await app.request(
+      `/households/${householdId}/pin`,
+      asParent(who, { method: 'PUT', body: JSON.stringify({ pin: 'abc' }) }),
+    );
+    expect(refused.status).toBe(400);
+    expect(events('pin_set')).toHaveLength(0);
+
+    expect((await setTestPin(app, who, householdId)).status).toBe(200);
+    expect(events('pin_set')).toEqual([
+      {
+        distinctId: who,
+        event: { event: 'pin_set', properties: {} },
+        groups: { household: householdId },
+      },
+    ]);
+  });
+
+  it('reports a Join Code only once one is issued, not on 409 pin_required', async () => {
+    const who = 'user_setup_code_at_example.com';
+    const householdId = await household(who);
+    const child = (await (await addChild(who, householdId, CHILD)).json()) as { id: string };
+
+    const refused = await issueCode(who, householdId, child.id);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: 'pin_required' });
+    expect(events('join_code_issued')).toHaveLength(0);
+
+    await setTestPin(app, who, householdId);
+    expect((await issueCode(who, householdId, child.id)).status).toBe(201);
+    expect(events('join_code_issued')).toEqual([
+      {
+        distinctId: who,
+        event: { event: 'join_code_issued', properties: {} },
+        groups: { household: householdId },
+      },
+    ]);
+  });
+
+  it('says nothing when the child to issue a code for is not in the household', async () => {
+    const who = 'user_setup_nochild_at_example.com';
+    const householdId = await household(who);
+    await setTestPin(app, who, householdId);
+    expect((await issueCode(who, householdId, uuid7())).status).toBe(404);
+    expect(events('join_code_issued')).toHaveLength(0);
+  });
+});
+
 describe('what the server sends', () => {
   it('never carries a child id, first name or pet name (ADR-0009)', async () => {
     const { childId } = await activate('user_dod_at_example.com');

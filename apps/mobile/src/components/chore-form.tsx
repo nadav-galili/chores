@@ -55,12 +55,23 @@ export function ChoreForm({
   initial,
   onSubmit,
   onDelete,
+  intro,
+  footer,
+  setup = false,
 }: {
   title: string;
   children: Child[];
   initial: ChoreFields;
   onSubmit: (fields: ChoreFields) => Promise<void>;
   onDelete?: () => Promise<void>;
+  /** Above the fields: guided setup's line on what this step is for. */
+  intro?: React.ReactNode;
+  footer?: React.ReactNode;
+  /**
+   * Guided setup's "Write my own": no Photo Proof control. Photo Proof is premium, and setup never
+   * shows a paywall or a Gate (spec #86), so the chore setup writes never asks for a photo.
+   */
+  setup?: boolean;
 }) {
   const styles = useThemedStyles(choreFormStyles);
   const household = useHousehold();
@@ -140,6 +151,7 @@ export function ChoreForm({
   return (
     <ScrollScreen>
       <Stack.Screen options={{ title: title }} />
+      {intro}
       <Field
         label={t('choreForm.title')}
         value={choreTitle}
@@ -190,26 +202,28 @@ export function ChoreForm({
           keyboardType="numbers-and-punctuation"
         />
       )}
-      <Pressable
-        style={styles.photoField}
-        onPress={photoIsGated ? openPhotoGate : undefined}
-        disabled={!photoIsGated}
-        accessibilityRole={photoIsGated ? 'button' : undefined}
-        accessibilityLabel={photoIsGated ? t('paywall.lockedPhotoProof') : undefined}
-      >
-        <View style={styles.photoCopy}>
-          <Text style={styles.photoLabel}>{t('choreForm.photoProof')}</Text>
-          <Text style={styles.photoHint}>
-            {photoIsGated ? t('paywall.lockedPrice') : t('choreForm.photoProofHint')}
-          </Text>
-        </View>
-        <Switch
-          value={requiresPhoto}
-          onValueChange={photoIsGated ? openPhotoGate : setRequiresPhoto}
-          disabled={photoIsGated}
-          accessibilityLabel={t('choreForm.photoProof')}
-        />
-      </Pressable>
+      {!setup && (
+        <Pressable
+          style={styles.photoField}
+          onPress={photoIsGated ? openPhotoGate : undefined}
+          disabled={!photoIsGated}
+          accessibilityRole={photoIsGated ? 'button' : undefined}
+          accessibilityLabel={photoIsGated ? t('paywall.lockedPhotoProof') : undefined}
+        >
+          <View style={styles.photoCopy}>
+            <Text style={styles.photoLabel}>{t('choreForm.photoProof')}</Text>
+            <Text style={styles.photoHint}>
+              {photoIsGated ? t('paywall.lockedPrice') : t('choreForm.photoProofHint')}
+            </Text>
+          </View>
+          <Switch
+            value={requiresPhoto}
+            onValueChange={photoIsGated ? openPhotoGate : setRequiresPhoto}
+            disabled={photoIsGated}
+            accessibilityLabel={t('choreForm.photoProof')}
+          />
+        </Pressable>
+      )}
       <ChipGroup label={t('choreForm.who')}>
         <Chip
           title={
@@ -236,6 +250,7 @@ export function ChoreForm({
       {onDelete && (
         <Button title={t('choreForm.delete')} onPress={remove} disabled={busy} secondary />
       )}
+      {footer}
     </ScrollScreen>
   );
 }

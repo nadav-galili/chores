@@ -7,7 +7,8 @@ import type {
   RedemptionDecision,
   RejectCompletionResult,
 } from '@chores/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { nextSetupStep } from '@chores/shared';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
@@ -15,8 +16,9 @@ import { Card, Coins, EmptyState, ErrorState, FILL, Loading, Screen } from '@/co
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { formatNumber, formatWallClock, t, type TranslationKey } from '@/lib/i18n';
-import type { Api } from '@/lib/api';
+import type { Api, Me } from '@/lib/api';
 import { rewardTitle } from '@/lib/reward-title';
+import { nextSetupHref, setupCardLabel } from '@/lib/setup';
 import { useParentToday } from '@/lib/use-parent-today';
 import { useThemedStyles, type Theme } from '@/theme';
 
@@ -363,6 +365,21 @@ function ChildCard({
   );
 }
 
+/** "Finish setup: {next step}", shown until a Kid Device has ever joined. */
+function SetupCard({ me }: { me: Pick<Me, 'setup' | 'children'> | null }) {
+  const styles = useThemedStyles(todayStyles);
+  const router = useRouter();
+  const href = me ? nextSetupHref(me) : null;
+  const label = me ? setupCardLabel(nextSetupStep(me.setup), me.children[0]) : null;
+  if (!href || !label) return null;
+  const text = t('parent.setup.card', { step: label });
+  return (
+    <Card onPress={() => router.push(href)} accessibilityLabel={text}>
+      <Text style={styles.name}>{text}</Text>
+    </Card>
+  );
+}
+
 /**
  * The evening scan: every child of the household, what each of them owes today and what each of
  * them has done, read top to bottom in one pass. A parent still does not tick a child's chore
@@ -387,6 +404,18 @@ export default function ParentToday() {
   const [decidingPhoto, setDecidingPhoto] = useState<string | null>(null);
   const { api } = state;
   const householdId = household?.id ?? null;
+  const setupStep = state.status === 'ready' ? nextSetupStep(state.me.setup) : 'done';
+
+  // The step screens write chores and the PIN without re-reading `/me`, and a Kid Device joins
+  // from another phone, so the card's facts are re-read whenever Today comes back into view —
+  // only while setup is unfinished, since `done` never changes back.
+  const refreshMe = state.refresh;
+  const setupDone = setupStep === 'done';
+  useFocusEffect(
+    useCallback(() => {
+      if (!setupDone) void refreshMe();
+    }, [setupDone, refreshMe]),
+  );
 
   /**
    * Reject one completion and say what came back. `already_undone` is not a failure — the child
@@ -529,6 +558,7 @@ export default function ParentToday() {
             />
           }
         >
+          <SetupCard me={state.me} />
           {today.today?.children.length === 0 && (
             <EmptyState
               title={t('parent.noChildren')}

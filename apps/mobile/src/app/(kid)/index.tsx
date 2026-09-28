@@ -1,12 +1,13 @@
 import { COINS_PER_CHORE } from '@chores/shared';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
+import { PetHello, type HelloTarget } from '@/components/pet-hello';
 import { StreakBadge } from '@/components/streak-badge';
-import { Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
+import { Button, Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
 import { wipeDeviceDb } from '@/db/client';
 import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
@@ -64,7 +65,20 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
   }, [router, device]);
 
   const today = useToday(session, () => void onRevoked());
-  const mode = useTheme().uiMode;
+  const theme = useTheme();
+  const mode = theme.uiMode;
+
+  // The row the greeting points at, measured in the window once it has been laid out.
+  const pointed = useRef<View>(null);
+  const [target, setTarget] = useState<HelloTarget | null>(null);
+  const pointAt = today.greeting?.pointAt ?? null;
+  const measurePointed = useCallback(
+    () => pointed.current?.measureInWindow((_x, y, _w, height) => setTarget({ y, height })),
+    [],
+  );
+  useEffect(() => {
+    if (pointAt === null) setTarget(null);
+  }, [pointAt]);
 
   return (
     <View style={styles.screen}>
@@ -82,28 +96,39 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
         data={today.items}
         keyExtractor={(i) => i.id}
         contentContainerStyle={styles.scroll}
-        extraData={today.coins}
         ListHeaderComponent={
           <>
             <Head today={today} onPet={() => router.push('/(kid)/pet')} />
             {today.status === 'ready' && <DayComplete today={today} />}
           </>
         }
-        renderItem={({ item }) => (
-          <ChoreRow
-            title={item.title}
-            icon={item.icon}
-            done={item.status === 'done'}
-            // Waiting on a grown-up is not done and pays nothing yet: no strike-through, no
-            // coins, and the camera glyph with the waiting line for the screen reader.
-            waiting={item.requires_photo && item.status === 'pending_photo'}
-            waitingLabel={t(`kid.${mode}.waitingPhoto`)}
-            coins={
-              item.requires_photo && item.status === 'pending_photo' ? undefined : COINS_PER_CHORE
-            }
-            onPress={() => today.toggle(item)}
-          />
-        )}
+        extraData={`${today.coins}:${pointAt}`}
+        // Anything above the list that grows moves the pointed row without re-laying it out.
+        onContentSizeChange={measurePointed}
+        renderItem={({ item }) => {
+          const row = (
+            <ChoreRow
+              title={item.title}
+              icon={item.icon}
+              done={item.status === 'done'}
+              // Waiting on a grown-up is not done and pays nothing yet: no strike-through, no
+              // coins, and the camera glyph with the waiting line for the screen reader.
+              waiting={item.requires_photo && item.status === 'pending_photo'}
+              waitingLabel={t(`kid.${mode}.waitingPhoto`)}
+              coins={
+                item.requires_photo && item.status === 'pending_photo' ? undefined : COINS_PER_CHORE
+              }
+              onPress={() => today.toggle(item)}
+            />
+          );
+          return item.id === pointAt ? (
+            <View ref={pointed} collapsable={false} onLayout={measurePointed}>
+              {row}
+            </View>
+          ) : (
+            row
+          );
+        }}
         ListEmptyComponent={today.status === 'ready' ? <EmptyDay today={today} /> : null}
         ListFooterComponent={
           <View style={styles.footer}>
@@ -136,7 +161,61 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
           onDone={today.clearReaction}
         />
       )}
+      {/* After the done moment, never over it: the question follows the completion it waited for. */}
+      <PushAsk today={today} visible={today.pushAsk && !today.reaction} />
+      {/* The pet's one-time hello on this device's first open. It is the pet's, so with the pet
+          flag off there is no one to say it. */}
+      {today.greeting && today.pet.enabled && (
+        <PetHello
+          text={t(`kid.${mode}.${pointAt === null ? 'petHelloNothingDue' : 'petHello'}`, {
+            name: today.firstName,
+            pet: today.pet.name,
+          })}
+          pet={{ name: today.pet.name, level: today.pet.progress.level, mood: 'happy' }}
+          target={pointAt === null ? null : target}
+          inset={theme.space.lg}
+          onDismiss={today.dismissGreeting}
+        />
+      )}
     </View>
+  );
+}
+
+/**
+ * The explanation before the OS notification prompt (docs/spec/01-product.md, notifications). It
+ * appears only when a parent set a reminder time and the child has completed something, and it
+ * says the one thing a notification here will ever be: their reminder. "Allow" raises the OS
+ * prompt; "Not now" closes it and asks nothing.
+ */
+function PushAsk({ today, visible }: { today: Today; visible: boolean }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  return (
+    <Modal visible={visible} animationType="fade" onRequestClose={() => today.answerPushAsk(false)}>
+      <View style={styles.askScrim}>
+        <View style={styles.askCard}>
+          {today.pet.enabled && (
+            <PetFigure
+              name={today.pet.name}
+              level={today.pet.progress.level}
+              mood="happy"
+              size={MOMENT_PET_SIZE[mode]}
+              showStage={false}
+            />
+          )}
+          <Text style={styles.momentText}>{t(`kid.${mode}.pushTitle`)}</Text>
+          <Text style={styles.askBody}>{t(`kid.${mode}.pushBody`)}</Text>
+          <View style={styles.askButtons}>
+            <Button title={t('kid.pushAllow')} onPress={() => today.answerPushAsk(true)} />
+            <Button
+              title={t('kid.pushNotNow')}
+              secondary
+              onPress={() => today.answerPushAsk(false)}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -415,6 +494,21 @@ const homeStyles = (theme: Theme) => ({
   },
   refusedText: { ...theme.type.label, color: theme.colors.danger },
   moment: { alignItems: 'center' as const, gap: theme.space.sm },
+  askScrim: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    padding: theme.space.lg,
+    backgroundColor: theme.colors.ground,
+  },
+  askCard: {
+    alignItems: 'center' as const,
+    gap: theme.space.md,
+    padding: theme.space.lg,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+  },
+  askBody: { ...theme.type.body, color: theme.colors.text, textAlign: 'center' as const },
+  askButtons: { alignSelf: 'stretch' as const, gap: theme.space.sm },
   momentText: {
     ...theme.type.heading,
     color: theme.colors.text,

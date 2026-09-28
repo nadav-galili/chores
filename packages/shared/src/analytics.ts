@@ -3,6 +3,7 @@ import type { DevicePlatform } from './join-code.ts';
 import type { ChoreKind } from './materialize.ts';
 import type { NotificationKind } from './notification.ts';
 import type { BuiltinRewardKey } from './reward.ts';
+import { SETUP_STEPS } from './setup.ts';
 import type { Gate } from './entitlement.ts';
 import { uuid5 } from './uuid5.ts';
 
@@ -91,7 +92,26 @@ export function choreCreated(chore: { kind: ChoreKind; assignee_count: number })
 }
 
 /**
- * Activation: a kid device exists. Sent by the API under the device's own new anon id, which is
+ * Onboarding: a parent added a child. The ui mode is the one thing about the child the funnel
+ * asks for — it is how many households add a second one, and which band — never the name.
+ */
+export function childCreated(child: { ui_mode: UiMode }): AnalyticsEvent {
+  return { event: 'child_created', properties: { ui_mode: child.ui_mode } };
+}
+
+/** Onboarding: the household has a Parent PIN, so a Join Code can now be shown (ADR-0013). */
+export function pinSet(): AnalyticsEvent {
+  return { event: 'pin_set', properties: {} };
+}
+
+/** Onboarding: a parent was shown a Join Code. Nothing about the code or the child crosses. */
+export function joinCodeIssued(): AnalyticsEvent {
+  return { event: 'join_code_issued', properties: {} };
+}
+
+/**
+ * Onboarding: a kid device exists — the last step before Activation, which is that device's first
+ * completion (`activation`). Sent by the API under the device's own new anon id, which is
  * the first thing that id is ever used for. It asks for the ui mode and the household rather than
  * the child, so there is no first name or pet name here to drop.
  */
@@ -106,6 +126,18 @@ export function joinCodeRedeemed(redeem: {
       ...kidProperties({ ui_mode: redeem.ui_mode, household_id: redeem.household_id }),
       platform: redeem.platform,
     },
+  };
+}
+
+/**
+ * Activation: the first completion by a child on this Kid Device, sent once per device. It carries
+ * the anonymous kid properties and nothing else (ADR-0009), named here rather than left to the
+ * client's registered ones so the event reads the same wherever it is counted.
+ */
+export function activation(device: { ui_mode: UiMode; household_id: string }): AnalyticsEvent {
+  return {
+    event: 'activation',
+    properties: kidProperties({ ui_mode: device.ui_mode, household_id: device.household_id }),
   };
 }
 
@@ -194,4 +226,36 @@ export function paywallShown(shown: { gate: Gate }): AnalyticsEvent {
  */
 export function pushOpened(open: { kind: NotificationKind }): AnalyticsEvent {
   return { event: 'push_opened', properties: { kind: open.kind } };
+}
+
+/**
+ * The steps of first run, in the order a new parent meets them (M5). `welcome` is the first screen,
+ * before there is a role; the rest are guided setup, ending at the Join Code's `connected`.
+ */
+export const ONBOARDING_STEPS = ['welcome', ...SETUP_STEPS, 'connected'] as const;
+
+export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
+/**
+ * A first-run screen was shown: the funnel from the first screen to Activation, step by step. The
+ * step is a catalog constant, so it says where someone is and nothing about who (ADR-0009).
+ */
+export function onboardingStepViewed(view: { step: OnboardingStep }): AnalyticsEvent {
+  return { event: 'onboarding_step_viewed', properties: { step: view.step } };
+}
+
+/**
+ * Someone answered the OS notification prompt, which this app only ever raises from behind its own
+ * explanation screen. Whether those screens earn their place is the question, so the event is who
+ * was asked and what the OS reported, and nothing else: on a kid device the anonymous properties
+ * every kid event already carries are the whole of who the child is (ADR-0009).
+ */
+export function pushPromptAnswered(answer: {
+  role: 'parent' | 'kid';
+  granted: boolean;
+}): AnalyticsEvent {
+  return {
+    event: 'push_prompt_answered',
+    properties: { role: answer.role, granted: answer.granted },
+  };
 }

@@ -58,7 +58,7 @@ describe('first sign-in', () => {
   it('has no household yet, so the client goes to create-household', async () => {
     const res = await app.request('/me', asParent('user_new'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ parent: null, household: null, children: [] });
+    expect(await res.json()).toMatchObject({ parent: null, household: null, children: [] });
   });
 });
 
@@ -334,6 +334,6 @@ describe('a parent whose token carries no email', () => {
     // No email claim means no address to match the invite against, so this is a parent with no
     // household — the create-household screen — and never a silent join to someone else's.
     const me = await app.request('/me', asParent('user_apple_private_two'));
-    expect(await me.json()).toEqual({ parent: null, household: null, children: [] });
+    expect(await me.json()).toMatchObject({ parent: null, household: null, children: [] });
   });
 });

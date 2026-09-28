@@ -20,7 +20,7 @@ Two themes, the same tokens: the child's at full strength, the parent's desatura
 | muted | `#5F7168` | `#6C7A73` | secondary text, borders, placeholders |
 | danger | `#B3261E` | `#9C3A33` | destructive actions and error copy |
 
-Three tints sit beside the table, behind the pet — `#FFF4CC` happy, `#E6F4FE` content, `#ECECF2` sleepy. They are the background of an illustration rather than chrome, nothing but `PetFigure` reads them, and they are the same in both themes because the parent side never draws a pet. They live in `src/theme/tokens.ts` as `petMoodGrounds` all the same: a colour value is written down in the theme module or nowhere.
+Three tints sit beside the table, behind the pet — `#FFF4CC` happy, `#E6F4FE` content, `#ECECF2` sleepy. They are the background of an illustration rather than chrome, nothing but `PetFigure` reads them, and they are the same in both themes because they belong to the art, not to the side drawing it: the parent side draws a pet in exactly two places — the welcome screen and the Little / Big cards of setup's Child step — and there it is the child's art on the child's ground. They live in `src/theme/tokens.ts` as `petMoodGrounds` all the same: a colour value is written down in the theme module or nowhere.
 
 Two rules the tokens cannot enforce on their own:
 

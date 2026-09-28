@@ -1,7 +1,8 @@
-import { hashPin, setPinInputSchema } from '@chores/shared';
+import { hashPin, pinSet, setPinInputSchema } from '@chores/shared';
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import { households } from './db/schema.ts';
 import { parseBody } from './parse-body.ts';
@@ -13,7 +14,7 @@ import { householdToApi } from './serialize.ts';
  * door, not a credential (ADR-0013); this file is the only place the hash is written, and the
  * kid device is the only place it is checked.
  */
-export function pinRoutes(db: Db) {
+export function pinRoutes(db: Db, analytics: Analytics) {
   const app = new Hono<ScopedEnv>();
   app.use('/households/:householdId/pin', householdScope(db));
 
@@ -35,6 +36,11 @@ export function pinRoutes(db: Db) {
       .where(eq(households.id, c.get('householdId')))
       .returning();
     if (!row) return c.json({ error: 'not_found' }, 404);
+    analytics.capture({
+      distinctId: c.get('clerkUserId'),
+      event: pinSet(),
+      groups: { household: row.id },
+    });
     return c.json(householdToApi(row));
   });
 
