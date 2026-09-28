@@ -18,11 +18,14 @@ export type MeSetup = SetupFacts & {
   createdHousehold: boolean;
 };
 
-export type SetupStep = 'household' | 'child' | 'chore' | 'pin' | 'join_code' | 'done';
+/** The steps of guided setup, in order. Analytics' onboarding steps are built from these. */
+export const SETUP_STEPS = ['household', 'child', 'chore', 'pin', 'join_code'] as const;
+
+export type SetupStep = (typeof SETUP_STEPS)[number] | 'done';
 
 /**
  * The first unmet fact, in setup order. A Kid Device having ever joined is terminal: a deleted
- * chore, a revoked device or a reinstall never sends a family back into setup.
+ * chore, a revoked device or a reinstall never sends a household back into setup.
  */
 export function nextSetupStep(facts: SetupFacts): SetupStep {
   if (facts.deviceEverJoined) return 'done';

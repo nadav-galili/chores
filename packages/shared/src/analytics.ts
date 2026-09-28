@@ -3,6 +3,7 @@ import type { DevicePlatform } from './join-code.ts';
 import type { ChoreKind } from './materialize.ts';
 import type { NotificationKind } from './notification.ts';
 import type { BuiltinRewardKey } from './reward.ts';
+import { SETUP_STEPS } from './setup.ts';
 import type { Gate } from './entitlement.ts';
 import { uuid5 } from './uuid5.ts';
 
@@ -109,7 +110,8 @@ export function joinCodeIssued(): AnalyticsEvent {
 }
 
 /**
- * Activation: a kid device exists. Sent by the API under the device's own new anon id, which is
+ * Onboarding: a kid device exists — the last step before Activation, which is that device's first
+ * completion (`activation`). Sent by the API under the device's own new anon id, which is
  * the first thing that id is ever used for. It asks for the ui mode and the household rather than
  * the child, so there is no first name or pet name here to drop.
  */
@@ -230,15 +232,7 @@ export function pushOpened(open: { kind: NotificationKind }): AnalyticsEvent {
  * The steps of first run, in the order a new parent meets them (M5). `welcome` is the first screen,
  * before there is a role; the rest are guided setup, ending at the Join Code's `connected`.
  */
-export const ONBOARDING_STEPS = [
-  'welcome',
-  'household',
-  'child',
-  'chore',
-  'pin',
-  'join_code',
-  'connected',
-] as const;
+export const ONBOARDING_STEPS = ['welcome', ...SETUP_STEPS, 'connected'] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
