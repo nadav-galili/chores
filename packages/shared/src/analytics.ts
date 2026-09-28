@@ -219,3 +219,19 @@ export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 export function onboardingStepViewed(view: { step: OnboardingStep }): AnalyticsEvent {
   return { event: 'onboarding_step_viewed', properties: { step: view.step } };
 }
+
+/**
+ * Someone answered the OS notification prompt, which this app only ever raises from behind its own
+ * explanation screen. Whether those screens earn their place is the question, so the event is who
+ * was asked and what the OS reported, and nothing else: on a kid device the anonymous properties
+ * every kid event already carries are the whole of who the child is (ADR-0009).
+ */
+export function pushPromptAnswered(answer: {
+  role: 'parent' | 'kid';
+  granted: boolean;
+}): AnalyticsEvent {
+  return {
+    event: 'push_prompt_answered',
+    properties: { role: answer.role, granted: answer.granted },
+  };
+}

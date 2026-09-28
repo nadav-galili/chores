@@ -1,12 +1,12 @@
 import { COINS_PER_CHORE } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
 import { StreakBadge } from '@/components/streak-badge';
-import { Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
+import { Button, Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
 import { wipeDeviceDb } from '@/db/client';
 import { shutdownAnalytics } from '@/lib/analytics';
 import { createDeviceApi } from '@/lib/api';
@@ -136,7 +136,47 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
           onDone={today.clearReaction}
         />
       )}
+      {/* After the done moment, never over it: the question follows the completion it waited for. */}
+      <PushAsk today={today} visible={today.pushAsk && !today.reaction} />
     </View>
+  );
+}
+
+/**
+ * The explanation before the OS notification prompt (docs/spec/01-product.md, notifications). It
+ * appears only when a parent set a reminder time and the child has completed something, and it
+ * says the one thing a notification here will ever be: their reminder. "Allow" raises the OS
+ * prompt; "Not now" closes it and asks nothing.
+ */
+function PushAsk({ today, visible }: { today: Today; visible: boolean }) {
+  const styles = useThemedStyles(homeStyles);
+  const mode = useTheme().uiMode;
+  return (
+    <Modal visible={visible} animationType="fade" onRequestClose={() => today.answerPushAsk(false)}>
+      <View style={styles.askScrim}>
+        <View style={styles.askCard}>
+          {today.pet.enabled && (
+            <PetFigure
+              name={today.pet.name}
+              level={today.pet.progress.level}
+              mood="happy"
+              size={MOMENT_PET_SIZE[mode]}
+              showStage={false}
+            />
+          )}
+          <Text style={styles.momentText}>{t(`kid.${mode}.pushTitle`)}</Text>
+          <Text style={styles.askBody}>{t(`kid.${mode}.pushBody`)}</Text>
+          <View style={styles.askButtons}>
+            <Button title={t('kid.pushAllow')} onPress={() => today.answerPushAsk(true)} />
+            <Button
+              title={t('kid.pushNotNow')}
+              secondary
+              onPress={() => today.answerPushAsk(false)}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -415,6 +455,21 @@ const homeStyles = (theme: Theme) => ({
   },
   refusedText: { ...theme.type.label, color: theme.colors.danger },
   moment: { alignItems: 'center' as const, gap: theme.space.sm },
+  askScrim: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    padding: theme.space.lg,
+    backgroundColor: theme.colors.ground,
+  },
+  askCard: {
+    alignItems: 'center' as const,
+    gap: theme.space.md,
+    padding: theme.space.lg,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+  },
+  askBody: { ...theme.type.body, color: theme.colors.text, textAlign: 'center' as const },
+  askButtons: { alignSelf: 'stretch' as const, gap: theme.space.sm },
   momentText: {
     ...theme.type.heading,
     color: theme.colors.text,

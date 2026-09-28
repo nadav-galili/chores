@@ -34,6 +34,10 @@ export const en = {
       other: '%{count} taps didn’t save. Tap to hide.',
     }),
     petButton: '%{name}, level %{level}',
+    // The explanation before the OS notification prompt: shown only when a parent set a reminder
+    // time and the child has completed something, and it says the notification is that reminder.
+    pushAllow: 'Allow',
+    pushNotNow: 'Not now',
     // Voice is the third of the three differences between the modes (docs/spec/06-design.md):
     // celebratory for a 7-year-old, neutral for a 10-year-old. `big` carries no exclamation
     // mark anywhere — that is the whole of what "neutral" means here, and it is checkable.
@@ -52,6 +56,8 @@ export const en = {
       // A photo chore's done moment: the coins are waiting on a grown-up, so the card says who
       // holds them rather than paying. Nothing here blames the child — waiting is the state.
       waitingPhoto: 'Waiting on a grown-up to take a look!',
+      pushTitle: 'Want a reminder?',
+      pushBody: 'A grown-up picked a time to remind you about your chores. Tap Allow to get it!',
     },
     big: {
       greeting: 'Hi %{name}',
@@ -65,6 +71,9 @@ export const en = {
       doneMoment: 'Plus %{coins} coins',
       grew: 'Your tree grew 🌱',
       waitingPhoto: 'Waiting on a grown-up to take a look.',
+      pushTitle: 'Your chore reminder',
+      pushBody:
+        'A grown-up set a time to remind you about your chores. Allow notifications to get it on this device.',
     },
   },
   // The coin display's own strings: the glyph sits where the language wants it, which is why a

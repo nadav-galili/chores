@@ -42,6 +42,24 @@ async function permitted(): Promise<boolean> {
   return (await Notifications.requestPermissionsAsync()).granted;
 }
 
+/**
+ * Whether the OS would still show its prompt: nothing granted yet, and nothing the child (or the
+ * OS) has already refused for good. The kid explanation screen is shown only while this holds —
+ * otherwise "Allow" would lead nowhere.
+ */
+export async function canAskForKidPush(): Promise<boolean> {
+  const current = await Notifications.getPermissionsAsync();
+  return !current.granted && current.canAskAgain;
+}
+
+/**
+ * The OS prompt, raised only from the kid explanation screen's "Allow" (docs/spec/01-product.md,
+ * notifications). Returns what the OS says the child answered.
+ */
+export async function askForKidPush(): Promise<boolean> {
+  return (await Notifications.requestPermissionsAsync()).granted;
+}
+
 /** Android shows nothing that does not belong to a channel. */
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
@@ -81,17 +99,19 @@ const localReminder =
   };
 
 /**
- * Arms this device's reminder the way the child row asks for, and re-registers its push token: a
- * token rots, so it is read on every open and sent on only the opens where it changed. Safe to
- * call whenever the child row is read — everything in here is a no-op once it agrees with what the
- * device has already arranged.
+ * Arms this device's reminder the way the child row asks for, once the child has allowed
+ * notifications, and re-registers its push token: a token rots, so it is read on every open and
+ * sent on only the opens where it changed. Safe to call whenever the child row is read —
+ * everything in here is a no-op once it agrees with what the device has already arranged.
  */
 export async function arrangeKidReminder(
   db: DeviceDb,
   child: { tz: string; reminderTime: string | null },
   now = new Date(),
 ): Promise<void> {
-  if (!(await permitted())) return;
+  // Never asks: the child is asked only from the explanation screen, and only once there is a
+  // reminder and a completion (`mayAskForPush`). Until then there is nothing to arrange.
+  if (!(await Notifications.getPermissionsAsync()).granted) return;
   await ensureChannel();
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
