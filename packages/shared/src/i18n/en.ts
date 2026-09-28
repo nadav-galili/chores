@@ -294,6 +294,19 @@ export const en = {
       pin: 'The Parent PIN is the only way out of kid mode on your child’s device.',
       join_code: 'Type this code on your child’s device to connect it to your household.',
     },
+    // The First chore step's suggestions: one tap makes a daily chore with that title. A list in
+    // the catalog, not seeded rows — add or drop one here, in every locale.
+    firstChore: {
+      pick: 'Tap one to add it as a daily chore',
+      suggestions: {
+        makeBed: 'Make your bed',
+        brushTeeth: 'Brush teeth',
+        feedPet: 'Feed the pet',
+        tidyToys: 'Tidy toys',
+        setTable: 'Set the table',
+      },
+      writeOwn: 'Write my own',
+    },
     finishLater: 'I’ll finish later',
     // The store links, for the child's device. Never the Join Code, which is single-use.
     appLink: {
