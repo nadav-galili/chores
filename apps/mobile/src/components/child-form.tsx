@@ -1,7 +1,7 @@
 import { childInputSchema, type ChildInput, type UiMode } from '@chores/shared';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Button, Choice, ErrorText, Field, Screen } from '@/components/ui';
+import { Button, Choice, ErrorText, Field, ScrollScreen } from '@/components/ui';
 import { fieldError, t } from '@/lib/i18n';
 
 const empty: ChildInput = { first_name: '', ui_mode: 'little', pet_name: '', reminder_time: null };
@@ -45,7 +45,7 @@ export function ChildForm({
   };
 
   return (
-    <Screen>
+    <ScrollScreen>
       <Stack.Screen options={{ title: title }} />
       <Field
         label={t('childForm.firstName')}
@@ -73,6 +73,6 @@ export function ChildForm({
       <ErrorText>{error}</ErrorText>
       <Button title={t('common.save')} onPress={submit} disabled={busy} />
       {footer}
-    </Screen>
+    </ScrollScreen>
   );
 }

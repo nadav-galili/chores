@@ -1,7 +1,7 @@
 import { pinSchema } from '@chores/shared';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Button, ErrorText, Field, Screen, Body } from '@/components/ui';
+import { Body, Button, ErrorText, Field, ScrollScreen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -34,7 +34,7 @@ export default function Pin() {
   };
 
   return (
-    <Screen>
+    <ScrollScreen>
       <Stack.Screen options={{ title: t('pin.title') }} />
       <Body>{t('pin.hint')}</Body>
       <Field
@@ -51,6 +51,6 @@ export default function Pin() {
         onPress={submit}
         disabled={busy || !pinSchema.safeParse(pin).success}
       />
-    </Screen>
+    </ScrollScreen>
   );
 }

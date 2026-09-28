@@ -2,7 +2,7 @@ import type { Parent, ParentInvite } from '@chores/shared';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button, ErrorText, Field, Screen } from '@/components/ui';
+import { Button, ErrorText, Field, ScrollScreen } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
@@ -71,7 +71,7 @@ export default function Partner() {
     (people?.parents.length ?? 0) + pending.length >= 2;
 
   return (
-    <Screen>
+    <ScrollScreen>
       <Stack.Screen options={{ title: t('partner.title') }} />
       <Text style={styles.hint}>{t('partner.hint')}</Text>
       <View style={styles.people}>
@@ -105,7 +105,7 @@ export default function Partner() {
         }
         disabled={busy || (!quotaReached && email.trim().length === 0)}
       />
-    </Screen>
+    </ScrollScreen>
   );
 }
 

@@ -2,7 +2,7 @@ import type { Household } from '@chores/shared';
 import { Stack } from 'expo-router';
 import { getCalendars, getLocales } from 'expo-localization';
 import { useState } from 'react';
-import { Button, Choice, ErrorText, Field, Screen } from '@/components/ui';
+import { Button, Choice, ErrorText, Field, ScrollScreen } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -32,7 +32,7 @@ export default function CreateHousehold() {
   };
 
   return (
-    <Screen>
+    <ScrollScreen>
       <Stack.Screen options={{ title: t('household.title') }} />
       <Field
         label={t('household.name')}
@@ -52,6 +52,6 @@ export default function CreateHousehold() {
       <Field label={t('household.tz')} value={phoneTz} editable={false} />
       <ErrorText>{error}</ErrorText>
       <Button title={t('household.create')} onPress={submit} disabled={busy || !name.trim()} />
-    </Screen>
+    </ScrollScreen>
   );
 }

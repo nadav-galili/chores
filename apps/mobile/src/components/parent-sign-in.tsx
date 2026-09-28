@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { Button, ErrorText, Field, ProviderButton, Screen, Title } from '@/components/ui';
+import { Button, ErrorText, Field, ProviderButton, ScrollScreen, Title } from '@/components/ui';
 import { isMissingBrowser } from '@/lib/browser-error';
 import { reportError } from '@/lib/error-reporting';
 import { t } from '@/lib/i18n';
@@ -141,7 +141,7 @@ export function ParentSignIn({
 
   if (step.kind === 'code') {
     return (
-      <Screen>
+      <ScrollScreen>
         <Title>{t('signIn.codeTitle')}</Title>
         <Field
           label={email}
@@ -162,12 +162,12 @@ export function ParentSignIn({
           secondary
         />
         {footer}
-      </Screen>
+      </ScrollScreen>
     );
   }
 
   return (
-    <Screen>
+    <ScrollScreen>
       <Title>{title}</Title>
       {/* The providers first, in their own clothes; the app's own green is for the app's own
           action below. Apple asks to be listed above the other options it is offered beside. */}
@@ -200,6 +200,6 @@ export function ParentSignIn({
         disabled={busy || !email.includes('@')}
       />
       {footer}
-    </Screen>
+    </ScrollScreen>
   );
 }

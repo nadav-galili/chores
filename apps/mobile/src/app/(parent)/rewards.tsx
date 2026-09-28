@@ -178,77 +178,89 @@ export default function Rewards() {
   return (
     <Screen list>
       <Stack.Screen options={{ title: t('rewards.title') }} />
-      <Body>{t('rewards.hint')}</Body>
-      <Button
-        title={
-          state.me.household?.entitlement === 'premium' ? t('rewards.add') : t('rewards.addPremium')
-        }
-        onPress={add}
-        secondary
-      />
-      {draft ? (
-        <View style={styles.form}>
-          <Text style={styles.formTitle}>{t('rewards.customTitle')}</Text>
-          <Field
-            label={t('rewards.customName')}
-            value={draft.title}
-            onChangeText={(title) => setDraft((value) => (value ? { ...value, title } : value))}
-            autoFocus
-          />
-          <Field
-            label={t('rewards.customIcon')}
-            value={draft.icon}
-            onChangeText={(icon) => setDraft((value) => (value ? { ...value, icon } : value))}
-          />
-          <Field
-            label={t('rewards.customCost')}
-            value={draft.cost}
-            onChangeText={(cost) => setDraft((value) => (value ? { ...value, cost } : value))}
-            keyboardType="number-pad"
-          />
-          <Button
-            title={busy === draft.rewardId ? t('rewards.saving') : t('rewards.saveCustom')}
-            onPress={() => void saveCustom()}
-            disabled={busy === draft.rewardId}
-          />
-          <Button title={t('rewards.cancel')} onPress={() => setDraft(null)} secondary />
-          {rewards.rewards.some((reward) => reward.id === draft.rewardId) ? (
-            confirmDelete ? (
-              <View style={styles.confirm}>
-                <Text style={styles.deleteText}>{t('rewards.deleteConfirm')}</Text>
-                <Button
-                  title={t('rewards.delete')}
-                  onPress={() => void removeCustom()}
-                  disabled={busy === draft.rewardId}
-                  secondary
-                />
-                <Button
-                  title={t('rewards.keep')}
-                  onPress={() => setConfirmDelete(false)}
-                  secondary
-                />
-              </View>
-            ) : (
-              <Button
-                title={t('rewards.delete')}
-                onPress={() => setConfirmDelete(true)}
-                secondary
-              />
-            )
-          ) : null}
-        </View>
-      ) : null}
-      {rewards.status === 'error' && (
-        <ErrorState
-          title={rewards.message || t('rewards.loadFailed')}
-          body={t('parent.unreachable')}
-          actionTitle={t('common.tryAgain')}
-          onAction={() => void rewards.refresh()}
-        />
-      )}
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {/* The hint, the add button and the draft form ride in the list's header rather than
+          sitting above it. Pinned, they pushed the list into whatever space was left — and with
+          the draft form open and its first field autofocused, the keyboard covered the Save
+          button with no way to scroll to it. In the header they scroll with the rewards. */}
       <FlatList
         style={FILL}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Body>{t('rewards.hint')}</Body>
+            <Button
+              title={
+                state.me.household?.entitlement === 'premium'
+                  ? t('rewards.add')
+                  : t('rewards.addPremium')
+              }
+              onPress={add}
+              secondary
+            />
+            {draft ? (
+              <View style={styles.form}>
+                <Text style={styles.formTitle}>{t('rewards.customTitle')}</Text>
+                <Field
+                  label={t('rewards.customName')}
+                  value={draft.title}
+                  onChangeText={(title) =>
+                    setDraft((value) => (value ? { ...value, title } : value))
+                  }
+                  autoFocus
+                />
+                <Field
+                  label={t('rewards.customIcon')}
+                  value={draft.icon}
+                  onChangeText={(icon) => setDraft((value) => (value ? { ...value, icon } : value))}
+                />
+                <Field
+                  label={t('rewards.customCost')}
+                  value={draft.cost}
+                  onChangeText={(cost) => setDraft((value) => (value ? { ...value, cost } : value))}
+                  keyboardType="number-pad"
+                />
+                <Button
+                  title={busy === draft.rewardId ? t('rewards.saving') : t('rewards.saveCustom')}
+                  onPress={() => void saveCustom()}
+                  disabled={busy === draft.rewardId}
+                />
+                <Button title={t('rewards.cancel')} onPress={() => setDraft(null)} secondary />
+                {rewards.rewards.some((reward) => reward.id === draft.rewardId) ? (
+                  confirmDelete ? (
+                    <View style={styles.confirm}>
+                      <Text style={styles.deleteText}>{t('rewards.deleteConfirm')}</Text>
+                      <Button
+                        title={t('rewards.delete')}
+                        onPress={() => void removeCustom()}
+                        disabled={busy === draft.rewardId}
+                        secondary
+                      />
+                      <Button
+                        title={t('rewards.keep')}
+                        onPress={() => setConfirmDelete(false)}
+                        secondary
+                      />
+                    </View>
+                  ) : (
+                    <Button
+                      title={t('rewards.delete')}
+                      onPress={() => setConfirmDelete(true)}
+                      secondary
+                    />
+                  )
+                ) : null}
+              </View>
+            ) : null}
+            {rewards.status === 'error' && (
+              <ErrorState
+                title={rewards.message || t('rewards.loadFailed')}
+                body={t('parent.unreachable')}
+                actionTitle={t('common.tryAgain')}
+                onAction={() => void rewards.refresh()}
+              />
+            )}
+            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+          </View>
+        }
         data={rewards.rewards}
         keyExtractor={(r) => r.id}
         renderItem={({ item }) => (
@@ -265,6 +277,8 @@ export default function Rewards() {
 }
 
 const rewardStyles = (theme: Theme) => ({
+  // The header stack keeps the gap the screen used to give these children directly.
+  listHeader: { gap: theme.space.md, paddingBottom: theme.space.md },
   row: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
