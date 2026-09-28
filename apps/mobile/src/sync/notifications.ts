@@ -25,7 +25,12 @@ async function held(db: DeviceDb) {
 
 async function record(
   db: DeviceDb,
-  fields: { push_token?: string | null; locale?: Locale | null; reminder_time?: string | null },
+  fields: {
+    push_token?: string | null;
+    locale?: Locale | null;
+    reminder_time?: string | null;
+    push_declined?: boolean;
+  },
   now: Date,
 ) {
   await db
@@ -115,11 +120,19 @@ export async function scheduleReminder(
 }
 
 /**
+ * The child answered the push explanation with "Not now". Held in SQLite, so no relaunch puts the
+ * explanation to them again; the OS prompt was never shown, and never will be from here.
+ */
+export async function declinePush(db: DeviceDb, now: Date): Promise<void> {
+  await record(db, { push_declined: true }, now);
+}
+
+/**
  * Whether this device may put the push question to the child at all (docs/spec/01-product.md,
  * notifications). Only a reminder is ever pushed to a child, so with no reminder time there is
  * nothing to ask for, ever. With one, the question waits until the device holds a completion that
  * still counts: a first open belongs to the pet, not to a system dialog. A tap taken back is not a
- * completion; one the device learned from a sync is.
+ * completion; one the device learned from a sync is. A child who said "Not now" is not asked again.
  */
 export async function mayAskForPush(
   db: DeviceDb,
@@ -127,6 +140,7 @@ export async function mayAskForPush(
   reminderTime: string | null,
 ): Promise<boolean> {
   if (reminderTime == null) return false;
+  if ((await held(db))?.push_declined) return false;
   const done = await db
     .select({ id: completions.id })
     .from(completions)

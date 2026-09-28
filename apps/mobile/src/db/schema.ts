@@ -255,6 +255,12 @@ export const notificationState = sqliteTable('notification_state', {
   locale: text('locale').$type<Locale>(),
   /** The household-local `HH:MM` the local notification is scheduled for; null for none. */
   reminder_time: text('reminder_time'),
+  /**
+   * The child answered the push explanation with "Not now". Kept, so the explanation is never put
+   * to them again on this device — only the explanation's "Allow" raises the OS prompt, so a child
+   * who declined it has never been asked by the OS and would otherwise be asked on every launch.
+   */
+  push_declined: bool('push_declined').notNull().default(false),
   updated_at: text('updated_at').notNull(),
 });
 
@@ -279,6 +285,12 @@ export const analyticsState = sqliteTable('analytics_state', {
    * synced and not per child — the device is bound to one child, and a pull never touches it.
    */
   activated: bool('activated').notNull().default(false),
+  /**
+   * Whether a child has completed a chore on this device — recorded on the tap itself, whether or
+   * not analytics is up yet, so Activation is always the first completion's, reported whenever
+   * there is first somewhere to report it.
+   */
+  first_completed: bool('first_completed').notNull().default(false),
 });
 
 /**

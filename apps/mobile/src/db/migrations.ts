@@ -80,6 +80,13 @@ export default {
       "when": 1790610662189,
       "tag": "0010_greeting",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790612862773,
+      "tag": "0011_kid_prompts",
+      "breakpoints": true
     }
   ]
 },
@@ -95,5 +102,6 @@ export default {
     m0008: "CREATE TABLE `photo_uploads` (\n\t`completion_id` text PRIMARY KEY NOT NULL,\n\t`chore_id` text NOT NULL,\n\t`chore_date` text NOT NULL,\n\t`completed_at` text NOT NULL,\n\t`local_uri` text NOT NULL,\n\t`content_type` text NOT NULL,\n\t`created_at` text NOT NULL,\n\t`attempts` integer DEFAULT 0 NOT NULL,\n\t`next_attempt_at` text NOT NULL\n);\n",
     m0009: "ALTER TABLE `analytics_state` ADD `activated` integer DEFAULT false NOT NULL;",
     m0010: "CREATE TABLE `greeting_state` (\n\t`id` integer PRIMARY KEY NOT NULL,\n\t`seen_at` text NOT NULL\n);\n",
+    m0011: "ALTER TABLE `analytics_state` ADD `first_completed` integer DEFAULT false NOT NULL;--> statement-breakpoint\nALTER TABLE `notification_state` ADD `push_declined` integer DEFAULT false NOT NULL;",
   },
 };

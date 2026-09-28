@@ -36,14 +36,20 @@ import {
   tapPhotoRedo,
   type ChildContext,
 } from '@/sync/local';
-import { mayAskForPush, serverHoldsToken } from '@/sync/notifications';
+import { declinePush, mayAskForPush, serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { retakePhotoForInstance, uploadPendingPhotos, type PhotoTransfer } from '@/sync/photo';
 import { greetingFor, markGreetingSeen, type Greeting } from '@/sync/greeting';
 import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
-import { markActivated, markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
+import {
+  markActivated,
+  markDayComplete,
+  markFirstCompletion,
+  markGroveStage,
+  markOpen,
+} from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
@@ -128,13 +134,6 @@ export type Today = TodayState & {
   dismissGreeting: () => void;
 };
 
-/**
- * "Not now" on the push explanation holds for the rest of this launch. It is kept in memory rather
- * than in SQLite on purpose: the OS prompt has not been shown, so the next launch may explain once
- * more; within a launch the child is not asked again after every tap.
- */
-let pushAskDeclined = false;
-
 /** What the header draws before the first read lands; the name comes from the join. */
 const PET_PLACEHOLDER: Omit<PetView, 'name'> = {
   enabled: true,
@@ -175,9 +174,13 @@ async function reportDay(
   db: DeviceDb,
   today: IsoDate,
   day: { complete: boolean; streak: number; stage: number },
+  kid: { ui_mode: DeviceSession['child']['ui_mode']; household_id: string },
 ): Promise<void> {
   if (!analyticsReady()) return;
   if (await markOpen(db, today)) capture(kidAppOpen());
+  // Activation is the first completion, recorded on its tap; it is said on the first read with
+  // analytics up, so a first tap that beat the client is still the one reported.
+  if (await markActivated(db)) capture(activation(kid));
   if (day.complete && (await markDayComplete(db, today))) {
     capture(kidDayComplete({ streak: day.streak }));
   }
@@ -269,13 +272,18 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         mayAskForPush: mayAsk,
         greeting,
       });
-      await reportDay(db, date, {
-        complete: summaries.some((s) => s.chore_date === date && s.complete),
-        streak,
-        stage: grove.ownTree.stage,
-      });
+      await reportDay(
+        db,
+        date,
+        {
+          complete: summaries.some((s) => s.chore_date === date && s.complete),
+          streak,
+          stage: grove.ownTree.stage,
+        },
+        { ui_mode: session.child.ui_mode, household_id: session.household.id },
+      );
     },
-    [childId, tz, boundary, joinedName],
+    [childId, tz, boundary, joinedName, session.child.ui_mode, session.household.id],
   );
 
   const refresh = useCallback(async () => {
@@ -342,13 +350,9 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           // The tap has counted, in SQLite, whether or not there is a network — which is the whole
           // offline promise, and why the event carries whether there was one.
           if (completed) capture(choreCompleted({ offline: state.offline }));
-          // Activation is this device's first completion, marked only once there is somewhere to
-          // send it — a first tap before the client is up must not be recorded as already said.
-          if (completed && analyticsReady() && (await markActivated(db))) {
-            capture(
-              activation({ ui_mode: session.child.ui_mode, household_id: session.household.id }),
-            );
-          }
+          // Activation is this device's first completion: kept here whether or not analytics is
+          // up, and reported by the read below (`reportDay`) as soon as there is somewhere to.
+          if (completed) await markFirstCompletion(db);
           // The child sees the new coins, streak and tree before anything reaches the network.
           await readLocal(db, state.offline);
           // A tap that completed the day paid a bonus and planted a tree — the two are asked
@@ -367,7 +371,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         }
       })();
     },
-    [readLocal, refresh, state.offline, session.child.ui_mode, session.household.id],
+    [readLocal, refresh, state.offline],
   );
 
   /**
@@ -531,7 +535,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   // The push question, once there is a reminder and a completion — and only while the OS would
   // still show its prompt, so "Allow" never leads nowhere (docs/spec/01-product.md, notifications).
   useEffect(() => {
-    if (!state.mayAskForPush || pushAskDeclined) return;
+    if (!state.mayAskForPush) return;
     let live = true;
     canAskForKidPush()
       .then((askable) => {
@@ -548,7 +552,11 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     (allow: boolean) => {
       setPushAsk(false);
       if (!allow) {
-        pushAskDeclined = true;
+        // Kept in SQLite, so no later launch explains again (`mayAskForPush`). A write that fails
+        // costs the child one more explanation on a later open, nothing else.
+        void (async () => declinePush(await openDeviceDb(), new Date()))().catch((e: unknown) =>
+          console.error('push decline not recorded', e),
+        );
         return;
       }
       void (async () => {
