@@ -360,6 +360,8 @@ export const he: Catalog = {
     uiMode: 'מצב תצוגה',
     little: 'קטנים',
     big: 'גדולים',
+    littleHint: 'טקסט וכפתורים גדולים יותר, לילדים צעירים',
+    bigHint: 'טקסט רגיל, לילדים שכבר קוראים',
     petName: 'שם החיה',
     reminder: 'שעת תזכורת (HH:MM, לא חובה)',
     showJoinCode: 'הצגת קוד הצטרפות',

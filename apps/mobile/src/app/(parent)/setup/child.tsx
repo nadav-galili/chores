@@ -4,8 +4,9 @@ import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
 
 /**
- * Guided setup's Child step, above the tab bar (spec #86). The existing child form for now; this
- * file is the step's alone, so reshaping it touches no other step.
+ * Guided setup's Child step, above the tab bar (spec #86): first name, pet name and Little / Big
+ * as picture cards. No reminder time, so the child is created without one; it stays editable from
+ * the child's edit screen.
  */
 export default function SetupChild() {
   const state = useHousehold();
@@ -16,6 +17,7 @@ export default function SetupChild() {
   return (
     <ChildForm
       title={t('childForm.add')}
+      setup
       intro={<SetupPurpose step="child" />}
       onSubmit={async (input) => {
         await state.api.createChild(householdId, input);
