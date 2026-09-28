@@ -251,6 +251,13 @@ have() {
   return 0
 }
 
+# strip_ansi — drop SGR colour codes from captured output. The EAS CLI colours its
+# output even when stdout is not a terminal, so `eas env:list` hands back each name
+# as ESC[1mNAME ESC[22m=value and a `grep "^NAME="` against it never matches — the
+# check then reports every variable missing however well the environment is set up.
+# Both preflight checks that read that output anchor on line starts, so both need it.
+strip_ansi() { sed $'s/\x1b\[[0-9;]*m//g'; }
+
 # url_serves URL "marker" — is this URL live and serving the page we mean? Captured
 # whole rather than piped into grep -q: under `set -o pipefail` a reader that closes
 # on the first match kills curl with SIGPIPE, and a live page reads as a dead one.
@@ -330,7 +337,7 @@ banner "Mibo — the production iOS build, and the TestFlight release"
 
 # ── 1 ───────────────────────────────────────────────────────────────────
 stage "Preflight — everything that kills a store build twenty minutes in"
-say "A store build is forty minutes of somebody else's computer. Six things are"
+say "A store build is forty minutes of somebody else's computer. Seven things are"
 say "checked here because each one fails late, or silently, or both."
 say ""
 say "1. The tools the later stages shell out to:"
@@ -378,7 +385,7 @@ say "4. The Sentry credentials, in the EAS '$ENVIRONMENT' environment:"
 # twenty minutes in. scripts/setup-sentry.sh writes `preview` and `production`, but
 # it was `preview`-only until #78 and a project set up before that has three of
 # these missing in an environment nobody looks at.
-if env_list=$(eas_mobile env:list "$ENVIRONMENT" 2>&1); then
+if env_list=$(eas_mobile env:list "$ENVIRONMENT" 2>&1 | strip_ansi); then
   missing_vars=()
   for var in "${SENTRY_VARS[@]}"; do
     if printf '%s' "$env_list" | grep -q "^${var}="; then
@@ -449,6 +456,56 @@ else
   printf '%s\n' "$deploy_out" | sed -n '1,4p' | while read -r line; do note "  $line"; done
   warn "Behind HEAD, and not serving the pages above. Redeploy before submitting."
   SKIPPED+=("scripts/deploy-api.sh — the live API is behind this tree")
+fi
+say ""
+
+say "7. The public app variables, in BOTH places that have to carry them:"
+# The trap that made criterion 4 fail for the whole of M4 without anybody noticing.
+# `eas build` reads eas.json's build.<profile>.env AND the EAS environment; `eas
+# update` reads ONLY the EAS environment — Expo documents it plainly ("Environment
+# variables set on the env field in build profiles are not available when you run
+# eas update"). So a variable that lives only in eas.json is compiled into the
+# binary and missing from every OTA bundle. The app then throws in its root layout
+# before rendering, expo-updates rolls back to the embedded bundle, and the result
+# is indistinguishable from an app that is simply up to date: no crash the user
+# sees, no failed command, nothing in the channel to look at. The only signal is a
+# Sentry error nobody is watching for.
+#
+# Checked as a parity diff rather than a list of names, so a variable added to
+# eas.json later is covered without editing this script.
+env_parity_ok=1
+if eas_env_out=$(eas_mobile env:list "$ENVIRONMENT" 2>&1 | strip_ansi); then
+  while IFS= read -r var; do
+    [[ -z "$var" ]] && continue
+    if printf '%s' "$eas_env_out" | grep -q "^${var}="; then
+      printf '  %s✓%s %s is in eas.json and the %s environment\n' \
+        "$GREEN" "$RESET" "$var" "$ENVIRONMENT"
+    else
+      printf '  %s✗%s %s is in eas.json but NOT in the %s environment\n' \
+        "$RED" "$RESET" "$var" "$ENVIRONMENT"
+      env_parity_ok=0
+    fi
+  done < <(jq -r --arg p "$PROFILE" \
+    '.build[$p].env // {} | keys[] | select(startswith("EXPO_PUBLIC_"))' "$EAS_JSON" 2>/dev/null)
+  if (( ! env_parity_ok )); then
+    say ""
+    warn "The build would work and every OTA update would be dead on arrival: the"
+    warn "bundle ships without these, the app throws before its first screen, and"
+    warn "expo-updates silently rolls back to the embedded bundle. It looks exactly"
+    warn "like an app with no update waiting."
+    note "  Mirror each one into the EAS environment, reading the value from eas.json"
+    note "  rather than retyping a key:"
+    printf '      %scd apps/mobile && eas env:set %s --name NAME \\%s\n' \
+      "$BOLD" "$ENVIRONMENT" "$RESET"
+    # shellcheck disable=SC2016  # the $(...) is printed for a human to copy, not run here
+    printf '      %s  --value "$(jq -r .build.%s.env.NAME eas.json)" \\%s\n' \
+      "$BOLD" "$PROFILE" "$RESET"
+    printf '      %s  --visibility plaintext --scope project%s\n' "$BOLD" "$RESET"
+    SKIPPED+=("mirror the EXPO_PUBLIC_ variables from eas.json into the EAS '$ENVIRONMENT' environment")
+  fi
+else
+  warn "eas env:list failed — could not compare eas.json against the environment."
+  SKIPPED+=("compare eas.json's EXPO_PUBLIC_ variables against the EAS '$ENVIRONMENT' environment")
 fi
 say ""
 
@@ -647,7 +704,8 @@ say "carries channel '$CHANNEL' (eas.json), so an update published there reaches
 say "— for runtime version $app_version and no other."
 say ""
 say "Two commands, and the second one is the one that gets forgotten:"
-printf '      %scd apps/mobile && eas update --channel %s --environment %s --message "..."%s\n' \
+printf '      %spnpm --filter @chores/shared build%s\n' "$BOLD" "$RESET"
+printf '      %scd apps/mobile && eas update --channel %s --environment %s --clear-cache --message "..."%s\n' \
   "$BOLD" "$CHANNEL" "$ENVIRONMENT" "$RESET"
 printf '      %scd apps/mobile && npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist%s\n' \
   "$BOLD" "$RESET"
@@ -662,6 +720,16 @@ note "on 57. It is what makes the OTA bundle carry the same EXPO_PUBLIC_ values 
 note "store build was compiled with — the API URL and the Clerk key among them. An"
 note "update built against the wrong environment points a shipped app at the wrong"
 note "backend, and nothing about it looks wrong."
+note ""
+note "@chores/shared resolves to its dist/, built by tsc — so 'eas update' bundles"
+note "whatever that directory happens to hold. It does NOT build workspace packages."
+note "On EAS Build this never bites, because pnpm install runs the package's"
+note "'prepare' script; locally a stale dist/ means an OTA hotfix to shared code"
+note "publishes the OLD code and looks like it worked. Hence the build first."
+note ""
+note "--clear-cache for the same class of reason: Metro caches transformed modules"
+note "per file, and a rebuilt dependency it believes it has already seen can be"
+note "served from that cache."
 note ""
 note "'eas update' exports to dist/ — its --input-dir default — with source maps,"
 note "and dist/ is what the second command reads. SENTRY_AUTH_TOKEN has to be in"
@@ -682,7 +750,11 @@ if confirm "Publish an update to the '$CHANNEL' channel now?"; then
   printf '  %sUpdate message:%s ' "$BOLD" "$RESET"
   read -r update_message || true
   [[ -z "$update_message" ]] && update_message="verify the $CHANNEL channel (#$ISSUE)"
-  if eas_mobile update --channel "$CHANNEL" --environment "$ENVIRONMENT" --message "$update_message"; then
+  if ! (cd "$REPO_ROOT" && pnpm --filter @chores/shared build); then
+    warn "The shared package did not build, so the update would carry a stale copy."
+    SKIPPED+=("pnpm --filter @chores/shared build, then re-run the update")
+  fi
+  if eas_mobile update --channel "$CHANNEL" --environment "$ENVIRONMENT" --clear-cache --message "$update_message"; then
     printf '  %s✓ published%s\n' "$GREEN" "$RESET"
     say ""
     step "Asking the updates server what it serves an iOS client on runtime $app_version."
@@ -707,7 +779,7 @@ if confirm "Publish an update to the '$CHANNEL' channel now?"; then
     fi
   else
     warn "eas update failed — the channel is unproven."
-    SKIPPED+=("eas update --channel $CHANNEL --environment $ENVIRONMENT")
+    SKIPPED+=("eas update --channel $CHANNEL --environment $ENVIRONMENT --clear-cache")
   fi
 else
   SKIPPED+=("eas update --channel $CHANNEL --environment $ENVIRONMENT, and its source-map upload")
