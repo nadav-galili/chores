@@ -195,3 +195,27 @@ export function paywallShown(shown: { gate: Gate }): AnalyticsEvent {
 export function pushOpened(open: { kind: NotificationKind }): AnalyticsEvent {
   return { event: 'push_opened', properties: { kind: open.kind } };
 }
+
+/**
+ * The steps of first run, in the order a new parent meets them (M5). `welcome` is the first screen,
+ * before there is a role; the rest are guided setup, ending at the Join Code's `connected`.
+ */
+export const ONBOARDING_STEPS = [
+  'welcome',
+  'household',
+  'child',
+  'chore',
+  'pin',
+  'join_code',
+  'connected',
+] as const;
+
+export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
+/**
+ * A first-run screen was shown: the funnel from the first screen to Activation, step by step. The
+ * step is a catalog constant, so it says where someone is and nothing about who (ADR-0009).
+ */
+export function onboardingStepViewed(view: { step: OnboardingStep }): AnalyticsEvent {
+  return { event: 'onboarding_step_viewed', properties: { step: view.step } };
+}
