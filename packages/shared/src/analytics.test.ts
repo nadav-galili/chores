@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   ANALYTICS_HOST,
+  activation,
   ageBand,
+  childCreated,
   choreCreated,
   choreCompleted,
   groveGrew,
   householdCreated,
   householdHash,
+  joinCodeIssued,
   joinCodeRedeemed,
   kidAppOpen,
   kidDayComplete,
@@ -14,6 +17,7 @@ import {
   parentIdentity,
   paywallShown,
   petReacted,
+  pinSet,
   purchaseCompleted,
   pushOpened,
   redemptionDecided,
@@ -89,6 +93,21 @@ describe('the events', () => {
     ).toBe('join_code_redeemed');
   });
 
+  it('names the setup steps between a household and a redeemed code', () => {
+    expect(childCreated({ ui_mode: 'big' })).toEqual({
+      event: 'child_created',
+      properties: { ui_mode: 'big' },
+    });
+    expect(pinSet()).toEqual({ event: 'pin_set', properties: {} });
+    expect(joinCodeIssued()).toEqual({ event: 'join_code_issued', properties: {} });
+  });
+
+  it('names Activation, a kid device’s first completion', () => {
+    expect(activation({ ui_mode: child.ui_mode, household_id: householdId }).event).toBe(
+      'activation',
+    );
+  });
+
   it('names the kid loop events the milestone asks about', () => {
     expect(kidAppOpen().event).toBe('kid_app_open');
     expect(choreCompleted({ offline: true }).properties).toEqual({ offline: true });
@@ -146,7 +165,11 @@ describe('what an event may carry', () => {
   const everyEvent = (): AnalyticsEvent[] => [
     householdCreated({ currency: 'ILS', tz: 'Asia/Jerusalem' }),
     choreCreated({ kind: 'daily', assignee_count: 2 }),
+    childCreated({ ui_mode: child.ui_mode }),
+    pinSet(),
+    joinCodeIssued(),
     joinCodeRedeemed({ ui_mode: child.ui_mode, household_id: householdId, platform: 'android' }),
+    activation({ ui_mode: child.ui_mode, household_id: householdId }),
     kidAppOpen(),
     choreCompleted({ offline: false }),
     petReacted({ tapped_at: 1000, shown_at: 1120 }),
@@ -179,5 +202,12 @@ describe('what an event may carry', () => {
       'platform',
       'ui_mode',
     ]);
+  });
+
+  it('carries, on Activation, only the anonymous kid properties (ADR-0009)', () => {
+    const activated = activation({ ui_mode: child.ui_mode, household_id: householdId });
+    expect(activated.properties).toEqual(
+      kidProperties({ ui_mode: child.ui_mode, household_id: householdId }),
+    );
   });
 });

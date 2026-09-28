@@ -1,5 +1,6 @@
 import {
   COINS_PER_CHORE,
+  activation,
   choreCompleted,
   choreDate,
   currentStreak,
@@ -40,7 +41,7 @@ import { retakePhotoForInstance, uploadPendingPhotos, type PhotoTransfer } from 
 import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
-import { markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
+import { markActivated, markDayComplete, markGroveStage, markOpen } from '@/sync/analytics';
 import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
@@ -311,6 +312,13 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           // The tap has counted, in SQLite, whether or not there is a network — which is the whole
           // offline promise, and why the event carries whether there was one.
           if (completed) capture(choreCompleted({ offline: state.offline }));
+          // Activation is this device's first completion, marked only once there is somewhere to
+          // send it — a first tap before the client is up must not be recorded as already said.
+          if (completed && analyticsReady() && (await markActivated(db))) {
+            capture(
+              activation({ ui_mode: session.child.ui_mode, household_id: session.household.id }),
+            );
+          }
           // The child sees the new coins, streak and tree before anything reaches the network.
           await readLocal(db, state.offline);
           // A tap that completed the day paid a bonus and planted a tree — the two are asked
@@ -329,7 +337,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         }
       })();
     },
-    [readLocal, refresh, state.offline],
+    [readLocal, refresh, state.offline, session.child.ui_mode, session.household.id],
   );
 
   /**

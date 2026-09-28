@@ -22,7 +22,7 @@ async function held(db: DeviceDb) {
 
 async function record(
   db: DeviceDb,
-  fields: { opened_on?: string; completed_on?: string; grove_stage?: number },
+  fields: { opened_on?: string; completed_on?: string; grove_stage?: number; activated?: boolean },
 ) {
   await db
     .insert(analyticsState)
@@ -68,4 +68,16 @@ export async function markGroveStage(db: DeviceDb, stage: number): Promise<boole
   if (reported != null && stage <= reported) return false;
   await record(db, { grove_stage: stage });
   return reported != null;
+}
+
+/**
+ * Whether this completion is Activation: the first by a child on this Kid Device, reported once
+ * per device. The caller asks after the tap is written, so an offline first completion is the one
+ * that counts; a later sync never asks, and the answer lives in SQLite, so a relaunch cannot ask
+ * it again.
+ */
+export async function markActivated(db: DeviceDb): Promise<boolean> {
+  if ((await held(db))?.activated) return false;
+  await record(db, { activated: true });
+  return true;
 }

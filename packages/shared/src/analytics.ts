@@ -91,6 +91,24 @@ export function choreCreated(chore: { kind: ChoreKind; assignee_count: number })
 }
 
 /**
+ * Onboarding: a parent added a child. The ui mode is the one thing about the child the funnel
+ * asks for — it is how many households add a second one, and which band — never the name.
+ */
+export function childCreated(child: { ui_mode: UiMode }): AnalyticsEvent {
+  return { event: 'child_created', properties: { ui_mode: child.ui_mode } };
+}
+
+/** Onboarding: the household has a Parent PIN, so a Join Code can now be shown (ADR-0013). */
+export function pinSet(): AnalyticsEvent {
+  return { event: 'pin_set', properties: {} };
+}
+
+/** Onboarding: a parent was shown a Join Code. Nothing about the code or the child crosses. */
+export function joinCodeIssued(): AnalyticsEvent {
+  return { event: 'join_code_issued', properties: {} };
+}
+
+/**
  * Activation: a kid device exists. Sent by the API under the device's own new anon id, which is
  * the first thing that id is ever used for. It asks for the ui mode and the household rather than
  * the child, so there is no first name or pet name here to drop.
@@ -106,6 +124,18 @@ export function joinCodeRedeemed(redeem: {
       ...kidProperties({ ui_mode: redeem.ui_mode, household_id: redeem.household_id }),
       platform: redeem.platform,
     },
+  };
+}
+
+/**
+ * Activation: the first completion by a child on this Kid Device, sent once per device. It carries
+ * the anonymous kid properties and nothing else (ADR-0009), named here rather than left to the
+ * client's registered ones so the event reads the same wherever it is counted.
+ */
+export function activation(device: { ui_mode: UiMode; household_id: string }): AnalyticsEvent {
+  return {
+    event: 'activation',
+    properties: kidProperties({ ui_mode: device.ui_mode, household_id: device.household_id }),
   };
 }
 

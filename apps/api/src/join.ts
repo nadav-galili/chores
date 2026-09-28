@@ -1,6 +1,7 @@
 import {
   JOIN_CODE_TTL_MS,
   generateJoinCode,
+  joinCodeIssued,
   joinCodeRedeemed,
   joinCodeStatus,
   redeemJoinCodeInputSchema,
@@ -91,6 +92,11 @@ export function joinRoutes(db: Db, redeemLimit: RateLimit, analytics: Analytics)
           child_id: row.childId,
           expires_at: row.expiresAt.toISOString(),
         };
+        analytics.capture({
+          distinctId: c.get('clerkUserId'),
+          event: joinCodeIssued(),
+          groups: { household: householdId },
+        });
         return c.json(issued, 201);
       }
     }
