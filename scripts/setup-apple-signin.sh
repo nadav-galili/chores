@@ -332,28 +332,35 @@ fi
 pause "Press Enter when the tooling looks right."
 
 # ── 2 ───────────────────────────────────────────────────────────────────
-stage "The entitlement in app.json"
-say "This is the half no dashboard can report on. Without it the built app has no"
-say "com.apple.developer.applesignin entitlement, and startSSOFlow({ strategy:"
-say "'oauth_apple' }) cannot complete on a device however right Clerk is."
+stage "The entitlement"
+say "com.apple.developer.applesignin has to be in the signed binary. What #85"
+say "assumed, and what turned out to be true, are different things — so this stage"
+say "checks the resolved config rather than reasoning about app.json."
+say ""
+note "@clerk/expo's own config plugin adds the entitlement unconditionally, in"
+note "withClerkAppleSignIn (node_modules/@clerk/expo/app.plugin.js). So it was in"
+note "the build before ios.usesAppleSignIn was ever set, and the Apple button's"
+note "failure was never the entitlement — it was an unsaved Clerk connection."
+note "ios.usesAppleSignIn stays set anyway: an entitlement cannot be hotfixed, and"
+note "this way the app declares it rather than inheriting it from a dependency."
 say ""
 if grep -q '"usesAppleSignIn": *true' "$MOBILE/app.json"; then
   printf '  %s✓%s app.json sets ios.usesAppleSignIn\n' "$GREEN" "$RESET"
 else
-  warn "app.json does not set ios.usesAppleSignIn — add it under \"ios\":"
+  note "app.json does not set ios.usesAppleSignIn. Not fatal — see above — but set it:"
   say '      "usesAppleSignIn": true'
   SKIPPED+=("add \"usesAppleSignIn\": true under ios in apps/mobile/app.json")
 fi
 say ""
-say "Proving the resolved config actually carries the entitlement, rather than"
-say "trusting that the key was spelt right:"
+say "The check that actually decides it — what the resolved config carries:"
 ENTITLED=""
 if entitlements=$(cd "$MOBILE" && npx expo config --type introspect 2>/dev/null); then
   if printf '%s' "$entitlements" | grep -q 'com.apple.developer.applesignin'; then
     printf '  %s✓%s expo config introspect shows com.apple.developer.applesignin\n' "$GREEN" "$RESET"
     ENTITLED=yes
   else
-    warn "the introspected config has no applesignin entitlement."
+    warn "the introspected config has no applesignin entitlement — this IS fatal."
+    warn "Neither app.json nor @clerk/expo is supplying it; the Apple button cannot work."
     SKIPPED+=("get com.apple.developer.applesignin into the introspected expo config")
   fi
 else
