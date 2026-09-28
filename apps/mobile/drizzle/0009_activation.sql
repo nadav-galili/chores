@@ -1,0 +1,1 @@
+ALTER TABLE `analytics_state` ADD `activated` integer DEFAULT false NOT NULL;

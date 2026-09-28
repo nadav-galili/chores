@@ -2,10 +2,16 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { instanceId, uuid7, type SyncRequest, type SyncResponse } from '@chores/shared';
+import { eq } from 'drizzle-orm';
+import { choreAssignees, chores, outbox } from '@/db/schema';
 import { openTestDb, openTestDbAt } from '@/db/test-db';
 import type { DeviceDb } from '@/db/types';
-import { markDayComplete, markGroveStage, markOpen } from './analytics';
+import { markActivated, markDayComplete, markGroveStage, markOpen } from './analytics';
+import { materializeToday } from './engine';
 import { cacheFetchedFlags, readFlag } from './flags';
+import { tapContext, tapDone, type ChildContext } from './local';
+import { syncNow } from './sync';
 
 let db: DeviceDb;
 let dir: string | undefined;
@@ -85,6 +91,98 @@ describe('what is remembered', () => {
     const second = await openTestDbAt(file);
     expect(await markOpen(second.db, '2026-09-10')).toBe(false);
     second.close();
+  });
+});
+
+describe('markActivated', () => {
+  const T = '2026-09-09T10:00:00.000Z';
+  const TODAY = '2026-09-09';
+  const child: ChildContext = {
+    householdId: uuid7(),
+    childId: uuid7(),
+    deviceId: uuid7(),
+    tz: 'Asia/Jerusalem',
+    dayBoundaryHour: 0,
+  };
+
+  /** A daily chore due today, as a pull would have written it. */
+  async function dueChore(target: DeviceDb) {
+    const id = uuid7();
+    await target.insert(chores).values({
+      id,
+      household_id: child.householdId,
+      title: 'Brush teeth',
+      icon: null,
+      kind: 'daily',
+      weekday_mask: null,
+      start_date: null,
+      end_date: null,
+      due_date: null,
+      requires_photo: false,
+      version: 1,
+      updated_at: T,
+      updated_by: uuid7(),
+      deleted_at: null,
+      field_clocks: {},
+    });
+    await target.insert(choreAssignees).values({ chore_id: id, child_id: child.childId });
+    await materializeToday(target, child.childId, TODAY);
+    return { chore_id: id, id: instanceId(id, child.childId, TODAY) };
+  }
+
+  /** A tap done, and whether the device would report it as Activation — what the screen does. */
+  async function complete(target: DeviceDb): Promise<boolean> {
+    await tapDone(target, tapContext(child, new Date(T)), await dueChore(target));
+    return markActivated(target);
+  }
+
+  const acks = (req: SyncRequest): Promise<SyncResponse> =>
+    Promise.resolve({
+      acked: req.ops.map((o) => ({ op_id: o.op_id })),
+      rejected: [],
+      changes: [],
+      cursor: 1,
+      has_more: false,
+    });
+
+  it('is true on this device’s first completion and false on the second', async () => {
+    expect(await complete(db)).toBe(true);
+    expect(await complete(db)).toBe(false);
+  });
+
+  it('fires exactly once for an offline first completion, and not again once the outbox syncs', async () => {
+    const fired = [await complete(db)];
+    const offline = () => Promise.reject(new Error('offline'));
+    await expect(syncNow(db, child, offline)).rejects.toThrow('offline');
+    fired.push(await complete(db));
+
+    // The network comes back, and the queued completions reach the server.
+    await db.update(outbox).set({ next_attempt_at: new Date(0).toISOString() });
+    await syncNow(db, child, acks);
+    expect(await db.select().from(outbox).where(eq(outbox.status, 'pending'))).toEqual([]);
+    fired.push(await complete(db));
+
+    expect(fired).toEqual([true, false, false]);
+  });
+
+  it('survives a restart, so a relaunch is not a second Activation', async () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'mibo-'));
+    const file = path.join(dir, 'mibo.db');
+    const first = await openTestDbAt(file);
+    expect(await complete(first.db)).toBe(true);
+    first.close();
+
+    const second = await openTestDbAt(file);
+    expect(await complete(second.db)).toBe(false);
+    second.close();
+  });
+
+  it('is its own record, apart from the daily events', async () => {
+    await markOpen(db, TODAY);
+    await markDayComplete(db, TODAY);
+    await markGroveStage(db, 0);
+    expect(await complete(db)).toBe(true);
+    expect(await markOpen(db, TODAY)).toBe(false);
   });
 });
 

@@ -274,6 +274,11 @@ export const analyticsState = sqliteTable('analytics_state', {
    * ever rises (ADR-0011), and the first stage a device reads is what it already had, not growth.
    */
   grove_stage: integer('grove_stage'),
+  /**
+   * Whether this device has reported Activation: its first completion, once per Kid Device. Not
+   * synced and not per child — the device is bound to one child, and a pull never touches it.
+   */
+  activated: bool('activated').notNull().default(false),
 });
 
 /** One row: how far this device has pulled the change log. */

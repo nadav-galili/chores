@@ -1,5 +1,6 @@
 import {
   builtinRewardsFor,
+  childCreated,
   childInputSchema,
   createHouseholdInputSchema,
   householdCreated,
@@ -237,6 +238,11 @@ export function householdRoutes(db: Db, analytics: Analytics) {
         sort: sql`(select coalesce(max(${children.sort}) + 1, 0) from ${children} where ${children.householdId} = ${householdId})`,
       })
       .returning();
+    analytics.capture({
+      distinctId: c.get('clerkUserId'),
+      event: childCreated({ ui_mode: row!.uiMode }),
+      groups: { household: householdId },
+    });
     return c.json(childToApi(row!), 201);
   });
 
