@@ -11,6 +11,8 @@ import {
   kidAppOpen,
   kidDayComplete,
   kidProperties,
+  onboardingStepViewed,
+  ONBOARDING_STEPS,
   parentIdentity,
   paywallShown,
   petReacted,
@@ -136,6 +138,25 @@ describe('the events', () => {
     }
   });
 
+  it('reports an onboarding step by its name alone, for every step the funnel has', () => {
+    expect(onboardingStepViewed({ step: 'welcome' })).toEqual({
+      event: 'onboarding_step_viewed',
+      properties: { step: 'welcome' },
+    });
+    expect([...ONBOARDING_STEPS]).toEqual([
+      'welcome',
+      'household',
+      'child',
+      'chore',
+      'pin',
+      'join_code',
+      'connected',
+    ]);
+    for (const step of ONBOARDING_STEPS) {
+      expect(onboardingStepViewed({ step }).properties).toEqual({ step });
+    }
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -157,6 +178,7 @@ describe('what an event may carry', () => {
     purchaseCompleted({ product_id: 'mibo_yearly', purchase_kind: 'subscription' }),
     paywallShown({ gate: 'photo_proof' }),
     ...notificationKindSchema.options.map((kind) => pushOpened({ kind })),
+    ...ONBOARDING_STEPS.map((step) => onboardingStepViewed({ step })),
   ];
 
   it('is never the child id, their first name, their pet name or a reward title (ADR-0009)', () => {

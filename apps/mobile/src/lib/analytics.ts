@@ -27,7 +27,7 @@ import { cacheFetchedFlags } from '@/sync/flags';
 
 const apiKey = process.env.EXPO_PUBLIC_POSTHOG_KEY;
 
-type Mode = 'parent' | 'kid';
+type Mode = 'welcome' | 'parent' | 'kid';
 
 let client: PostHog | null = null;
 let mode: Mode | null = null;
@@ -87,18 +87,37 @@ export async function startKidAnalytics(session: DeviceSession): Promise<void> {
   flushOpenedPush();
 }
 
+/**
+ * The welcome screen's client, before there is a role: an anonymous id and nothing else, so the
+ * first step of the onboarding funnel is counted even for someone who never signs in. It starts
+ * from a fresh id — the device may have been a kid device before, and that anon id must not be
+ * the one a welcome view lands on. A parent who goes on to sign in keeps this id and `identify`
+ * joins the two; a kid device replaces it with its own (ADR-0009).
+ */
+export async function startWelcomeAnalytics(): Promise<void> {
+  if (mode === 'welcome' && client) return;
+  await shutdownAnalytics();
+  mode = 'welcome';
+  client = build({ flags: false });
+  // The SDK would otherwise pick up whatever id it last persisted, which may be a child's.
+  client?.reset();
+}
+
 /** Parent mode's client: the Clerk user, in their household's group. */
 export async function startParentAnalytics(
   clerkUserId: string,
   householdId: string | null,
 ): Promise<void> {
   if (mode !== 'parent' || !client) {
-    await shutdownAnalytics();
+    // The welcome client's id was fresh and has only ever been this person on the welcome
+    // screen, so it is kept for `identify` to join. Anything else is started from nothing.
+    const fromWelcome = mode === 'welcome' && client !== null;
+    await shutdownAnalytics({ keepIdentity: fromWelcome });
     mode = 'parent';
     client = build({ flags: true });
     // Identifying on top of an id this device already held would alias the two people — and on a
     // phone that was in kid mode, the other person is a child (ADR-0009). Start from nothing.
-    client?.reset();
+    if (!fromWelcome) client?.reset();
   }
   const identity = parentIdentity(clerkUserId, householdId);
   client?.identify(identity.distinct_id);
@@ -151,12 +170,12 @@ export async function refreshFlags(db: DeviceDb, now = new Date()): Promise<void
  * id — aliasing the two — and go on sending the child's ui mode and household hash. A child is
  * anonymous per device, and stays that way (ADR-0009).
  */
-export async function shutdownAnalytics(): Promise<void> {
+export async function shutdownAnalytics(options: { keepIdentity?: boolean } = {}): Promise<void> {
   const going = client;
   client = null;
   mode = null;
   kidIdentity = null;
-  going?.reset();
+  if (!options.keepIdentity) going?.reset();
   await going?.shutdown();
 }
 

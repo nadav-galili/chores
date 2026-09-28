@@ -22,7 +22,8 @@ export const en = {
     continue: 'Continue',
   },
   role: {
-    question: 'Who is using this device?',
+    headline: 'Chores your kid actually wants to do',
+    subline: 'They tap each chore when it’s done, earn coins and grow a pet that cheers them on.',
     parent: 'Parent',
     kid: 'Kid',
   },
