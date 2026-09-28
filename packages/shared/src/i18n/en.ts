@@ -387,6 +387,8 @@ export const en = {
     uiMode: 'Screen mode',
     little: 'Little',
     big: 'Big',
+    littleHint: 'Larger text and buttons, for younger children',
+    bigHint: 'Regular text, for children who read',
     petName: 'Pet name',
     reminder: 'Reminder time (HH:MM, optional)',
     showJoinCode: 'Show join code',
