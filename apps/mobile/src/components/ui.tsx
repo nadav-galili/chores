@@ -237,7 +237,8 @@ export function ChipGroup({
  * the app draws a chip, so a second chip elsewhere cannot drift from this one.
  *
  * `role` is how it announces itself: `radio` where one of the set is chosen, `checkbox` where
- * any number may be.
+ * any number may be, `button` where tapping it does something rather than choosing (guided
+ * setup's suggested chores), and so is never active.
  */
 export function Chip({
   title,
@@ -248,7 +249,7 @@ export function Chip({
   title: string;
   active: boolean;
   onPress: () => void;
-  role?: 'radio' | 'checkbox';
+  role?: 'radio' | 'checkbox' | 'button';
 }) {
   const chips = useThemedStyles(chipStyles);
   return (
@@ -256,7 +257,9 @@ export function Chip({
       style={[chips.chip, active && chips.chipActive]}
       onPress={onPress}
       accessibilityRole={role}
-      accessibilityState={role === 'radio' ? { selected: active } : { checked: active }}
+      accessibilityState={
+        role === 'radio' ? { selected: active } : role === 'checkbox' ? { checked: active } : {}
+      }
     >
       <Text style={[chips.chipText, active && chips.chipTextActive]}>{title}</Text>
     </Pressable>

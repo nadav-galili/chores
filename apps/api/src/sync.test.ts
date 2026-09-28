@@ -361,3 +361,78 @@ describe('POST /sync pull', () => {
     expect(body.rejected).toEqual([{ op_id: opId, reason: 'unknown_op' }]);
   });
 });
+
+describe('a First chore suggestion (M5.4)', () => {
+  // Guided setup's order, not the fixture's: the chore is written before any device has joined,
+  // exactly as a chip tap writes it, and the device's first pull the same Chore Date has it.
+  it('is on the child’s list the Chore Date it was created, once their device joins', async () => {
+    const clerkUserId = 'user_first_chore';
+    const res = await app.request(
+      '/households',
+      asParent(clerkUserId, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Galili', tz: TZ, currency: 'ILS' }),
+      }),
+    );
+    const { household } = (await res.json()) as { household: { id: string } };
+    const child = (await (
+      await app.request(
+        `/households/${household.id}/children`,
+        asParent(clerkUserId, {
+          method: 'POST',
+          body: JSON.stringify({ first_name: 'Noa', ui_mode: 'little', pet_name: 'Pip' }),
+        }),
+      )
+    ).json()) as { id: string };
+
+    const choreId = uuid7();
+    const put = await app.request(
+      `/households/${household.id}/chores/${choreId}`,
+      asParent(clerkUserId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          fields: {
+            title: 'Make your bed',
+            icon: null,
+            kind: 'daily',
+            weekday_mask: null,
+            start_date: null,
+            end_date: null,
+            due_date: null,
+            requires_photo: false,
+            assignees: [child.id],
+          },
+          updated_at: new Date().toISOString(),
+        }),
+      }),
+    );
+    expect(put.status).toBe(201);
+
+    await setTestPin(app, clerkUserId, household.id);
+    const issued = (await (
+      await app.request(
+        `/households/${household.id}/children/${child.id}/join-code`,
+        asParent(clerkUserId, { method: 'POST' }),
+      )
+    ).json()) as { code: string };
+    const session = (await (
+      await app.request('/join-codes/redeem', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: issued.code, platform: 'ios' }),
+      })
+    ).json()) as DeviceSession;
+
+    const { changes } = await pullAll(session);
+    const instances = ofTable(changes, 'chore_instances');
+    expect(instances.map((c) => c.row)).toEqual([
+      expect.objectContaining({
+        id: instanceId(choreId, child.id, today()),
+        chore_id: choreId,
+        child_id: child.id,
+        chore_date: today(),
+        status: 'due',
+      }),
+    ]);
+  });
+});
