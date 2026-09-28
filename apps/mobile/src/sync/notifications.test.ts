@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { instanceId, uuid7 } from '@chores/shared';
 import { openTestDb } from '@/db/test-db';
 import type { DeviceDb } from '@/db/types';
-import { notificationState, outbox } from '@/db/schema';
+import { choreAssignees, chores, completions, notificationState, outbox } from '@/db/schema';
+import { applyPull, materializeToday } from './engine';
+import { tapContext, tapToggle, type ChildContext } from './local';
 import {
   forgetRegisteredToken,
+  mayAskForPush,
   registerPushToken,
   scheduleReminder,
   serverHoldsToken,
@@ -149,5 +153,105 @@ describe('scheduleReminder', () => {
     const failing = () => Promise.reject(new Error('no permission'));
     await expect(scheduleReminder(db, '16:00', failing, now)).rejects.toThrow('no permission');
     expect(await state()).toBeUndefined();
+  });
+});
+
+describe('mayAskForPush', () => {
+  const childId = uuid7();
+  const householdId = uuid7();
+  const TODAY = '2026-09-09';
+  const child: ChildContext = {
+    householdId,
+    childId,
+    deviceId: uuid7(),
+    tz: 'Asia/Jerusalem',
+    dayBoundaryHour: 0,
+  };
+
+  /** A daily chore for this child with today's Instance materialized, as a first open has it. */
+  async function seedChore() {
+    const id = uuid7();
+    await db.insert(chores).values({
+      id,
+      household_id: householdId,
+      title: 'Dishes',
+      icon: '🍽️',
+      kind: 'daily',
+      weekday_mask: null,
+      start_date: null,
+      end_date: null,
+      due_date: null,
+      requires_photo: false,
+      version: 1,
+      updated_at: now.toISOString(),
+      updated_by: uuid7(),
+      deleted_at: null,
+      field_clocks: {},
+    });
+    await db.insert(choreAssignees).values({ chore_id: id, child_id: childId });
+    await materializeToday(db, childId, TODAY);
+    return { chore_id: id, id: instanceId(id, childId, TODAY) };
+  }
+
+  const tap = (instance: { chore_id: string; id: string }, status: 'due' | 'done') =>
+    tapToggle(db, tapContext(child, now), { ...instance, status });
+
+  it('never asks a child with no reminder time, whatever they have done', async () => {
+    expect(await mayAskForPush(db, childId, null)).toBe(false);
+    await tap(await seedChore(), 'due');
+    expect(await mayAskForPush(db, childId, null)).toBe(false);
+  });
+
+  it('does not ask on a first open, before the device has any completion', async () => {
+    await seedChore();
+    expect(await mayAskForPush(db, childId, '16:00')).toBe(false);
+  });
+
+  it('asks once the device has a completion and there is a reminder to deliver', async () => {
+    await tap(await seedChore(), 'due');
+    expect(await mayAskForPush(db, childId, '16:00')).toBe(true);
+  });
+
+  it('does not count a tap the child took back', async () => {
+    const instance = await seedChore();
+    await tap(instance, 'due');
+    await tap(instance, 'done');
+    expect(await mayAskForPush(db, childId, '16:00')).toBe(false);
+  });
+
+  it('counts a completion the device learned from a sync, as a rejoined device has', async () => {
+    const instance = await seedChore();
+    const id = uuid7();
+    await applyPull(db, {
+      acked: [],
+      rejected: [],
+      has_more: false,
+      cursor: 1,
+      changes: [
+        {
+          seq: 1,
+          table: 'completions',
+          row_id: id,
+          op: 'insert',
+          row: {
+            id,
+            instance_id: instance.id,
+            chore_id: instance.chore_id,
+            child_id: childId,
+            household_id: householdId,
+            chore_date: TODAY,
+            completed_at: now.toISOString(),
+            device_id: null,
+            photo_key: null,
+            status: 'accepted',
+            rejected_by: null,
+            rejected_at: null,
+            created_at: now.toISOString(),
+          },
+        },
+      ],
+    });
+    expect(await db.select().from(completions)).toHaveLength(1);
+    expect(await mayAskForPush(db, childId, '16:00')).toBe(true);
   });
 });

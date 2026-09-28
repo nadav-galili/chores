@@ -28,6 +28,8 @@ export const he: Catalog = {
       other: '%{count} הקשות לא נשמרו. הקישו כדי להסתיר.',
     },
     petButton: '%{name}, רמה %{level}',
+    pushAllow: 'לאפשר',
+    pushNotNow: 'לא עכשיו',
     little: {
       greeting: 'היי %{name}!',
       empty: '🎈 אין מה לעשות היום!',
@@ -40,6 +42,8 @@ export const he: Catalog = {
       doneMoment: 'יופי! עוד %{coins} מטבעות',
       grew: 'העץ שלכם צמח! 🌱',
       waitingPhoto: 'מחכים שמבוגר יעיף מבט!',
+      pushTitle: 'רוצים תזכורת?',
+      pushBody: 'מבוגר בחר שעה להזכיר לכם את המטלות. הקישו על ״לאפשר״ כדי לקבל אותה!',
     },
     big: {
       greeting: 'היי %{name}',
@@ -53,6 +57,8 @@ export const he: Catalog = {
       doneMoment: 'עוד %{coins} מטבעות',
       grew: 'העץ שלכם צמח 🌱',
       waitingPhoto: 'מחכים שמבוגר יעיף מבט.',
+      pushTitle: 'התזכורת למטלות שלכם',
+      pushBody: 'מבוגר קבע שעה להזכיר לכם את המטלות. אפשרו התראות כדי לקבל אותה במכשיר הזה.',
     },
   },
   coins: {

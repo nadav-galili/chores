@@ -16,6 +16,7 @@ import {
   petReacted,
   purchaseCompleted,
   pushOpened,
+  pushPromptAnswered,
   redemptionDecided,
   rewardRequested,
   type AnalyticsEvent,
@@ -136,6 +137,17 @@ describe('the events', () => {
     }
   });
 
+  it('reports a push prompt as who was asked and what they said, and nothing else', () => {
+    expect(pushPromptAnswered({ role: 'kid', granted: true })).toEqual({
+      event: 'push_prompt_answered',
+      properties: { role: 'kid', granted: true },
+    });
+    expect(pushPromptAnswered({ role: 'parent', granted: false }).properties).toEqual({
+      role: 'parent',
+      granted: false,
+    });
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -157,6 +169,8 @@ describe('what an event may carry', () => {
     purchaseCompleted({ product_id: 'mibo_yearly', purchase_kind: 'subscription' }),
     paywallShown({ gate: 'photo_proof' }),
     ...notificationKindSchema.options.map((kind) => pushOpened({ kind })),
+    pushPromptAnswered({ role: 'kid', granted: true }),
+    pushPromptAnswered({ role: 'parent', granted: false }),
   ];
 
   it('is never the child id, their first name, their pet name or a reward title (ADR-0009)', () => {

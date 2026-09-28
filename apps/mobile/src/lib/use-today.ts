@@ -7,6 +7,7 @@ import {
   kidAppOpen,
   kidDayComplete,
   petReacted,
+  pushPromptAnswered,
   tapCompletesTheDay,
   type DeviceSession,
   type IsoDate,
@@ -34,7 +35,7 @@ import {
   tapPhotoRedo,
   type ChildContext,
 } from '@/sync/local';
-import { serverHoldsToken } from '@/sync/notifications';
+import { mayAskForPush, serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { retakePhotoForInstance, uploadPendingPhotos, type PhotoTransfer } from '@/sync/photo';
 import { showGrove, type GroveView } from '@/sync/grove';
@@ -45,7 +46,7 @@ import { ApiError, createDeviceApi } from '@/lib/api';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
 import { playDoneHaptic } from '@/lib/haptics';
-import { arrangeKidReminder } from '@/lib/notifications';
+import { arrangeKidReminder, askForKidPush, canAskForKidPush } from '@/lib/notifications';
 import { putPhoto, takePhoto, type TakenPhoto } from '@/lib/photo';
 
 export type TodayState = {
@@ -73,6 +74,8 @@ export type TodayState = {
   reminderTime: string | null;
   /** The server holds this device's push token, so the reminder is a push and not a local one. */
   pushRegistered: boolean;
+  /** There is a reminder to deliver and the device has a completion: the push question may come. */
+  mayAskForPush: boolean;
 };
 
 /**
@@ -113,7 +116,18 @@ export type Today = TodayState & {
   reaction: DoneReaction | null;
   /** The animation has finished playing. */
   clearReaction: () => void;
+  /** Show the explanation screen that comes before the OS notification prompt. */
+  pushAsk: boolean;
+  /** "Allow" raises the OS prompt; "Not now" closes the explanation and asks nothing. */
+  answerPushAsk: (allow: boolean) => void;
 };
+
+/**
+ * "Not now" on the push explanation holds for the rest of this launch. It is kept in memory rather
+ * than in SQLite on purpose: the OS prompt has not been shown, so the next launch may explain once
+ * more; within a launch the child is not asked again after every tap.
+ */
+let pushAskDeclined = false;
 
 /** What the header draws before the first read lands; the name comes from the join. */
 const PET_PLACEHOLDER: Omit<PetView, 'name'> = {
@@ -182,7 +196,9 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     grove: grovePlaceholder(session.child.id),
     reminderTime: null,
     pushRegistered: false,
+    mayAskForPush: false,
   });
+  const [pushAsk, setPushAsk] = useState(false);
   const [reaction, setReaction] = useState<DoneReaction | null>(null);
   const taps = useRef(0);
   // The child's own Grove Stage as of the last read. A tap that raises it planted a tree, which
@@ -224,6 +240,8 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         ]);
       stage.current = grove.ownTree.stage;
       const streak = currentStreak(summaries, date);
+      const reminderTime = rows[0]?.reminder_time ?? null;
+      const mayAsk = await mayAskForPush(db, childId, reminderTime);
       setState({
         status: 'ready',
         firstName: rows[0]?.first_name ?? joinedName,
@@ -235,8 +253,9 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         refused: refused.length,
         pet: { ...pet, name: pet.name ?? session.child.pet_name },
         grove,
-        reminderTime: rows[0]?.reminder_time ?? null,
+        reminderTime,
         pushRegistered,
+        mayAskForPush: mayAsk,
       });
       await reportDay(db, date, {
         complete: summaries.some((s) => s.chore_date === date && s.complete),
@@ -475,5 +494,58 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     })();
   }, [tz, state.reminderTime, state.pushRegistered]);
 
-  return { ...state, toggle, redo, dismissRefused, reaction, clearReaction };
+  // The push question, once there is a reminder and a completion — and only while the OS would
+  // still show its prompt, so "Allow" never leads nowhere (docs/spec/01-product.md, notifications).
+  useEffect(() => {
+    if (!state.mayAskForPush || pushAskDeclined) return;
+    let live = true;
+    canAskForKidPush()
+      .then((askable) => {
+        if (live && askable) setPushAsk(true);
+      })
+      // Reading the permission is not something a child can act on; the screen stays as it is.
+      .catch((e: unknown) => console.error('push permission read failed', e));
+    return () => {
+      live = false;
+    };
+  }, [state.mayAskForPush]);
+
+  const answerPushAsk = useCallback(
+    (allow: boolean) => {
+      setPushAsk(false);
+      if (!allow) {
+        pushAskDeclined = true;
+        return;
+      }
+      void (async () => {
+        try {
+          const granted = await askForKidPush();
+          // Only the answer; the anonymous kid properties ride along as they do on every event.
+          capture(pushPromptAnswered({ role: 'kid', granted }));
+          if (granted) {
+            await arrangeKidReminder(await openDeviceDb(), {
+              tz,
+              reminderTime: state.reminderTime,
+            });
+          }
+        } catch (e) {
+          // The child already said yes; a reminder that fails to arm is retried by the next open's
+          // arrangement, and nothing about it is theirs to fix.
+          console.error('kid push request failed', e);
+        }
+      })();
+    },
+    [tz, state.reminderTime],
+  );
+
+  return {
+    ...state,
+    toggle,
+    redo,
+    dismissRefused,
+    reaction,
+    clearReaction,
+    pushAsk,
+    answerPushAsk,
+  };
 }

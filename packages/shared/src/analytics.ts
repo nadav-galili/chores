@@ -195,3 +195,19 @@ export function paywallShown(shown: { gate: Gate }): AnalyticsEvent {
 export function pushOpened(open: { kind: NotificationKind }): AnalyticsEvent {
   return { event: 'push_opened', properties: { kind: open.kind } };
 }
+
+/**
+ * Someone answered the OS notification prompt, which this app only ever raises from behind its own
+ * explanation screen. Whether those screens earn their place is the question, so the event is who
+ * was asked and what the OS reported, and nothing else: on a kid device the anonymous properties
+ * every kid event already carries are the whole of who the child is (ADR-0009).
+ */
+export function pushPromptAnswered(answer: {
+  role: 'parent' | 'kid';
+  granted: boolean;
+}): AnalyticsEvent {
+  return {
+    event: 'push_prompt_answered',
+    properties: { role: answer.role, granted: answer.granted },
+  };
+}
