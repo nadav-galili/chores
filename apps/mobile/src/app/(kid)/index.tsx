@@ -1,10 +1,11 @@
 import { COINS_PER_CHORE } from '@chores/shared';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { DoneMoment } from '@/components/done-moment';
 import { TreeFigure } from '@/components/grove';
 import { PetFigure } from '@/components/pet';
+import { PetHello, type HelloTarget } from '@/components/pet-hello';
 import { StreakBadge } from '@/components/streak-badge';
 import { Button, Card, ChoreRow, Coins, EmptyState, OfflineStrip } from '@/components/ui';
 import { wipeDeviceDb } from '@/db/client';
@@ -64,7 +65,20 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
   }, [router, device]);
 
   const today = useToday(session, () => void onRevoked());
-  const mode = useTheme().uiMode;
+  const theme = useTheme();
+  const mode = theme.uiMode;
+
+  // The row the greeting points at, measured in the window once it has been laid out.
+  const pointed = useRef<View>(null);
+  const [target, setTarget] = useState<HelloTarget | null>(null);
+  const pointAt = today.greeting?.pointAt ?? null;
+  const measurePointed = useCallback(
+    () => pointed.current?.measureInWindow((_x, y, _w, height) => setTarget({ y, height })),
+    [],
+  );
+  useEffect(() => {
+    if (pointAt === null) setTarget(null);
+  }, [pointAt]);
 
   return (
     <View style={styles.screen}>
@@ -82,28 +96,39 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
         data={today.items}
         keyExtractor={(i) => i.id}
         contentContainerStyle={styles.scroll}
-        extraData={today.coins}
         ListHeaderComponent={
           <>
             <Head today={today} onPet={() => router.push('/(kid)/pet')} />
             {today.status === 'ready' && <DayComplete today={today} />}
           </>
         }
-        renderItem={({ item }) => (
-          <ChoreRow
-            title={item.title}
-            icon={item.icon}
-            done={item.status === 'done'}
-            // Waiting on a grown-up is not done and pays nothing yet: no strike-through, no
-            // coins, and the camera glyph with the waiting line for the screen reader.
-            waiting={item.requires_photo && item.status === 'pending_photo'}
-            waitingLabel={t(`kid.${mode}.waitingPhoto`)}
-            coins={
-              item.requires_photo && item.status === 'pending_photo' ? undefined : COINS_PER_CHORE
-            }
-            onPress={() => today.toggle(item)}
-          />
-        )}
+        extraData={`${today.coins}:${pointAt}`}
+        // Anything above the list that grows moves the pointed row without re-laying it out.
+        onContentSizeChange={measurePointed}
+        renderItem={({ item }) => {
+          const row = (
+            <ChoreRow
+              title={item.title}
+              icon={item.icon}
+              done={item.status === 'done'}
+              // Waiting on a grown-up is not done and pays nothing yet: no strike-through, no
+              // coins, and the camera glyph with the waiting line for the screen reader.
+              waiting={item.requires_photo && item.status === 'pending_photo'}
+              waitingLabel={t(`kid.${mode}.waitingPhoto`)}
+              coins={
+                item.requires_photo && item.status === 'pending_photo' ? undefined : COINS_PER_CHORE
+              }
+              onPress={() => today.toggle(item)}
+            />
+          );
+          return item.id === pointAt ? (
+            <View ref={pointed} collapsable={false} onLayout={measurePointed}>
+              {row}
+            </View>
+          ) : (
+            row
+          );
+        }}
         ListEmptyComponent={today.status === 'ready' ? <EmptyDay today={today} /> : null}
         ListFooterComponent={
           <View style={styles.footer}>
@@ -138,6 +163,20 @@ function Home({ device, session }: { device: DeviceSessionValue; session: Device
       )}
       {/* After the done moment, never over it: the question follows the completion it waited for. */}
       <PushAsk today={today} visible={today.pushAsk && !today.reaction} />
+      {/* The pet's one-time hello on this device's first open. It is the pet's, so with the pet
+          flag off there is no one to say it. */}
+      {today.greeting && today.pet.enabled && (
+        <PetHello
+          text={t(`kid.${mode}.${pointAt === null ? 'petHelloNothingDue' : 'petHello'}`, {
+            name: today.firstName,
+            pet: today.pet.name,
+          })}
+          pet={{ name: today.pet.name, level: today.pet.progress.level, mood: 'happy' }}
+          target={pointAt === null ? null : target}
+          inset={theme.space.lg}
+          onDismiss={today.dismissGreeting}
+        />
+      )}
     </View>
   );
 }

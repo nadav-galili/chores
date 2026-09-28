@@ -281,6 +281,16 @@ export const analyticsState = sqliteTable('analytics_state', {
   activated: bool('activated').notNull().default(false),
 });
 
+/**
+ * One row, present once the pet has greeted the child on this device and the child tapped it
+ * away. Device-local and never synced: a Kid Device is bound to one child, and the greeting is
+ * about the device's first open, not the child's.
+ */
+export const greetingState = sqliteTable('greeting_state', {
+  id: integer('id').primaryKey(),
+  seen_at: text('seen_at').notNull(),
+});
+
 /** One row: how far this device has pulled the change log. */
 export const syncState = sqliteTable('sync_state', {
   id: integer('id').primaryKey(),

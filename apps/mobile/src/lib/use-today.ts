@@ -39,6 +39,7 @@ import {
 import { mayAskForPush, serverHoldsToken } from '@/sync/notifications';
 import { clearRejectedOps, rejectedOps } from '@/sync/outbox';
 import { retakePhotoForInstance, uploadPendingPhotos, type PhotoTransfer } from '@/sync/photo';
+import { greetingFor, markGreetingSeen, type Greeting } from '@/sync/greeting';
 import { showGrove, type GroveView } from '@/sync/grove';
 import { showPet, type PetView } from '@/sync/pet';
 import { syncNow } from '@/sync/sync';
@@ -77,6 +78,8 @@ export type TodayState = {
   pushRegistered: boolean;
   /** There is a reminder to deliver and the device has a completion: the push question may come. */
   mayAskForPush: boolean;
+  /** The pet's one-time hello on this device's first open; null once it has been tapped away. */
+  greeting: Greeting | null;
 };
 
 /**
@@ -121,6 +124,8 @@ export type Today = TodayState & {
   pushAsk: boolean;
   /** "Allow" raises the OS prompt; "Not now" closes the explanation and asks nothing. */
   answerPushAsk: (allow: boolean) => void;
+  /** The child tapped the greeting away; it never shows on this device again. */
+  dismissGreeting: () => void;
 };
 
 /**
@@ -198,6 +203,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     reminderTime: null,
     pushRegistered: false,
     mayAskForPush: false,
+    greeting: null,
   });
   const [pushAsk, setPushAsk] = useState(false);
   const [reaction, setReaction] = useState<DoneReaction | null>(null);
@@ -206,6 +212,9 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
   // is the only honest signal for the done moment: coins and trees are separate quantities from
   // one event (ADR-0004, ADR-0011), so a coin total cannot stand in for a Day Complete.
   const stage = useRef(0);
+  // Set on the tap that dismisses the greeting, so a read already in flight cannot bring it back
+  // before the dismissal is written.
+  const greeted = useRef(false);
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
 
@@ -240,6 +249,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
           serverHoldsToken(db),
         ]);
       stage.current = grove.ownTree.stage;
+      const greeting = greeted.current ? null : await greetingFor(db, items);
       const streak = currentStreak(summaries, date);
       const reminderTime = rows[0]?.reminder_time ?? null;
       const mayAsk = await mayAskForPush(db, childId, reminderTime);
@@ -257,6 +267,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
         reminderTime,
         pushRegistered,
         mayAskForPush: mayAsk,
+        greeting,
       });
       await reportDay(db, date, {
         complete: summaries.some((s) => s.chore_date === date && s.complete),
@@ -464,6 +475,21 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
 
   const clearReaction = useCallback(() => setReaction(null), []);
 
+  // Hidden in this tick, written after: the tap that dismisses it must not wait on SQLite. A write
+  // that fails leaves the greeting to show once more on the next open, which the child survives;
+  // the device says why.
+  const dismissGreeting = useCallback(() => {
+    greeted.current = true;
+    setState((s) => ({ ...s, greeting: null }));
+    void (async () => {
+      try {
+        await markGreetingSeen(await openDeviceDb(), new Date());
+      } catch (e) {
+        console.error('greeting seen failed to write', e);
+      }
+    })();
+  }, []);
+
   const dismissRefused = useCallback(() => {
     void (async () => {
       const db = await openDeviceDb();
@@ -555,5 +581,6 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
     clearReaction,
     pushAsk,
     answerPushAsk,
+    dismissGreeting,
   };
 }

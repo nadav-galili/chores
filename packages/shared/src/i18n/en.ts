@@ -58,6 +58,9 @@ export const en = {
       waitingPhoto: 'Waiting on a grown-up to take a look!',
       pushTitle: 'Want a reminder?',
       pushBody: 'A grown-up picked a time to remind you about your chores. Tap Allow to get it!',
+      // The pet's one-time hello on this device's first open; it points at the first due row.
+      petHello: 'Hi %{name}! I’m %{pet}. Tap it when you’ve done it!',
+      petHelloNothingDue: 'Hi %{name}! I’m %{pet}!',
     },
     big: {
       greeting: 'Hi %{name}',
@@ -74,6 +77,8 @@ export const en = {
       pushTitle: 'Your chore reminder',
       pushBody:
         'A grown-up set a time to remind you about your chores. Allow notifications to get it on this device.',
+      petHello: 'Hi %{name}. I’m %{pet}. Tap it when you’ve done it.',
+      petHelloNothingDue: 'Hi %{name}. I’m %{pet}.',
     },
   },
   // The coin display's own strings: the glyph sits where the language wants it, which is why a

@@ -45,6 +45,8 @@ export const he: Catalog = {
       waitingPhoto: 'מחכים שמבוגר יעיף מבט!',
       pushTitle: 'רוצים תזכורת?',
       pushBody: 'מבוגר בחר שעה להזכיר לכם את המטלות. הקישו על ״לאפשר״ כדי לקבל אותה!',
+      petHello: 'היי %{name}! אני %{pet}. כשתסיימו, הקישו עליה!',
+      petHelloNothingDue: 'היי %{name}! אני %{pet}!',
     },
     big: {
       greeting: 'היי %{name}',
@@ -60,6 +62,8 @@ export const he: Catalog = {
       waitingPhoto: 'מחכים שמבוגר יעיף מבט.',
       pushTitle: 'התזכורת למטלות שלכם',
       pushBody: 'מבוגר קבע שעה להזכיר לכם את המטלות. אפשרו התראות כדי לקבל אותה במכשיר הזה.',
+      petHello: 'היי %{name}. אני %{pet}. כשתסיימו, הקישו עליה.',
+      petHelloNothingDue: 'היי %{name}. אני %{pet}.',
     },
   },
   coins: {
