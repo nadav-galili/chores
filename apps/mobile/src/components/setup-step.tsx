@@ -1,17 +1,11 @@
-import { nextSetupStep, onboardingStepViewed, type OnboardingStep } from '@chores/shared';
+import { onboardingStepViewed } from '@chores/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { Body, Button } from '@/components/ui';
 import { captureParentEvent } from '@/lib/analytics';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
-import { setupStepHref, TODAY } from '@/lib/setup';
-
-/** The guided-setup steps a parent sees as a screen of their own. */
-export type SetupStepScreen = Extract<
-  OnboardingStep,
-  'household' | 'child' | 'chore' | 'pin' | 'join_code'
->;
+import { nextSetupHref, setupPurpose, TODAY_HREF, type SetupStepScreen } from '@/lib/setup';
 
 /**
  * What every guided-setup step shares, so a step screen is only its own form (spec #86, Routing).
@@ -28,13 +22,13 @@ export function useSetupStep(step: SetupStepScreen) {
     captureParentEvent(onboardingStepViewed({ step }));
   }, [step]);
 
-  const finishLater = useCallback(() => router.dismissTo(TODAY), [router]);
+  const finishLater = useCallback(() => router.dismissTo(TODAY_HREF), [router]);
 
   const advance = useCallback(async () => {
     const me = await refresh();
-    const next = me ? setupStepHref(nextSetupStep(me.setup), me.children[0]?.id) : null;
+    const next = me ? nextSetupHref(me) : null;
     if (next) router.replace(next);
-    else router.dismissTo(TODAY);
+    else router.dismissTo(TODAY_HREF);
   }, [refresh, router]);
 
   return { advance, finishLater };
@@ -42,7 +36,7 @@ export function useSetupStep(step: SetupStepScreen) {
 
 /** The step's one line on what it is for. */
 export function SetupPurpose({ step }: { step: SetupStepScreen }) {
-  return <Body>{t(`setup.purpose.${step}`)}</Body>;
+  return <Body>{setupPurpose(step)}</Body>;
 }
 
 /** "I'll finish later": off to Today, where the card names the step left. */

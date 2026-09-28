@@ -254,6 +254,8 @@ export const en = {
       rewards: 'Rewards',
       allowance: 'Allowance',
       pin: 'Parent PIN',
+      // The way back to the parent-push explanation, shown while the phone can still be asked.
+      eveningSummary: 'Evening summary',
       signOut: 'Sign out',
     },
     // A tab's label is not the screen's title: it sits under an icon in a bar five wide, so it is
@@ -320,6 +322,8 @@ export const en = {
     // The parent's push ask, after "connected": the one evening message (the Digest) it is for.
     push: {
       title: 'Get tonight’s summary of what %{name} did',
+      // The same ask from More, in a household with more than one child.
+      titleHousehold: 'Get tonight’s summary of what your children did',
       body: 'One message each evening, while there’s still time to finish what’s left.',
       allow: 'Allow',
       notNow: 'Not now',

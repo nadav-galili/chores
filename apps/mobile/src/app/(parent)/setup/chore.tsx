@@ -17,9 +17,10 @@ const SUGGESTIONS = Object.keys(CATALOGS.en.setup.firstChore.suggestions) as Sug
  * Guided setup's First chore step, above the tab bar (spec #86). A suggestion is one tap: a
  * `daily` chore with that title, no start date, the child setup is for as its only assignee and
  * no Photo Proof — so setup never touches a Gate (ADR-0005). "Write my own" swaps in the chore
- * form preset to that child, and saving it advances the same way.
+ * form preset to that child, with its Photo Proof control left out for the same reason, and saving
+ * it advances the same way.
  *
- * The child is the first one, as the Join Code step's is (`setupStepHref`): guided setup sets up
+ * The child is the first one, as the Join Code step's is (`nextSetupHref`): guided setup sets up
  * one child.
  */
 export default function SetupChore() {
@@ -47,6 +48,7 @@ export default function SetupChore() {
         children={state.me.children}
         initial={{ ...emptyChore([]), assignees: [child.id] }}
         intro={<SetupPurpose step="chore" />}
+        setup
         onSubmit={async (fields) => {
           await save(fields);
           await advance();

@@ -1,15 +1,15 @@
 import { useAuth } from '@clerk/expo';
-import { connectedOnOpen, nextSetupStep, setupStepOnSignIn } from '@chores/shared';
+import { connectedOnOpen, setupStepOnSignIn } from '@chores/shared';
 import { Redirect, Stack, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Button, ErrorText, Loading, Screen, Title } from '@/components/ui';
-import { awaitingDevice } from '@/lib/connected';
+import { readAwaitingDeviceRecord } from '@/lib/connected';
 import { t } from '@/lib/i18n';
 import { HouseholdProvider, useHousehold } from '@/lib/household-context';
 import { INSTANT_SCREENS, parentScreens } from '@/lib/navigation';
 import { HasHeaderProvider } from '@/lib/page-chrome';
 import { useNotificationTapRouting } from '@/lib/notifications';
-import { setupStepHref, TODAY } from '@/lib/setup';
+import { nextSetupHref, setupStepHref, TODAY_HREF } from '@/lib/setup';
 import { ThemeProvider, useTheme } from '@/theme';
 
 /**
@@ -49,17 +49,15 @@ function HouseholdGate() {
   }
   if (me.household !== null && onCreate) {
     // The household was just created (or already existed): straight on to the next step.
-    const next = me.setup.createdHousehold
-      ? setupStepHref(nextSetupStep(me.setup), me.children[0]?.id)
-      : null;
-    return <Redirect href={next ?? TODAY} />;
+    const next = me.setup.createdHousehold ? nextSetupHref(me) : null;
+    return <Redirect href={next ?? TODAY_HREF} />;
   }
   if (!entered && !pathname.startsWith('/setup/')) {
     const step = setupStepOnSignIn(me.setup);
-    const href = step ? setupStepHref(step, me.children[0]?.id) : null;
+    const href = step ? setupStepHref(step, me) : null;
     if (href) return <Redirect href={href} />;
     // A parent who left the Join Code step before the device joined sees "connected" once, now.
-    const connected = connectedOnOpen(awaitingDevice(), me);
+    const connected = connectedOnOpen(readAwaitingDeviceRecord(), me);
     if (connected) {
       return <Redirect href={{ pathname: '/setup/connected', params: { id: connected } }} />;
     }

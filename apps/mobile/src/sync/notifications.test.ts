@@ -1,11 +1,15 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { instanceId, uuid7 } from '@chores/shared';
-import { openTestDb } from '@/db/test-db';
+import { openTestDb, openTestDbAt } from '@/db/test-db';
 import type { DeviceDb } from '@/db/types';
 import { choreAssignees, chores, completions, notificationState, outbox } from '@/db/schema';
 import { applyPull, materializeToday } from './engine';
 import { tapContext, tapToggle, type ChildContext } from './local';
 import {
+  declinePush,
   forgetRegisteredToken,
   mayAskForPush,
   registerPushToken,
@@ -253,5 +257,37 @@ describe('mayAskForPush', () => {
     });
     expect(await db.select().from(completions)).toHaveLength(1);
     expect(await mayAskForPush(db, childId, '16:00')).toBe(true);
+  });
+
+  it('never asks again once the child said "Not now", however much they do after', async () => {
+    await tap(await seedChore(), 'due');
+    await declinePush(db, now);
+    expect(await mayAskForPush(db, childId, '16:00')).toBe(false);
+    await tap(await seedChore(), 'due');
+    expect(await mayAskForPush(db, childId, '17:30')).toBe(false);
+  });
+
+  it('remembers "Not now" across a restart, so the next launch does not explain again', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'mibo-'));
+    try {
+      const file = path.join(dir, 'mibo.db');
+      const first = await openTestDbAt(file);
+      await declinePush(first.db, now);
+      first.close();
+
+      const second = await openTestDbAt(file);
+      db = second.db;
+      await tap(await seedChore(), 'due');
+      expect(await mayAskForPush(db, childId, '16:00')).toBe(false);
+      second.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not disturb what the reminder arrangement has recorded', async () => {
+    await registerPushToken(db, { token: 'ExponentPushToken[a]', locale: 'en' }, now);
+    await declinePush(db, now);
+    expect((await state())?.push_token).toBe('ExponentPushToken[a]');
   });
 });

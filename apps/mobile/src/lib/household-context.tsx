@@ -86,3 +86,15 @@ export function useHousehold(): HouseholdContextValue {
   if (!ctx) throw new Error('useHousehold must be used inside HouseholdProvider');
   return ctx;
 }
+
+/** The household's id once `/me` has loaded with one; undefined before, and without one. */
+export function useHouseholdId(): string | undefined {
+  const state = useHousehold();
+  return state.status === 'ready' ? state.me.household?.id : undefined;
+}
+
+/** One of the household's children by id, once `/me` has loaded; undefined for any other id. */
+export function useHouseholdChild(id: string | undefined): Me['children'][number] | undefined {
+  const state = useHousehold();
+  return state.status === 'ready' ? state.me.children.find((c) => c.id === id) : undefined;
+}

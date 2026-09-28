@@ -7,7 +7,13 @@ import { eq } from 'drizzle-orm';
 import { choreAssignees, chores, outbox } from '@/db/schema';
 import { openTestDb, openTestDbAt } from '@/db/test-db';
 import type { DeviceDb } from '@/db/types';
-import { markActivated, markDayComplete, markGroveStage, markOpen } from './analytics';
+import {
+  markActivated,
+  markDayComplete,
+  markFirstCompletion,
+  markGroveStage,
+  markOpen,
+} from './analytics';
 import { materializeToday } from './engine';
 import { cacheFetchedFlags, readFlag } from './flags';
 import { tapContext, tapDone, type ChildContext } from './local';
@@ -130,9 +136,15 @@ describe('markActivated', () => {
     return { chore_id: id, id: instanceId(id, child.childId, TODAY) };
   }
 
-  /** A tap done, and whether the device would report it as Activation — what the screen does. */
-  async function complete(target: DeviceDb): Promise<boolean> {
+  /** A tap done, recorded whether or not analytics is up — what the screen does on every tap. */
+  async function tap(target: DeviceDb): Promise<void> {
     await tapDone(target, tapContext(child, new Date(T)), await dueChore(target));
+    await markFirstCompletion(target);
+  }
+
+  /** A tap done, and whether the device would report Activation now, with analytics up. */
+  async function complete(target: DeviceDb): Promise<boolean> {
+    await tap(target);
     return markActivated(target);
   }
 
@@ -173,6 +185,41 @@ describe('markActivated', () => {
     first.close();
 
     const second = await openTestDbAt(file);
+    expect(await complete(second.db)).toBe(false);
+    second.close();
+  });
+
+  it('is never news before the device has a completion', async () => {
+    expect(await markActivated(db)).toBe(false);
+    await dueChore(db);
+    expect(await markActivated(db)).toBe(false);
+  });
+
+  it('reports a first tap made before analytics was up once it is, and only once', async () => {
+    // First tap: analytics is not ready, so nothing is asked — but the tap is still recorded.
+    await tap(db);
+    // Analytics comes up on the next read: the first completion is reported now.
+    expect(await markActivated(db)).toBe(true);
+    // The next completion is not a second Activation.
+    expect(await complete(db)).toBe(false);
+    expect(await markActivated(db)).toBe(false);
+  });
+
+  it('does not wait for a later completion to report a first one analytics missed', async () => {
+    await tap(db);
+    // Every read asks, tap or no tap; the first one after analytics is up is the one that says it.
+    expect([await markActivated(db), await markActivated(db)]).toEqual([true, false]);
+  });
+
+  it('reports a first tap made before analytics was up on a later launch', async () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'mibo-'));
+    const file = path.join(dir, 'mibo.db');
+    const first = await openTestDbAt(file);
+    await tap(first.db);
+    first.close();
+
+    const second = await openTestDbAt(file);
+    expect(await markActivated(second.db)).toBe(true);
     expect(await complete(second.db)).toBe(false);
     second.close();
   });
