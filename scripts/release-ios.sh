@@ -264,6 +264,47 @@ url_serves() {
   return 1
 }
 
+# manifest_serves RUNTIME — does the updates server offer an update to a client
+# claiming to be this binary? The three ways criterion 4 fails are all server-side
+# and all invisible on the device: an update group published against the wrong
+# channel, against a runtime the binary does not have, or for Android only. Each
+# one leaves the app launching its embedded bundle forever, which looks exactly
+# like an app that is up to date. So this asks u.expo.dev the question the app asks
+# on launch, and reads the update id back out of the response headers.
+#
+# `-D -` puts the headers on stdout ahead of the multipart body so the whole reply
+# is captured in one pass and matched in bash — same reason as url_serves, and here
+# the body is a multipart blob nobody wants to parse in shell.
+manifest_serves() {
+  local runtime="$1" url="" reply="" id=""
+  url=$(jq -r '.expo.updates.url // empty' "$APP_JSON" 2>/dev/null) || url=""
+  if [[ -z "$url" ]]; then
+    printf '  %s✗%s app.json names no updates.url, so there is no endpoint to ask\n' \
+      "$RED" "$RESET"
+    return 1
+  fi
+  if ! reply=$(curl -fsS -D - --max-time 20 "$url" \
+      -H 'expo-platform: ios' \
+      -H "expo-runtime-version: $runtime" \
+      -H "expo-channel-name: $CHANNEL" \
+      -H 'expo-protocol-version: 1' \
+      -H 'expo-api-version: 1' \
+      -H 'accept: multipart/mixed' 2>/dev/null); then
+    printf '  %s✗%s the updates server served no manifest for ios on runtime %s\n' \
+      "$RED" "$RESET" "$runtime"
+    return 1
+  fi
+  id=$(printf '%s' "$reply" | tr -d '\r' | sed -n 's/^expo-update-id: *//p' | head -1)
+  if [[ -z "$id" ]]; then
+    printf '  %s✗%s a reply carrying no expo-update-id — nothing is published for runtime %s\n' \
+      "$RED" "$RESET" "$runtime"
+    return 1
+  fi
+  printf '  %s✓%s ios / runtime %s / channel %s → update %s\n' \
+    "$GREEN" "$RESET" "$runtime" "$CHANNEL" "$id"
+  return 0
+}
+
 # check "label" "what must be true" — record a step as verified, failing, or not yet
 # run. Bare Enter is the third answer: most of these need a TestFlight build on a
 # physical device, and a step nobody could attempt yet is not a step that failed.
@@ -628,7 +669,13 @@ note "this shell's environment for it: the token is an EAS secret, readable on a
 note "builder and not from here, so export it by hand for this one command."
 say ""
 warn "An update is instant and irreversible for anyone who fetches it. Publish a"
-warn "no-op or a copy fix to prove the channel, not a behaviour change."
+warn "copy fix, not a behaviour change."
+warn ""
+warn "Make it a copy fix you can SEE. Criterion 4 is that the installed app picks"
+warn "the update up, and a no-op update cannot show that on a device: the screen is"
+warn "byte-identical either way, so the OTA check in stage 9 becomes a question"
+warn "nobody can answer honestly. Change a heading, read it on the device, then"
+warn "change it back and publish once more."
 say ""
 if confirm "Publish an update to the '$CHANNEL' channel now?"; then
   update_message=""
@@ -637,6 +684,17 @@ if confirm "Publish an update to the '$CHANNEL' channel now?"; then
   [[ -z "$update_message" ]] && update_message="verify the $CHANNEL channel (#$ISSUE)"
   if eas_mobile update --channel "$CHANNEL" --environment "$ENVIRONMENT" --message "$update_message"; then
     printf '  %s✓ published%s\n' "$GREEN" "$RESET"
+    say ""
+    step "Asking the updates server what it serves an iOS client on runtime $app_version."
+    if manifest_serves "$app_version"; then
+      RESULTS+=("- [x] 4. The $CHANNEL channel serves this binary — ios, runtime $app_version")
+    else
+      warn "The update published, but the server does not offer it to this binary."
+      warn "Compare the runtime the update carries against the build's $app_version;"
+      warn "a runtime mismatch is the usual cause and no device will ever show it."
+      SKIPPED+=("investigate why $CHANNEL serves no ios manifest for runtime $app_version")
+    fi
+    say ""
     if [[ -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
       warn "SENTRY_AUTH_TOKEN is not set, so the source maps were not uploaded."
       SKIPPED+=("upload the OTA source maps: SENTRY_AUTH_TOKEN=... npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist")
@@ -669,7 +727,7 @@ check "3. Household setup" "A household can be created, a Join Code issued, and 
 check "3. Parent PIN" "On the paired device the Parent PIN reaches parent mode, and a wrong PIN does not."
 check "4. Paywall renders" "A gate shows the paywall with all three prices, and the renewal terms and both document links under them."
 check "4. Sandbox purchase" "A sandbox purchase completes and the household turns premium without a restart."
-check "5. OTA update" "The update published in stage 8 is picked up — reopen the app once, then again, and the change is there."
+check "5. OTA update" "The visible change from stage 8 reached the device — reopen once so it fetches in the background, then again so it launches the update."
 pause
 
 # ── 10 ──────────────────────────────────────────────────────────────────
