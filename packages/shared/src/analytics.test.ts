@@ -3,6 +3,9 @@ import {
   ANALYTICS_HOST,
   activation,
   ageBand,
+  buttonTapped,
+  paywallStep,
+  screenViewed,
   childCreated,
   choreCreated,
   choreCompleted,
@@ -188,6 +191,30 @@ describe('the events', () => {
     });
   });
 
+  it('reports a parent screen by its route template and a tap by its call site’s name', () => {
+    expect(screenViewed({ screen: '(parent)/(tabs)/chores/[id]' })).toEqual({
+      event: 'screen_viewed',
+      properties: { screen: '(parent)/(tabs)/chores/[id]' },
+    });
+    expect(buttonTapped({ screen: '(parent)/paywall', button: 'restore' })).toEqual({
+      event: 'button_tapped',
+      properties: { screen: '(parent)/paywall', button: 'restore' },
+    });
+  });
+
+  it('names every paywall step under the gate that opened it, and a plan only once picked', () => {
+    expect(paywallStep({ step: 'dismissed', gate: 'child_quota' })).toEqual({
+      event: 'paywall_dismissed',
+      properties: { gate: 'child_quota' },
+    });
+    expect(
+      paywallStep({ step: 'purchase_started', gate: 'photo_proof', product_id: 'mibo_yearly' }),
+    ).toEqual({
+      event: 'paywall_purchase_started',
+      properties: { gate: 'photo_proof', product_id: 'mibo_yearly' },
+    });
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -216,6 +243,9 @@ describe('what an event may carry', () => {
     ...ONBOARDING_STEPS.map((step) => onboardingStepViewed({ step })),
     pushPromptAnswered({ role: 'kid', granted: true }),
     pushPromptAnswered({ role: 'parent', granted: false }),
+    screenViewed({ screen: '(parent)/(tabs)/children/[id]' }),
+    buttonTapped({ screen: '(parent)/(tabs)/children/[id]', button: 'add_chore' }),
+    paywallStep({ step: 'plan_selected', gate: 'photo_proof', product_id: 'mibo_yearly' }),
   ];
 
   it('is never the child id, their first name, their pet name or a reward title (ADR-0009)', () => {

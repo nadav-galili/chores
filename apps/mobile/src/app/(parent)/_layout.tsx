@@ -10,6 +10,7 @@ import { INSTANT_SCREENS, parentScreens } from '@/lib/navigation';
 import { HasHeaderProvider } from '@/lib/page-chrome';
 import { useNotificationTapRouting } from '@/lib/notifications';
 import { nextSetupHref, setupStepHref, TODAY_HREF } from '@/lib/setup';
+import { useScreenViewed } from '@/lib/track';
 import { ThemeProvider, useTheme } from '@/theme';
 
 /**
@@ -38,7 +39,7 @@ function HouseholdGate() {
       <Screen>
         <Title>{t('parent.unreachable')}</Title>
         <ErrorText>{state.message}</ErrorText>
-        <Button title={t('common.tryAgain')} onPress={() => void state.refresh()} />
+        <Button name="try_again" title={t('common.tryAgain')} onPress={() => void state.refresh()} />
       </Screen>
     );
   }
@@ -74,6 +75,7 @@ function HouseholdGate() {
  * `(tabs)` draws no header of its own; each tab's stack draws its own.
  */
 function ParentStack() {
+  useScreenViewed();
   return (
     <HasHeaderProvider>
       <Stack screenOptions={parentScreens(useTheme())}>

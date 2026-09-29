@@ -130,6 +130,17 @@ export function capture(event: AnalyticsEvent): void {
   client?.capture(event.event, event.properties);
 }
 
+/**
+ * Captures a view or a tap: sent in parent and welcome mode, dropped in kid mode, where a screen
+ * or button says nothing this app may ask about a child (ADR-0009). Unlike `captureParentEvent`
+ * nothing is held for later — a tap that finds no client was made before there was one to count
+ * it, and holding it could hand a kid device's tap to the parent who signs in next.
+ */
+export function captureInteraction(event: AnalyticsEvent): void {
+  if (mode === 'kid') return;
+  capture(event);
+}
+
 /** Parent events that arrived while the parent client was not up yet, oldest first. */
 const heldParentEvents: AnalyticsEvent[] = [];
 const MAX_HELD_PARENT_EVENTS = 10;

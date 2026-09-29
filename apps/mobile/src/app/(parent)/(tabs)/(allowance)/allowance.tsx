@@ -153,7 +153,7 @@ function ChildMoney({
         onChangeText={setPayoutCoins}
         keyboardType="number-pad"
       />
-      <Button
+      <Button name="payout"
         title={busy === 'payout' ? t('allowance.saving') : t('allowance.payout')}
         onPress={() => void payout()}
         disabled={busy !== null}
@@ -166,7 +166,7 @@ function ChildMoney({
         keyboardType="numbers-and-punctuation"
       />
       <Field label={t('allowance.adjustNote')} value={adjustNote} onChangeText={setAdjustNote} />
-      <Button
+      <Button name="adjust_balance"
         title={busy === 'adjust' ? t('allowance.saving') : t('allowance.adjust')}
         onPress={() => void adjust()}
         disabled={busy !== null}
@@ -269,7 +269,7 @@ export default function Allowance() {
       <Screen>
         <Stack.Screen options={{ title: t('allowance.lockedTitle') }} />
         <Body>{t('allowance.lockedHint')}</Body>
-        <Button
+        <Button name="unlock_money_ledger"
           title={t('allowance.lockedAction')}
           onPress={() => router.push({ pathname: '/paywall', params: { gate: 'money_ledger' } })}
         />
@@ -313,7 +313,7 @@ export default function Allowance() {
             onChangeText={setRate}
             keyboardType="number-pad"
           />
-          <Button
+          <Button name="save_rate"
             title={busy ? t('allowance.saving') : t('allowance.saveRate')}
             onPress={() => void saveRate()}
             disabled={busy}

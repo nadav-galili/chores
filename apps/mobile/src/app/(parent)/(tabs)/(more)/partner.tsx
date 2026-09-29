@@ -96,7 +96,7 @@ export default function Partner() {
         placeholder="name@example.com"
       />
       <ErrorText>{error}</ErrorText>
-      <Button
+      <Button name="add_partner"
         title={quotaReached ? t('paywall.lockedPrice') : t('partner.add')}
         onPress={
           quotaReached

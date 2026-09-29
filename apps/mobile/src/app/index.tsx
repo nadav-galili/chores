@@ -64,8 +64,8 @@ function Welcome({ onChoose }: { onChoose: (role: Role) => void }) {
         </Text>
         <Text style={styles.subline}>{t('role.subline')}</Text>
       </View>
-      <Button title={t('role.parent')} onPress={() => onChoose('parent')} />
-      <Button title={t('role.kid')} onPress={() => onChoose('kid')} />
+      <Button name="choose_parent" title={t('role.parent')} onPress={() => onChoose('parent')} />
+      <Button name="choose_kid" title={t('role.kid')} onPress={() => onChoose('kid')} />
     </Screen>
   );
 }

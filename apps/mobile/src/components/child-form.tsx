@@ -90,7 +90,7 @@ export function ChildForm({
         />
       )}
       <ErrorText>{error}</ErrorText>
-      <Button title={t('common.save')} onPress={submit} disabled={busy} />
+      <Button name="save_child" title={t('common.save')} onPress={submit} disabled={busy} />
       {footer}
     </ScrollScreen>
   );

@@ -57,7 +57,7 @@ export default function ChoresList() {
           />
         )}
       />
-      <Button
+      <Button name="add_chore"
         title={t('chores.add')}
         onPress={() => router.push('/chores/new')}
         disabled={children.length === 0}

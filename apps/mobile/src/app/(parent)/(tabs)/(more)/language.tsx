@@ -58,7 +58,7 @@ export default function Language() {
         options={LOCALES.map((value) => ({ value, title: ENDONYM[value] }))}
       />
       <ErrorText>{error}</ErrorText>
-      <Button title={t('language.apply')} onPress={apply} disabled={choice === current} />
+      <Button name="apply_language" title={t('language.apply')} onPress={apply} disabled={choice === current} />
     </ScrollScreen>
   );
 }

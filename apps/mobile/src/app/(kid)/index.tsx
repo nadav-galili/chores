@@ -206,8 +206,8 @@ function PushAsk({ today, visible }: { today: Today; visible: boolean }) {
           <Text style={styles.momentText}>{t(`kid.${mode}.pushTitle`)}</Text>
           <Text style={styles.askBody}>{t(`kid.${mode}.pushBody`)}</Text>
           <View style={styles.askButtons}>
-            <Button title={t('kid.pushAllow')} onPress={() => today.answerPushAsk(true)} />
-            <Button
+            <Button name="allow_push" title={t('kid.pushAllow')} onPress={() => today.answerPushAsk(true)} />
+            <Button name="push_not_now"
               title={t('kid.pushNotNow')}
               secondary
               onPress={() => today.answerPushAsk(false)}

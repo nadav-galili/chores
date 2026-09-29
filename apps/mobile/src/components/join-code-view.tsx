@@ -128,7 +128,7 @@ export function JoinCodeView({
         </Text>
       </View>
       <ErrorText>{error}</ErrorText>
-      <Button title={t('joinCode.newCode')} onPress={() => void issue()} secondary />
+      <Button name="new_join_code" title={t('joinCode.newCode')} onPress={() => void issue()} secondary />
       {footer}
     </Screen>
   );

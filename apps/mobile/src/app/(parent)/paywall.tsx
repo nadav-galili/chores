@@ -1,4 +1,4 @@
-import { paywallShown, gateSchema, type Gate } from '@chores/shared';
+import { paywallShown, paywallStep, gateSchema, type Gate } from '@chores/shared';
 import { Redirect, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
@@ -111,36 +111,47 @@ function GatedPaywall({ gate }: { gate: Gate }) {
 
   const buy = useCallback(
     async (aPackage: PurchasesPackage) => {
+      const product_id = aPackage.product.identifier;
+      capture(paywallStep({ step: 'plan_selected', gate, product_id }));
       setStatus('purchasing');
       setError(null);
+      capture(paywallStep({ step: 'purchase_started', gate, product_id }));
       try {
         await purchase(aPackage);
       } catch (cause) {
-        if (purchaseWasCancelled(cause)) return setStatus('idle');
+        if (purchaseWasCancelled(cause)) {
+          capture(paywallStep({ step: 'purchase_cancelled', gate, product_id }));
+          return setStatus('idle');
+        }
+        capture(paywallStep({ step: 'purchase_failed', gate, product_id }));
         reportError(cause, 'paywall_purchase');
         setStatus('purchase_error');
         return setError(t('paywall.purchaseFailed'));
       }
       await confirmWithServer();
     },
-    [confirmWithServer],
+    [confirmWithServer, gate],
   );
 
   const restorePurchase = useCallback(async () => {
+    capture(paywallStep({ step: 'restore_tapped', gate }));
     setStatus('restoring');
     setError(null);
     try {
       if (!(await restore())) {
+        capture(paywallStep({ step: 'restore_failed', gate }));
         setStatus('restore_error');
         return setError(t('paywall.restoreFailed'));
       }
     } catch (cause) {
+      capture(paywallStep({ step: 'restore_failed', gate }));
       reportError(cause, 'paywall_restore');
       setStatus('restore_error');
       return setError(t('paywall.restoreFailed'));
     }
+    capture(paywallStep({ step: 'restore_completed', gate }));
     await confirmWithServer();
-  }, [confirmWithServer]);
+  }, [confirmWithServer, gate]);
 
   const busy = ['purchasing', 'restoring', 'verifying', 'ready'].includes(status);
 
@@ -189,18 +200,33 @@ function GatedPaywall({ gate }: { gate: Gate }) {
       {status === 'ready' && <Text style={styles.status}>{t('paywall.ready')}</Text>}
       <ErrorText>{error}</ErrorText>
       {status === 'load_error' && (
-        <Button title={t('paywall.retry')} onPress={() => void load()} secondary />
+        <Button title={t('paywall.retry')} name="retry_load" onPress={() => void load()} secondary />
       )}
       {status === 'verification_error' && (
-        <Button title={t('common.tryAgain')} onPress={() => void confirmWithServer()} secondary />
+        <Button
+          title={t('common.tryAgain')}
+          name="retry_verification"
+          onPress={() => void confirmWithServer()}
+          secondary
+        />
       )}
       <Button
         title={t('paywall.restore')}
+        name="restore"
         onPress={() => void restorePurchase()}
         disabled={busy || status === 'loading'}
         secondary
       />
-      <Button title={t('paywall.close')} onPress={() => router.back()} disabled={busy} secondary />
+      <Button
+        title={t('paywall.close')}
+        name="close"
+        onPress={() => {
+          capture(paywallStep({ step: 'dismissed', gate }));
+          router.back();
+        }}
+        disabled={busy}
+        secondary
+      />
     </ScrollScreen>
   );
 }

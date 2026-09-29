@@ -58,7 +58,7 @@ export default function CreateHousehold() {
       />
       <Field label={t('household.tz')} value={phoneTz} editable={false} />
       <ErrorText>{error}</ErrorText>
-      <Button title={t('household.create')} onPress={submit} disabled={busy || !name.trim()} />
+      <Button name="create_household" title={t('household.create')} onPress={submit} disabled={busy || !name.trim()} />
     </ScrollScreen>
   );
 }

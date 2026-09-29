@@ -58,7 +58,7 @@ export default function JoinCode() {
       id={id}
       pinHref="/pin"
       connected={connected}
-      footer={<Button title={t('common.done')} onPress={() => router.back()} />}
+      footer={<Button name="done" title={t('common.done')} onPress={() => router.back()} />}
     />
   );
 }

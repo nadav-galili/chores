@@ -11,7 +11,8 @@
         "buildType": "apk"
       },
       "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
       }
     },
     "preview": {

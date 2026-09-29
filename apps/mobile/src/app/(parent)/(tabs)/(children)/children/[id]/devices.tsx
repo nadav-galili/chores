@@ -162,7 +162,7 @@ export default function Devices() {
         />
       )}
       {/* The way back from a revocation, and the only way: there is no un-revoke. */}
-      <Button
+      <Button name="show_join_code"
         title={t('devices.showJoinCode')}
         secondary
         onPress={() =>

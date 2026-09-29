@@ -259,3 +259,49 @@ export function pushPromptAnswered(answer: {
     properties: { role: answer.role, granted: answer.granted },
   };
 }
+
+/**
+ * A parent screen was shown. The screen is the route's template — `(parent)/(tabs)/chores/[id]`,
+ * never the concrete path, so no id rides along — and only parent screens report: a kid screen
+ * sends outcomes, not views (ADR-0009).
+ */
+export function screenViewed(view: { screen: string }): AnalyticsEvent {
+  return { event: 'screen_viewed', properties: { screen: view.screen } };
+}
+
+/**
+ * A parent tapped a button. `button` is the call site's own catalog constant, never the label —
+ * a label can carry a child's name or a parent's words. Kid devices never send this (ADR-0009).
+ */
+export function buttonTapped(tap: { screen: string; button: string }): AnalyticsEvent {
+  return { event: 'button_tapped', properties: { screen: tap.screen, button: tap.button } };
+}
+
+/** The paywall's own buttons and outcomes, beyond `paywall_shown` and the server's `purchase_completed`. */
+export type PaywallStep =
+  | 'plan_selected'
+  | 'purchase_started'
+  | 'purchase_cancelled'
+  | 'purchase_failed'
+  | 'restore_tapped'
+  | 'restore_completed'
+  | 'restore_failed'
+  | 'dismissed';
+
+/**
+ * A step in the paywall funnel, attributable to the capability that opened it. `product_id` is the
+ * store's catalog id, present once a plan has been picked; nothing here is about a child.
+ */
+export function paywallStep(step: {
+  step: PaywallStep;
+  gate: Gate;
+  product_id?: string;
+}): AnalyticsEvent {
+  return {
+    event: `paywall_${step.step}`,
+    properties: {
+      gate: step.gate,
+      ...(step.product_id ? { product_id: step.product_id } : {}),
+    },
+  };
+}

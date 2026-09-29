@@ -62,7 +62,7 @@ export default function SetupJoinCode() {
       pinHref={PIN_BACKSTOP}
       footer={
         <>
-          <Button title={t('setup.appLink.send')} onPress={() => void sendAppLink()} />
+          <Button name="send_app_link" title={t('setup.appLink.send')} onPress={() => void sendAppLink()} />
           <FinishLater onPress={finishLater} />
         </>
       }

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CHEVRON, formatNumber, t } from '@/lib/i18n';
 import { useHasHeader } from '@/lib/page-chrome';
 import { usePop } from '@/lib/motion';
+import { useTap } from '@/lib/track';
 import { useCountUp } from '@/lib/use-count-up';
 import { providerBrand, useTheme, useThemedStyles, type Theme } from '@/theme';
 
@@ -107,20 +108,24 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
 
 export function Button({
   title,
+  name,
   onPress,
   disabled,
   secondary,
 }: {
   title: string;
+  /** What analytics calls this button: a constant, never the label (see `useTap`). */
+  name: string;
   onPress: () => void;
   disabled?: boolean;
   secondary?: boolean;
 }) {
   const styles = useThemedStyles(buttonStyles);
+  const tap = useTap();
   return (
     <Pressable
       style={[styles.button, secondary && styles.buttonSecondary, disabled && styles.disabled]}
-      onPress={onPress}
+      onPress={tap(name, onPress)}
       disabled={disabled}
       accessibilityRole="button"
     >
@@ -162,11 +167,12 @@ export function ProviderButton({
   mark?: React.ReactNode;
 }) {
   const styles = useThemedStyles(providerButtonStyles);
+  const tap = useTap();
   const apple = provider === 'apple';
   return (
     <Pressable
       style={[styles.button, apple ? styles.apple : styles.google, disabled && styles.disabled]}
-      onPress={onPress}
+      onPress={tap(`sign_in_${provider}`, onPress)}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={title}
@@ -343,7 +349,7 @@ function StateShell({
       <Text style={[styles.stateTitle, error && styles.errorTitle]}>{title}</Text>
       {body ? <Text style={styles.stateBody}>{body}</Text> : null}
       {actionTitle && onAction ? (
-        <Button title={actionTitle} secondary={!error} onPress={onAction} />
+        <Button name="empty_state_action" title={actionTitle} secondary={!error} onPress={onAction} />
       ) : null}
     </View>
   );

@@ -246,9 +246,9 @@ export function ChoreForm({
         ))}
       </ChipGroup>
       <ErrorText>{error}</ErrorText>
-      <Button title={t('common.save')} onPress={submit} disabled={busy} />
+      <Button name="save_chore" title={t('common.save')} onPress={submit} disabled={busy} />
       {onDelete && (
-        <Button title={t('choreForm.delete')} onPress={remove} disabled={busy} secondary />
+        <Button name="delete_chore" title={t('choreForm.delete')} onPress={remove} disabled={busy} secondary />
       )}
       {footer}
     </ScrollScreen>

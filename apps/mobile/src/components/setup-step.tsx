@@ -41,5 +41,5 @@ export function SetupPurpose({ step }: { step: SetupStepScreen }) {
 
 /** "I'll finish later": off to Today, where the card names the step left. */
 export function FinishLater({ onPress }: { onPress: () => void }) {
-  return <Button title={t('setup.finishLater')} onPress={onPress} secondary />;
+  return <Button name="finish_later" title={t('setup.finishLater')} onPress={onPress} secondary />;
 }

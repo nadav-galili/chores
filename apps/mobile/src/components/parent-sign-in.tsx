@@ -151,12 +151,12 @@ export function ParentSignIn({
           autoFocus
         />
         <ErrorText>{error}</ErrorText>
-        <Button
+        <Button name="verify_code"
           title={t('common.continue')}
           onPress={verifyCode}
           disabled={busy || code.length < 4}
         />
-        <Button
+        <Button name="use_different_email"
           title={t('signIn.differentEmail')}
           onPress={() => {
             setCode('');
@@ -198,7 +198,7 @@ export function ParentSignIn({
         autoComplete="email"
       />
       <ErrorText>{error}</ErrorText>
-      <Button
+      <Button name="sign_in_email"
         title={t('signIn.emailCode')}
         onPress={sendCode}
         disabled={busy || !email.includes('@')}

@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "building-a-dashboard": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/building-a-dashboard/SKILL.md",
+      "computedHash": "151cb5014089a1907131bb1949d8e37929d5ab2f6275f668bc86f261dad30942"
+    },
     "clerk": {
       "source": "clerk/skills",
       "sourceType": "github",
@@ -36,6 +42,66 @@
       "sourceType": "github",
       "skillPath": "skills/core/clerk-setup/SKILL.md",
       "computedHash": "382732a11dee7ffe3d021cdb72ac8d71e173491c6bff59b3a2903d40d4520f21"
+    },
+    "diagnosing-sdk-health": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/diagnosing-sdk-health/SKILL.md",
+      "computedHash": "929e95863650ca0e20b7810ac86e7d7ad0bb4dad4dc75982cb19e3e2f70f1f03"
+    },
+    "exploring-live-traffic": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/exploring-live-traffic/SKILL.md",
+      "computedHash": "b91aa9c2a5be9dc53b759302477bfe93f3d8a95c3fb11231930530301eb79df6"
+    },
+    "instrument-integration": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/instrument-integration/SKILL.md",
+      "computedHash": "98df556954793de11e2618d2c3781ac4f5134c1ced58de6be1c3d7eb1e97a39c"
+    },
+    "instrument-product-analytics": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/instrument-product-analytics/SKILL.md",
+      "computedHash": "cd16d176c8b7bbf6cc300086ba7ce8d0616c2fd2a2748e3a3d478bc01c449e91"
+    },
+    "investigate-metric": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/investigate-metric/SKILL.md",
+      "computedHash": "306141002fcda36f8727afc27a85090b0e04034800222ae47b0f6d3f5fc60911"
+    },
+    "modeling-activation-metrics": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/modeling-activation-metrics/SKILL.md",
+      "computedHash": "d39d0d03db8d920b0a3d8082d5ab65b9d5ff57dc14790c5b12c53b90cfb50e64"
+    },
+    "modeling-conversion-metrics": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/modeling-conversion-metrics/SKILL.md",
+      "computedHash": "c8092a63ee29d02f9c0506a9b3a31918c2f90a345673149227d48dd9868d8ab5"
+    },
+    "modeling-revenue-metrics": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/modeling-revenue-metrics/SKILL.md",
+      "computedHash": "1ba88f96c1359ac17ae13d0f187812e6024f61aa80af813b93453d862e55513d"
+    },
+    "querying-posthog-data": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/querying-posthog-data/SKILL.md",
+      "computedHash": "1760740dc91df062cb74977e5540daaf362fa6eac3da3fcfbdae979354b94be4"
+    },
+    "resolving-ingestion-warnings": {
+      "source": "PostHog/skills",
+      "sourceType": "github",
+      "skillPath": "skills/omnibus/resolving-ingestion-warnings/SKILL.md",
+      "computedHash": "826430f64ada030ec226de0d6f4905f592026f7826d1ff6543857db25c9c3494"
     },
     "show-me": {
       "source": "humanlayer/skills",

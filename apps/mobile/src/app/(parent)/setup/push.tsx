@@ -60,8 +60,19 @@ export default function SetupPush() {
           {child ? t('setup.push.title', { name: child.first_name }) : t('setup.push.titleHousehold')}
         </Title>
         <Body>{t('setup.push.body')}</Body>
-        <Button title={t('setup.push.allow')} onPress={() => void allow()} disabled={asking} />
-        <Button title={t('setup.push.notNow')} secondary disabled={asking} onPress={done} />
+        <Button
+          name="allow_push"
+          title={t('setup.push.allow')}
+          onPress={() => void allow()}
+          disabled={asking}
+        />
+        <Button
+          name="push_not_now"
+          title={t('setup.push.notNow')}
+          secondary
+          disabled={asking}
+          onPress={done}
+        />
       </Screen>
     </HasHeaderProvider>
   );

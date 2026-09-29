@@ -91,7 +91,7 @@ export default function SetupChore() {
         ))}
       </ChipGroup>
       <ErrorText>{error}</ErrorText>
-      <Button title={t('setup.firstChore.writeOwn')} onPress={() => setWriting(true)} secondary />
+      <Button name="write_own_chore" title={t('setup.firstChore.writeOwn')} onPress={() => setWriting(true)} secondary />
       <FinishLater onPress={finishLater} />
     </ScrollScreen>
   );

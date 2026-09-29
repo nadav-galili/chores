@@ -22,7 +22,7 @@ export default function EditChild() {
       <Screen>
         <Stack.Screen options={{ title: t('childForm.edit', { name: child.first_name }) }} />
         <Body>{t('paywall.childLocked')}</Body>
-        <Button
+        <Button name="unlock_child_quota"
           title={t('paywall.lockedPrice')}
           onPress={() => router.push({ pathname: '/paywall', params: { gate: 'child_quota' } })}
         />
@@ -46,14 +46,14 @@ export default function EditChild() {
       }}
       footer={
         <>
-          <Button
+          <Button name="open_week"
             title={t('parent.week.open')}
             secondary
             onPress={() =>
               router.push({ pathname: '/children/[id]/week', params: { id: child.id } })
             }
           />
-          <Button
+          <Button name="show_join_code"
             title={t('childForm.showJoinCode')}
             secondary
             onPress={() =>
@@ -63,7 +63,7 @@ export default function EditChild() {
               })
             }
           />
-          <Button
+          <Button name="open_devices"
             title={t('childForm.devices')}
             secondary
             onPress={() =>

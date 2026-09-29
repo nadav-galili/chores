@@ -71,12 +71,12 @@ export default function Join() {
         placeholderTextColor={colors.muted}
       />
       <ErrorText>{error}</ErrorText>
-      <Button
+      <Button name="join_household"
         title={t('join.action')}
         onPress={() => void join()}
         disabled={busy || !parsed.success}
       />
-      <Button
+      <Button name="im_a_parent"
         title={t('join.imAParent')}
         secondary
         onPress={() => {

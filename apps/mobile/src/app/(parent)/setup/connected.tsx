@@ -55,7 +55,7 @@ export default function SetupConnected() {
         <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
         <Title>{t('setup.connected.title', { name: child.first_name })}</Title>
         <Body>{t('setup.connected.body', { name: child.first_name })}</Body>
-        <Button title={t('common.continue')} onPress={() => void next()} />
+        <Button name="continue" title={t('common.continue')} onPress={() => void next()} />
       </Screen>
     </HasHeaderProvider>
   );

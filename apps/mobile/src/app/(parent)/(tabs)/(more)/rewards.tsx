@@ -187,7 +187,7 @@ export default function Rewards() {
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Body>{t('rewards.hint')}</Body>
-            <Button
+            <Button name="add_reward"
               title={
                 state.me.household?.entitlement === 'premium'
                   ? t('rewards.add')
@@ -218,30 +218,30 @@ export default function Rewards() {
                   onChangeText={(cost) => setDraft((value) => (value ? { ...value, cost } : value))}
                   keyboardType="number-pad"
                 />
-                <Button
+                <Button name="save_custom_reward"
                   title={busy === draft.rewardId ? t('rewards.saving') : t('rewards.saveCustom')}
                   onPress={() => void saveCustom()}
                   disabled={busy === draft.rewardId}
                 />
-                <Button title={t('rewards.cancel')} onPress={() => setDraft(null)} secondary />
+                <Button name="cancel_reward_edit" title={t('rewards.cancel')} onPress={() => setDraft(null)} secondary />
                 {rewards.rewards.some((reward) => reward.id === draft.rewardId) ? (
                   confirmDelete ? (
                     <View style={styles.confirm}>
                       <Text style={styles.deleteText}>{t('rewards.deleteConfirm')}</Text>
-                      <Button
+                      <Button name="confirm_delete_reward"
                         title={t('rewards.delete')}
                         onPress={() => void removeCustom()}
                         disabled={busy === draft.rewardId}
                         secondary
                       />
-                      <Button
+                      <Button name="keep_reward"
                         title={t('rewards.keep')}
                         onPress={() => setConfirmDelete(false)}
                         secondary
                       />
                     </View>
                   ) : (
-                    <Button
+                    <Button name="delete_reward"
                       title={t('rewards.delete')}
                       onPress={() => setConfirmDelete(true)}
                       secondary

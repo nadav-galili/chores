@@ -55,7 +55,7 @@ export default function Exit() {
       <Screen>
         <Title>{t('exit.noPinTitle')}</Title>
         <Body>{t('exit.noPin')}</Body>
-        <Button title={t('exit.stay')} secondary onPress={() => router.back()} />
+        <Button name="stay_locked" title={t('exit.stay')} secondary onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -112,12 +112,12 @@ export default function Exit() {
               ? t('exit.wrongPin')
               : null}
         </ErrorText>
-        <Button
+        <Button name="unlock_exit"
           title={t('exit.unlock')}
           onPress={submit}
           disabled={msLeft > 0 || !pinSchema.safeParse(pin).success}
         />
-        <Button title={t('exit.stay')} secondary onPress={() => router.back()} />
+        <Button name="stay_locked" title={t('exit.stay')} secondary onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -130,8 +130,8 @@ export default function Exit() {
           name: device.session?.child.first_name ?? t('exit.theChild'),
         })}
       </Body>
-      <Button title={t('exit.leave')} onPress={() => void leave()} />
-      <Button title={t('exit.stay')} secondary onPress={() => router.back()} />
+      <Button name="leave_kid_mode" title={t('exit.leave')} onPress={() => void leave()} />
+      <Button name="stay_kid_mode" title={t('exit.stay')} secondary onPress={() => router.back()} />
     </Screen>
   );
 }

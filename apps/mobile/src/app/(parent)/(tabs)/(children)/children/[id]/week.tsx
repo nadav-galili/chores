@@ -212,13 +212,13 @@ export default function ChildWeek() {
       )}
       {/* The way past the seven days, for the tier that does not have them. */}
       {!premium && (
-        <Button
+        <Button name="see_more_history"
           title={t('parent.week.seeMore')}
           onPress={() => router.push({ pathname: '/paywall', params: { gate: 'full_history' } })}
           secondary
         />
       )}
-      <Button title={t('common.done')} onPress={() => router.back()} />
+      <Button name="done" title={t('common.done')} onPress={() => router.back()} />
     </Screen>
   );
 }

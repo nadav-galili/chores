@@ -69,7 +69,7 @@ export function PinForm({
         secureTextEntry
       />
       <ErrorText>{error}</ErrorText>
-      <Button
+      <Button name="save_pin"
         title={t('pin.save')}
         onPress={submit}
         disabled={busy || !pinSchema.safeParse(pin).success || confirm.length !== pin.length}

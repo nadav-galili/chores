@@ -32,7 +32,7 @@ export default function ChildrenList() {
           />
         )}
       />
-      <Button title={t('children.add')} onPress={() => router.push('/children/new')} />
+      <Button name="add_child" title={t('children.add')} onPress={() => router.push('/children/new')} />
     </Screen>
   );
 }
