@@ -13,6 +13,7 @@ import { createApp } from './app.ts';
 import type { Db } from './db/client.ts';
 import { childDevices, households, parents } from './db/schema.ts';
 import { writeHouseholdInstances } from './materialize.ts';
+import { photoKey } from './photo-key.ts';
 
 /**
  * "The Review Family" (#100): the household App Review and TestFlight testers sign into. Built
@@ -35,9 +36,9 @@ const REVIEW_TZ = 'America/Los_Angeles';
 const HISTORY_DAYS = 6;
 
 /**
- * How premium is set, per ADR-0016: a documented manual write, not a webhook. The webhook is the
- * only writer of an entitlement *a purchase* moves; this household has no purchase behind it, and
- * forging a signed RevenueCat event would put a fake row in `revenuecat_events` that reads as a
+ * How premium is set: a manual write, the single exception ADR-0016's amendment names — this seed
+ * only, run by an operator, never reachable from a route. This household has no purchase behind
+ * it, and forging a signed RevenueCat event would put a fake row in `revenuecat_events` that reads as a
  * real one. The source names itself so the row cannot be mistaken for a purchase, and a real
  * sandbox purchase by a reviewer still flows through the webhook as usual (its later EXPIRATION
  * may return the household to free — the next rerun restores it).
@@ -48,18 +49,17 @@ export type SeedOptions = {
   clerkUserId: string;
   email: string;
   now?: Date;
-  /**
-   * Stores the photo proof at its canonical key. Left out, the waiting completion carries no
-   * photo — the approval queue still has it, with no picture to open.
-   */
-  uploadPhoto?: (key: string) => Promise<void>;
+  /** Stores the photo proof at its canonical key (ADR-0017). */
+  uploadPhoto: (key: string) => Promise<void>;
 };
 
 export type SeededHousehold = {
   householdId: string;
   children: { id: string; firstName: string }[];
-  /** The completion waiting on a parent, with its photo when `uploadPhoto` was given. */
-  pendingCompletionId: string;
+  /** Yesterday's photo chore, tapped without a photo: waiting on a parent, nothing to open. */
+  awaitingApprovalCompletionId: string;
+  /** Today's photo chore, done with its photo proof and waiting on a parent. */
+  photoProofCompletionId: string;
   pendingRedemptionId: string;
 };
 
@@ -166,7 +166,7 @@ export async function seedReviewHousehold(db: Db, options: SeedOptions): Promise
     await writeHouseholdInstances(db, household.id, d);
   }
 
-  const complete = (choreId: string, date: IsoDate, completionId = uuid7(), photoKey?: string) => ({
+  const complete = (choreId: string, date: IsoDate, completionId = uuid7(), key?: string) => ({
     op_id: uuid7(),
     type: 'complete',
     payload: {
@@ -174,7 +174,7 @@ export async function seedReviewHousehold(db: Db, options: SeedOptions): Promise
       chore_id: choreId,
       chore_date: date,
       completed_at: stamp,
-      ...(photoKey ? { photo_key: photoKey } : {}),
+      ...(key ? { photo_key: key } : {}),
     },
   });
   const sync = async (child: typeof maya, ops: unknown[]) => {
@@ -197,12 +197,13 @@ export async function seedReviewHousehold(db: Db, options: SeedOptions): Promise
   mayaOps.push(complete(maya.chores[0]!.id, today));
   await sync(maya, mayaOps);
 
-  // Leo: the last three days complete, his photo chore approved on each; today, the photo chore
-  // done with its proof and waiting on a parent.
+  // Leo: two days complete, his photo chore approved on each. Two items waiting on a parent, kept
+  // apart (#100): yesterday's photo chore tapped with no photo (awaiting approval), and today's
+  // done with its photo proof.
   const [teeth, homework, plants] = leo.chores as [Chore & { id: string }, ...typeof leo.chores];
   const leoOps = [];
   const toApprove: string[] = [];
-  for (let d = addDays(today, -3); d < today; d = addDays(d, 1)) {
+  for (let d = addDays(today, -3); d < addDays(today, -1); d = addDays(d, 1)) {
     const photoCompletion = uuid7();
     toApprove.push(photoCompletion);
     leoOps.push(
@@ -211,11 +212,17 @@ export async function seedReviewHousehold(db: Db, options: SeedOptions): Promise
       complete(plants!.id, d, photoCompletion),
     );
   }
-  const pendingCompletionId = uuid7();
-  const photoKey = `children/${leo.id}/completions/${pendingCompletionId}`;
-  if (uploadPhoto) await uploadPhoto(photoKey);
+  const awaitingApprovalCompletionId = uuid7();
+  leoOps.push(
+    complete(teeth.id, addDays(today, -1)),
+    complete(homework!.id, addDays(today, -1)),
+    complete(plants!.id, addDays(today, -1), awaitingApprovalCompletionId),
+  );
+  const photoProofCompletionId = uuid7();
+  const proofKey = photoKey(leo.id, photoProofCompletionId);
+  await uploadPhoto(proofKey);
   leoOps.push(complete(teeth.id, today));
-  leoOps.push(complete(plants!.id, today, pendingCompletionId, uploadPhoto ? photoKey : undefined));
+  leoOps.push(complete(plants!.id, today, photoProofCompletionId, proofKey));
   await sync(leo, leoOps);
   for (const completionId of toApprove) {
     await call(`${h}/completions/${completionId}/approve`, 'POST');
@@ -254,7 +261,8 @@ export async function seedReviewHousehold(db: Db, options: SeedOptions): Promise
   return {
     householdId: household.id,
     children: [maya, leo].map(({ id, firstName }) => ({ id, firstName })),
-    pendingCompletionId,
+    awaitingApprovalCompletionId,
+    photoProofCompletionId,
     pendingRedemptionId,
   };
 }

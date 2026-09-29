@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { normalizeEmail } from '@chores/shared';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { parseBody } from './parse-body.ts';
@@ -29,10 +30,9 @@ const bodySchema = z.object({ email: z.string().min(1), secret: z.string().min(1
  * refusing early on length would say how long the secret is.
  */
 const digest = (value: string) => createHash('sha256').update(value).digest();
-const sameSecret = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const constantTimeEqual = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
 
-const clerkHeaders = (secretKey: string) => ({
+export const clerkHeaders = (secretKey: string) => ({
   authorization: `Bearer ${secretKey}`,
   'content-type': 'application/json',
 });
@@ -92,8 +92,8 @@ export function reviewAccessRoutes(config: ReviewAccess | undefined, limit = DEF
     const body = await parseBody(c, bodySchema);
     if (!body.ok) return c.json({ error: 'invalid_body' }, 400);
     // Both compared every time, so a wrong email and a wrong secret take the same path.
-    const emailOk = sameSecret(normalizeEmail(body.data.email), allowed);
-    const secretOk = sameSecret(body.data.secret, config.secret);
+    const emailOk = constantTimeEqual(normalizeEmail(body.data.email), allowed);
+    const secretOk = constantTimeEqual(body.data.secret, config.secret);
     if (!emailOk || !secretOk) return c.json({ error: 'unauthorized' }, 401);
 
     let token: string | null;

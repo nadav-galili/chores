@@ -1,3 +1,4 @@
+import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { isClerkAPIResponseError, useClerk, useSignIn, useSignUp } from '@clerk/expo';
 // Core 3's SSO hook, to match the `future` sign-in and sign-up resources this screen already
 // uses. The default `useSSO` is the legacy one: it reads `createdSessionId` off a legacy resource
@@ -11,7 +12,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Button, ErrorText, Field, ProviderButton, ScrollScreen, Title } from '@/components/ui';
-import { ApiError, REVIEW_EMAIL, reviewAccess } from '@/lib/api';
+import { ApiError, reviewAccess } from '@/lib/api';
 import { isMissingBrowser } from '@/lib/browser-error';
 import { reportError } from '@/lib/error-reporting';
 import { t } from '@/lib/i18n';
@@ -59,7 +60,7 @@ export function ParentSignIn({
     setError(null);
     // The review address never gets a code: nobody outside can read its inbox. Every other
     // address goes on exactly as before.
-    if (email.trim().toLowerCase() === REVIEW_EMAIL) return setStep({ kind: 'review' });
+    if (normalizeEmail(email) === REVIEW_EMAIL) return setStep({ kind: 'review' });
     const { error: createError } = await signIn.create({ identifier: email.trim() });
     if (!createError) {
       const { error: sendError } = await signIn.emailCode.sendCode({ emailAddress: email.trim() });
@@ -180,9 +181,10 @@ export function ParentSignIn({
           value={code}
           onChangeText={setCode}
           keyboardType={review ? 'default' : 'number-pad'}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry={review}
+          // The secret only: the code step stays a bare number pad.
+          {...(review
+            ? ({ autoCapitalize: 'none', autoCorrect: false, secureTextEntry: true } as const)
+            : {})}
           autoFocus
         />
         <ErrorText>{error}</ErrorText>
@@ -190,7 +192,7 @@ export function ParentSignIn({
           name={review ? 'verify_review' : 'verify_code'}
           title={t('common.continue')}
           onPress={review ? signInForReview : verifyCode}
-          disabled={busy || reviewBusy || code.length < 4}
+          disabled={review ? busy || reviewBusy || code.length === 0 : busy || code.length < 4}
         />
         <Button name="use_different_email"
           title={t('signIn.differentEmail')}

@@ -1,3 +1,4 @@
+import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { serve } from '@hono/node-server';
 import { posthogAnalytics } from './analytics.ts';
 import { createApp } from './app.ts';
@@ -34,6 +35,11 @@ const reviewEmail = process.env.REVIEW_EMAIL;
 const reviewSecret = process.env.REVIEW_SECRET;
 if (Boolean(reviewEmail) !== Boolean(reviewSecret)) {
   throw new Error('REVIEW_EMAIL and REVIEW_SECRET must be set together');
+}
+// The app asks for the secret only when the shared address is typed; any other address here is a
+// door no app build can reach, so it fails loudly instead.
+if (reviewEmail && normalizeEmail(reviewEmail) !== REVIEW_EMAIL) {
+  throw new Error(`REVIEW_EMAIL must be ${REVIEW_EMAIL} (REVIEW_EMAIL in @chores/shared)`);
 }
 
 const db = createDb(databaseUrl);

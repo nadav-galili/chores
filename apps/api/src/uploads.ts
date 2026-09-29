@@ -7,6 +7,7 @@ import type { Db } from './db/client.ts';
 import { completions } from './db/schema.ts';
 import { requireKidDevice, type DeviceEnv } from './device-auth.ts';
 import { parseBody } from './parse-body.ts';
+import { photoKey } from './photo-key.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
 
 export type R2Config = {
@@ -45,7 +46,7 @@ export function uploadRoutes(db: Db, config?: R2Config) {
 
     // The device contributes only the completion id. Its authenticated child scope is the only
     // source of the prefix, so it cannot name another child's object even with a forged `key`.
-    const key = `children/${c.get('childId')}/completions/${parsed.data.completion_id}`;
+    const key = photoKey(c.get('childId'), parsed.data.completion_id);
     const uploadUrl = await getSignedUrl(
       client,
       new PutObjectCommand({
@@ -75,7 +76,7 @@ export function uploadRoutes(db: Db, config?: R2Config) {
 
     // `photoKey` marks that a proof was attached, but the URL still names the canonical key. A
     // future sync bug cannot turn a stored, device-provided string into access to another object.
-    const key = `children/${completion.childId}/completions/${c.req.param('completionId')}`;
+    const key = photoKey(completion.childId, c.req.param('completionId'));
 
     const readUrl = await getSignedUrl(
       client,
