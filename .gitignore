@@ -21,3 +21,6 @@ apps/mobile/ios/
 # Local EAS build artifacts (`--local` writes these next to eas.json).
 build-*.apk
 build-*.aab
+
+# Store-screenshot generator (app-store-screenshots skill); local tool, not part of the app.
+nextjs/
