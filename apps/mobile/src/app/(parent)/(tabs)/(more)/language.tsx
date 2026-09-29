@@ -1,7 +1,7 @@
 import { LOCALES, type Locale } from '@chores/shared';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Body, Button, Choice, ErrorText, ScrollScreen } from '@/components/ui';
+import { Body, Button, Choice, ErrorText, ScrollScreen, Title } from '@/components/ui';
 import { withCause } from '@/lib/errors';
 import { locale as current, t } from '@/lib/i18n';
 import { chooseLocale } from '@/lib/locale-choice';
@@ -10,29 +10,41 @@ import { chooseLocale } from '@/lib/locale-choice';
 const ENDONYM: Readonly<Record<Locale, string>> = { en: 'English', he: 'עברית' };
 
 /**
- * The language, and the warning that picking one restarts the app.
+ * The language, and the fact that a new one waits for the next open.
  *
- * The restart is said out loud rather than sprung: Hebrew mirrors the whole layout, React Native
- * can only change direction at startup, and an app that blinks out and back with no explanation
- * reads as a crash — particularly to the parent who just tapped something.
+ * Hebrew mirrors the whole layout and React Native can only change direction at startup, so the
+ * choice is stored and the parent is asked to close and reopen Mibo (`lib/locale-choice.ts` says
+ * why the app no longer reloads itself). The ask stays on screen once made: there is no way back
+ * to the picker that would make sense, since the app is still running in the old language and the
+ * choice is already kept.
  */
 export default function Language() {
   const [choice, setChoice] = useState<Locale>(current);
-  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function apply() {
+  function apply() {
     if (choice === current) return;
-    setBusy(true);
     setError(null);
     try {
-      await chooseLocale(choice);
+      chooseLocale(choice);
+      setSaved(true);
     } catch (e) {
-      // Reaching here means the restart itself failed, so the app is still in the old language
-      // and the choice is already stored — it will be in the new one whenever it next opens.
-      setError(withCause(t('language.restartFailed'), e));
-      setBusy(false);
+      // The keychain refused the write: the app is in the old language and will stay there.
+      setError(withCause(t('language.saveFailed'), e));
     }
+  }
+
+  if (saved) {
+    return (
+      <ScrollScreen>
+        <Stack.Screen
+          options={{ title: t('language.title'), headerBackVisible: false, gestureEnabled: false }}
+        />
+        <Title>{t('language.savedTitle')}</Title>
+        <Body>{t('language.savedBody')}</Body>
+      </ScrollScreen>
+    );
   }
 
   return (
@@ -46,11 +58,7 @@ export default function Language() {
         options={LOCALES.map((value) => ({ value, title: ENDONYM[value] }))}
       />
       <ErrorText>{error}</ErrorText>
-      <Button
-        title={busy ? t('language.restarting') : t('language.apply')}
-        onPress={() => void apply()}
-        disabled={busy || choice === current}
-      />
+      <Button title={t('language.apply')} onPress={apply} disabled={choice === current} />
     </ScrollScreen>
   );
 }

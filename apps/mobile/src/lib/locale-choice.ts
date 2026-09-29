@@ -1,7 +1,5 @@
 import { localeSchema, type Locale } from '@chores/shared';
 import * as SecureStore from 'expo-secure-store';
-import * as Updates from 'expo-updates';
-import { DevSettings } from 'react-native';
 
 /**
  * The language a parent picked, which outranks the phone's own.
@@ -29,20 +27,17 @@ export function storedLocale(): Locale | null {
 }
 
 /**
- * Remember the choice and restart into it.
+ * Remember the choice. It applies at the next launch, and nothing here hurries that along.
  *
- * The restart is not a shortcut. `I18nManager.forceRTL` only takes effect when the app next
- * starts — React Native lays a tree out in one direction for the life of the process — so English
- * to Hebrew cannot be a re-render, here or in any other app. Since the direction has to restart,
- * the strings ride along with it rather than being threaded through a context that every screen
- * would have to subscribe to for the one flip in the app's life a family performs.
+ * `I18nManager.forceRTL` only takes effect when the app next starts — React Native lays a tree out
+ * in one direction for the life of the process — so English to Hebrew cannot be a re-render, here
+ * or in any other app. It used to be a reload of the JavaScript bundle, and that was worse than
+ * nothing: the strings flipped at once while the native chrome kept its direction until a real
+ * relaunch, and a reload starts from the app's launch URL, so a parent who had opened Mibo from a
+ * deep link watched it open the same link again — a child's Join Code screen, minting a fresh
+ * single-use code. The language screen asks the parent to close and reopen Mibo instead, and
+ * until they do the app stays whole in the language it started in.
  */
-export async function chooseLocale(next: Locale): Promise<void> {
+export function chooseLocale(next: Locale): void {
   SecureStore.setItem(KEY, next);
-  try {
-    await Updates.reloadAsync();
-  } catch {
-    // No update runtime in a development client, where reloading is the dev server's job.
-    DevSettings.reload();
-  }
 }

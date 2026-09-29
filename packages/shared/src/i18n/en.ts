@@ -278,11 +278,15 @@ export const en = {
   },
   language: {
     title: 'Language',
-    hint: 'Mibo restarts when you change this, because Hebrew lays the whole app out right to left.',
+    hint: 'Hebrew lays the whole app out right to left, so a new language takes effect the next time Mibo opens.',
     label: 'Language',
-    apply: 'Change language and restart',
-    restarting: 'Restarting…',
-    restartFailed: 'Could not restart. The language is saved and will apply next time Mibo opens.',
+    apply: 'Change language',
+    saveFailed: 'Could not save the language.',
+    // Shown after the choice, in the language the app is still running in. The steps are the
+    // phone's, said plainly: a backgrounded app is not a reopened one.
+    savedTitle: 'Language saved',
+    savedBody:
+      'Close Mibo and open it again to see it in the new language. Open the app switcher (swipe up from the bottom and pause, or use the Recents button), swipe Mibo away, then open it from the home screen.',
   },
   household: {
     title: 'Set up your household',

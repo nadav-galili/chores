@@ -5,6 +5,7 @@ import { Body, Button, Screen, Title } from '@/components/ui';
 import { captureParentEvent } from '@/lib/analytics';
 import { useHousehold, useHouseholdChild, useHouseholdId } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
+import { HasHeaderProvider } from '@/lib/page-chrome';
 import { askForParentPush } from '@/lib/notifications';
 import { TODAY_HREF } from '@/lib/setup';
 
@@ -50,14 +51,18 @@ export default function SetupPush() {
   if (!householdId || (id && !child)) return null;
 
   return (
-    <Screen>
-      <Stack.Screen options={{ title: '', headerBackVisible: false, gestureEnabled: false }} />
-      <Title>
-        {child ? t('setup.push.title', { name: child.first_name }) : t('setup.push.titleHousehold')}
-      </Title>
-      <Body>{t('setup.push.body')}</Body>
-      <Button title={t('setup.push.allow')} onPress={() => void allow()} disabled={asking} />
-      <Button title={t('setup.push.notNow')} secondary disabled={asking} onPress={done} />
-    </Screen>
+    // No header: there is nowhere back to go from here, and an empty bar was a bar with nothing to
+    // say — a blank strip the screen reader announced by its native class name.
+    <HasHeaderProvider hasHeader={false}>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <Title>
+          {child ? t('setup.push.title', { name: child.first_name }) : t('setup.push.titleHousehold')}
+        </Title>
+        <Body>{t('setup.push.body')}</Body>
+        <Button title={t('setup.push.allow')} onPress={() => void allow()} disabled={asking} />
+        <Button title={t('setup.push.notNow')} secondary disabled={asking} onPress={done} />
+      </Screen>
+    </HasHeaderProvider>
   );
 }

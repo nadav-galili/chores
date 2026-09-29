@@ -1,5 +1,5 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { t } from '@/lib/i18n';
+import { NativeTabs, type SFSymbolIcon } from 'expo-router/unstable-native-tabs';
+import { isRTL, nativeIsRTL, t, type TranslationKey } from '@/lib/i18n';
 
 /**
  * The parent's five destinations.
@@ -20,30 +20,35 @@ import { t } from '@/lib/i18n';
  * expects, it picks up the system's own blur and iOS 26's minimise behaviour, and the icons are
  * SF Symbols the OS already has — no icon package and no bundled asset. Android draws its own
  * bar from the same triggers and shows the labels; the symbols are iOS's and it ignores them.
+ *
+ * The bar is the OS's, so it is laid out the OS's way, not React Native's: in Hebrew on an iPhone
+ * the app reads right to left while UIKit still places the first trigger on the left, and Today
+ * ends up at the far end of the bar from where a Hebrew reader starts. Where the two directions
+ * disagree the triggers are handed over in reverse, so the bar reads in the app's direction
+ * whichever way the OS fills it. (`nativeIsRTL` in `lib/i18n` says when they disagree.)
  */
+// Today is the first tab whichever end of the bar it sits at: with the triggers reversed the
+// router would otherwise take More for the group's first route, and Android's back button with it.
+export const unstable_settings = { initialRouteName: '(today)' };
+
+const TABS: readonly { name: string; sf: SFSymbolIcon['sf']; label: TranslationKey }[] = [
+  { name: '(today)', sf: 'checklist', label: 'parent.tabs.today' },
+  { name: '(children)', sf: 'person.2', label: 'parent.tabs.children' },
+  { name: '(chores)', sf: 'list.bullet.rectangle', label: 'parent.tabs.chores' },
+  { name: '(allowance)', sf: 'banknote', label: 'parent.tabs.allowance' },
+  { name: '(more)', sf: 'ellipsis', label: 'parent.tabs.more' },
+];
+
 export default function ParentTabs() {
+  const tabs = isRTL === nativeIsRTL ? TABS : [...TABS].reverse();
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="(today)">
-        <NativeTabs.Trigger.Icon sf="checklist" />
-        <NativeTabs.Trigger.Label>{t('parent.tabs.today')}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(children)">
-        <NativeTabs.Trigger.Icon sf="person.2" />
-        <NativeTabs.Trigger.Label>{t('parent.tabs.children')}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(chores)">
-        <NativeTabs.Trigger.Icon sf="list.bullet.rectangle" />
-        <NativeTabs.Trigger.Label>{t('parent.tabs.chores')}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(allowance)">
-        <NativeTabs.Trigger.Icon sf="banknote" />
-        <NativeTabs.Trigger.Label>{t('parent.tabs.allowance')}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(more)">
-        <NativeTabs.Trigger.Icon sf="ellipsis" />
-        <NativeTabs.Trigger.Label>{t('parent.tabs.more')}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
+      {tabs.map(({ name, sf, label }) => (
+        <NativeTabs.Trigger key={name} name={name}>
+          <NativeTabs.Trigger.Icon sf={sf} />
+          <NativeTabs.Trigger.Label>{t(label)}</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
+      ))}
     </NativeTabs>
   );
 }

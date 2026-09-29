@@ -9,7 +9,7 @@ import {
 import * as format from '@chores/shared';
 import { getLocales } from 'expo-localization';
 import { I18n, type TranslateOptions } from 'i18n-js';
-import { I18nManager } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 import { storedLocale } from '@/lib/locale-choice';
 
 /**
@@ -18,9 +18,10 @@ import { storedLocale } from '@/lib/locale-choice';
  * shared; this file is the device half — the phone's locale, and the layout direction.
  *
  * The locale is read once at launch, and still is: picking a language in the app writes the
- * choice and restarts (`lib/locale-choice.ts`), because React Native lays a tree out in one
- * direction for the life of the process and `I18nManager.forceRTL` only takes effect on the next
- * start. So there is still nothing to re-render when it changes, and no screen subscribes to it.
+ * choice and asks for a relaunch (`lib/locale-choice.ts`), because React Native lays a tree out in
+ * one direction for the life of the process and `I18nManager.forceRTL` only takes effect on the
+ * next start. So there is still nothing to re-render when it changes, and no screen subscribes to
+ * it.
  *
  * A stored choice outranks the phone: a household that reads Hebrew on an English phone should
  * not have to change the phone. With no choice stored it is the phone's own list, most-preferred
@@ -29,13 +30,27 @@ import { storedLocale } from '@/lib/locale-choice';
  * in another RTL language we do not speak, which falls back to English.
  */
 
-export const locale: Locale = storedLocale() ?? pickLocale(getLocales().map((l) => l.languageTag));
+const phone = getLocales();
+export const locale: Locale = storedLocale() ?? pickLocale(phone.map((l) => l.languageTag));
 export const isRTL = isRtl(locale);
 
 if (I18nManager.isRTL !== isRTL) {
   I18nManager.allowRTL(isRTL);
   I18nManager.forceRTL(isRTL);
 }
+
+/**
+ * Which way the OS lays out the chrome it draws itself — the native tab bar, the header — as
+ * opposed to the direction React Native lays out ours. The two agree on a Hebrew Android phone
+ * and disagree everywhere else Hebrew is read: `forceRTL` above turns our tree around but says
+ * nothing to UIKit or to the Activity, which follow the phone and the app's own localizations.
+ *
+ * iOS: this bundle declares no localizations, so UIKit runs the app in its development language,
+ * English, and lays its bars out left to right whatever the phone speaks. (Declaring Hebrew via
+ * `expo-localization`'s `supportedLocales` would change this, and this line with it.)
+ * Android: the manifest's `supportsRtl` lets the Activity follow the phone's own language.
+ */
+export const nativeIsRTL = Platform.OS === 'android' && phone[0]?.textDirection === 'rtl';
 
 const i18n = new I18n(CATALOGS, {
   locale,

@@ -13,8 +13,18 @@ import { createContext, use } from 'react';
  */
 const HasHeaderContext = createContext(false);
 
-export function HasHeaderProvider({ children }: { children: React.ReactNode }) {
-  return <HasHeaderContext value={true}>{children}</HasHeaderContext>;
+/**
+ * `hasHeader={false}` is for the one screen in a stack of headers that hides its own: the stack's
+ * provider still says "header", and `Screen` would leave the first line under the status bar.
+ */
+export function HasHeaderProvider({
+  children,
+  hasHeader = true,
+}: {
+  children: React.ReactNode;
+  hasHeader?: boolean;
+}) {
+  return <HasHeaderContext value={hasHeader}>{children}</HasHeaderContext>;
 }
 
 export function useHasHeader(): boolean {

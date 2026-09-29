@@ -6,6 +6,7 @@ import { captureParentEvent } from '@/lib/analytics';
 import { clearAwaitingDeviceRecord } from '@/lib/connected';
 import { useHousehold, useHouseholdChild } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
+import { HasHeaderProvider } from '@/lib/page-chrome';
 import { canAskForPush } from '@/lib/notifications';
 import { TODAY_HREF } from '@/lib/setup';
 
@@ -47,11 +48,15 @@ export default function SetupConnected() {
   if (!child) return null;
 
   return (
-    <Screen>
-      <Stack.Screen options={{ title: '', headerBackVisible: false, gestureEnabled: false }} />
-      <Title>{t('setup.connected.title', { name: child.first_name })}</Title>
-      <Body>{t('setup.connected.body', { name: child.first_name })}</Body>
-      <Button title={t('common.continue')} onPress={() => void next()} />
-    </Screen>
+    // No header: there is nowhere back to go from here, and an empty bar was a bar with nothing to
+    // say — a blank strip the screen reader announced by its native class name.
+    <HasHeaderProvider hasHeader={false}>
+      <Screen>
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <Title>{t('setup.connected.title', { name: child.first_name })}</Title>
+        <Body>{t('setup.connected.body', { name: child.first_name })}</Body>
+        <Button title={t('common.continue')} onPress={() => void next()} />
+      </Screen>
+    </HasHeaderProvider>
   );
 }
