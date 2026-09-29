@@ -20,6 +20,7 @@ import {
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db/client.ts';
 import { ledgerRow } from './ledger-row.ts';
+import { photoKey as canonicalKey } from './photo-key.ts';
 import {
   appliedOps,
   childDevices,
@@ -192,7 +193,7 @@ async function applyOne(tx: Tx, ctx: OpContext, raw: SyncOp): Promise<StoredResu
     // the child's tap — so a key on a chore that does not ask for one keeps the accepted path.
     // A key on a photo chore must be the server-named presign answer echoed back
     // (`children/{childId}/completions/{completionId}`); anything else is a forged key.
-    const canonicalPhotoKey = `children/${ctx.childId}/completions/${completion_id}`;
+    const canonicalPhotoKey = canonicalKey(ctx.childId, completion_id);
     if (chore.requiresPhoto && typeof photoKey === 'string' && photoKey !== canonicalPhotoKey) {
       return reject('invalid_payload');
     }

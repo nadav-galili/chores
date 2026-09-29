@@ -19,6 +19,7 @@ import {
   seedReviewHousehold,
   type SeededHousehold,
 } from './review-household.ts';
+import { photoKey } from './photo-key.ts';
 import { asParent } from './test/auth.ts';
 import { freshDb } from './test/db.ts';
 
@@ -64,19 +65,26 @@ describe('the review household seed', () => {
     expect(row!.entitlementSource).toBe(REVIEW_ENTITLEMENT_SOURCE);
   });
 
-  it('holds a week of work: approved photo chores, one with proof awaiting approval', async () => {
-    const photos = await db
-      .select({ status: completions.status, photoKey: completions.photoKey, id: completions.id })
+  it('holds a week of work: approved photo chores, and two waiting on a parent', async () => {
+    const waiting = await db
+      .select({ photoKey: completions.photoKey, id: completions.id })
       .from(completions)
       .where(
         and(
           eq(completions.householdId, second.householdId),
-          sql`${completions.status} in ('pending_photo')`,
+          eq(completions.status, 'pending_photo'),
         ),
       );
-    expect(photos).toHaveLength(1);
-    expect(photos[0]!.id).toBe(second.pendingCompletionId);
-    expect(photos[0]!.photoKey).toBe(uploaded.at(-1));
+    expect(waiting.map((c) => c.id).sort()).toEqual(
+      [second.awaitingApprovalCompletionId, second.photoProofCompletionId].sort(),
+    );
+    const byId = new Map(waiting.map((c) => [c.id, c.photoKey]));
+    // Two separate items (#100): one awaiting approval with no photo, one with its photo proof.
+    expect(byId.get(second.awaitingApprovalCompletionId)).toBeNull();
+    const leo = second.children.find((c) => c.firstName === 'Leo')!;
+    const proof = photoKey(leo.id, second.photoProofCompletionId);
+    expect(byId.get(second.photoProofCompletionId)).toBe(proof);
+    expect(uploaded.at(-1)).toBe(proof);
     const [accepted] = await db
       .select({ n: count() })
       .from(completions)

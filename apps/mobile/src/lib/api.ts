@@ -244,12 +244,6 @@ const noToken: GetToken = () => Promise.resolve(null);
 export const redeemJoinCode = (input: RedeemJoinCodeInput) =>
   call<DeviceSession>(noToken, '/join-codes/redeem', json('POST', input));
 
-/**
- * The App Review account (#100). Typed on the sign-in screen, it asks for the review secret in
- * place of an emailed code; the address is not a secret, the secret lives only on the server.
- */
-export const REVIEW_EMAIL = 'review@mibokids.app';
-
 /** Public: trades the review email and secret for a Clerk sign-in token (a `ticket`). */
 export const reviewAccess = (email: string, secret: string) =>
   call<{ token: string }>(noToken, '/review-access', json('POST', { email, secret }));

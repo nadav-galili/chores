@@ -35,3 +35,13 @@ The signing secret is server-only configuration. Missing, malformed, stale or mi
 requests are refused and logged before JSON parsing and before any database write. The five-minute
 signature timestamp tolerance is for delivery latency and clock skew; replay safety after that is
 the event id's job.
+
+## Amendment: the review-household seed (#100)
+
+One exception, and only this one: the App Review seed (`apps/api/src/review-household.ts`, run
+as `pnpm --filter api seed:review`) writes `households.entitlement = 'premium'` directly, with
+`entitlement_source = 'manual:review-household'`. The household has no purchase behind it, and a
+forged signed event would put a row in `revenuecat_events` that reads as a real purchase. The
+exception holds because the seed is operator-run with production credentials and is never
+reachable from a route: nothing a phone can send reaches that write. Any other direct write to
+`households.entitlement` is still a violation of this ADR.

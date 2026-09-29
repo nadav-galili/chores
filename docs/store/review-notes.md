@@ -14,14 +14,21 @@ Before every submission, rebuild the household the reviewer lands in, so they ne
 last reviewer's state:
 
 ```
-DATABASE_URL=… CLERK_SECRET_KEY=… REVIEW_EMAIL=review@mibokids.app \
+DATABASE_URL=… CLERK_SECRET_KEY=… \
 R2_ACCOUNT_ID=… R2_BUCKET=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… \
 pnpm --filter api seed:review
 ```
 
+Every `R2_*` variable is required: the photo proof is stored in R2, and the seed stops before
+writing anything when one is missing. The review address is not an input; it is `REVIEW_EMAIL`
+in `packages/shared/src/review.ts`, which the app matches on the sign-in screen. The API's own
+`REVIEW_EMAIL` on Railway must be that same address, or the API refuses to start.
+
 It builds "The Review Family" (two children — Maya on the little layout, Leo on the big one — a
-week of chores, approved and waiting photo proof, a reward catalogue with one request waiting,
-coins, a grove, Parent PIN `1234`) and sets premium by a documented manual write, not a webhook
+week of chores with some done and some approved, one photo chore awaiting approval with no photo
+and a second waiting with its photo proof, a reward catalogue with one request waiting, coins, a
+grove, Parent PIN `1234`) and sets premium by a manual write, not a webhook — the one exception
+the amendment to `docs/adr/0016-revenuecat-webhook-is-the-only-entitlement-writer.md` names
 (`REVIEW_ENTITLEMENT_SOURCE` in `apps/api/src/review-household.ts` says why).
 
 ---
@@ -58,7 +65,7 @@ SUBSCRIPTION
 The demo household is already premium. Premium unlocks: more than one child, more than two parents, custom rewards, full history, the money ledger and payouts, and photo proof (a chore can ask the child for a photo, which a parent approves). The child's side is never gated. Purchases use the sandbox environment and are fine to make: to see the paywall, sign in with your own Apple ID instead (Continue with Apple), create a household, and add a second child.
 
 WHAT IS WAITING FOR YOU
-In the demo household: Leo's "Water the plants" is done with a photo and waiting for approval on the parent's Today, and Maya has asked for a reward that is waiting too.
+In the demo household, on the parent's Today: Leo's "Water the plants" from today is done with a photo and waiting for approval, yesterday's is waiting for approval without a photo, and Maya has asked for a reward that is waiting too.
 
 Privacy policy: https://mibokids.app/privacy · Terms: https://mibokids.app/terms
 ```
@@ -115,5 +122,5 @@ unlisted video or a shared file link that needs no sign-in):
 3. Simulator B: Kid → the Join Code. Show Today, mark a chore done (coins and the pet react), the
    Shop and a reward request, the grove. (A simulator has no camera; the photo proof already
    waiting on A's Today stands in for that step.)
-4. Back on A: the new request and the waiting photo are on Today; approve both.
+4. Back on A: the new request and the two waiting photo chores are on Today; approve them.
 5. On B: long-press the top-right corner for two seconds, enter `1234`, and leave kid mode.
