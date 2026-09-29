@@ -20,6 +20,8 @@ import { isRTL, nativeIsRTL, t, type TranslationKey } from '@/lib/i18n';
  * expects, it picks up the system's own blur and iOS 26's minimise behaviour, and the icons are
  * SF Symbols the OS already has — no icon package and no bundled asset. Android draws its own
  * bar from the same triggers and shows the labels; the symbols are iOS's and it ignores them.
+ * With no icon, Material's default for five items — a label on the selected tab only — leaves the
+ * other four as blank, tappable space, so Android is told to label every tab.
  *
  * The bar is the OS's, so it is laid out the OS's way, not React Native's: in Hebrew on an iPhone
  * the app reads right to left while UIKit still places the first trigger on the left, and Today
@@ -42,7 +44,7 @@ const TABS: readonly { name: string; sf: SFSymbolIcon['sf']; label: TranslationK
 export default function ParentTabs() {
   const tabs = isRTL === nativeIsRTL ? TABS : [...TABS].reverse();
   return (
-    <NativeTabs>
+    <NativeTabs labelVisibilityMode="labeled">
       {tabs.map(({ name, sf, label }) => (
         <NativeTabs.Trigger key={name} name={name}>
           <NativeTabs.Trigger.Icon sf={sf} />

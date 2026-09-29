@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   Animated,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -349,7 +350,12 @@ function StateShell({
       <Text style={[styles.stateTitle, error && styles.errorTitle]}>{title}</Text>
       {body ? <Text style={styles.stateBody}>{body}</Text> : null}
       {actionTitle && onAction ? (
-        <Button name="empty_state_action" title={actionTitle} secondary={!error} onPress={onAction} />
+        <Button
+          name="empty_state_action"
+          title={actionTitle}
+          secondary={!error}
+          onPress={onAction}
+        />
       ) : null}
     </View>
   );
@@ -387,6 +393,7 @@ export function ScrollScreen({
   const styles = useThemedStyles(screenStyles);
   const { colors, space } = useTheme();
   const insets = useSafeAreaInsets();
+  const hasHeader = useHasHeader();
   return (
     <ScrollView
       style={styles.scroll}
@@ -394,8 +401,13 @@ export function ScrollScreen({
         styles.page,
         styles.scrollContent,
         // `contentInsetAdjustmentBehavior` handles the top under a native header and does nothing
-        // without one, so the bottom inset is still ours to pay either way.
-        { paddingBottom: insets.bottom + space.xl },
+        // without one, so the bottom inset is still ours to pay either way. It is iOS-only: on
+        // Android, edge-to-edge draws a headerless page under the status bar unless the top is
+        // paid here too — which is what put sign-in's first line under the clock.
+        {
+          paddingTop: Platform.OS === 'android' && !hasHeader ? insets.top : 0,
+          paddingBottom: insets.bottom + space.xl,
+        },
       ]}
       contentInsetAdjustmentBehavior="automatic"
       // A field low on the form scrolls up above the keyboard instead of sitting under it.
