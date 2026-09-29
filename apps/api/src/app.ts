@@ -16,6 +16,7 @@ import type { RateLimit } from './rate-limit.ts';
 import { redemptionRoutes } from './redemptions.ts';
 import { revenuecatRoutes } from './revenuecat.ts';
 import { rejectionRoutes } from './rejection.ts';
+import { reviewAccessRoutes, type ReviewAccess } from './review-access.ts';
 import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
 import { termsRoutes } from './terms.ts';
@@ -35,6 +36,8 @@ export type AppOptions = {
   r2?: R2Config;
   /** HMAC secret RevenueCat uses to sign the exact webhook request body (ADR-0016). */
   revenuecatWebhookSigningSecret?: string;
+  /** The App Review sign-in (#100); left out, `POST /review-access` does not exist. */
+  reviewAccess?: ReviewAccess;
 };
 
 const DEFAULT_SYNC_PAGE_SIZE = 500;
@@ -49,6 +52,7 @@ export function createApp(
     analytics = noAnalytics,
     r2,
     revenuecatWebhookSigningSecret,
+    reviewAccess,
   }: AppOptions,
 ) {
   const app = new Hono();
@@ -68,6 +72,8 @@ export function createApp(
   app.route('/', privacyRoutes());
   app.route('/', termsRoutes());
   app.route('/', landingRoutes());
+  // Before any account too: it is how the review account gets its session in the first place.
+  app.route('/', reviewAccessRoutes(reviewAccess));
 
   app.use('/me', requireClerkUser(verifyToken));
   app.use('/households/*', requireClerkUser(verifyToken));

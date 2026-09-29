@@ -157,6 +157,8 @@ export const en = {
     title: 'Sign in as a parent',
     codeTitle: 'Enter the code we emailed you',
     differentEmail: 'Use a different email',
+    reviewTitle: 'Enter the review password',
+    reviewWrong: 'That password is not right',
     apple: 'Continue with Apple',
     appleUnfinished: 'Apple sign-in did not finish',
     appleFailed: 'Apple sign-in failed',

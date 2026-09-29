@@ -4,6 +4,7 @@ import {
   childInputSchema,
   createHouseholdInputSchema,
   householdCreated,
+  normalizeEmail,
   parentInviteInputSchema,
   uuid7,
   type MeSetup,
@@ -42,7 +43,7 @@ export function householdRoutes(db: Db, analytics: Analytics) {
    */
   const claimInvite = async (clerkUserId: string, email: string | null) => {
     if (!email) return undefined;
-    const normalized = email.trim().toLowerCase();
+    const normalized = normalizeEmail(email);
     return db.transaction(async (tx) => {
       const invite = await tx.query.parentInvites.findFirst({
         where: and(eq(parentInvites.email, normalized), isNull(parentInvites.acceptedAt)),
@@ -146,7 +147,8 @@ export function householdRoutes(db: Db, analytics: Analytics) {
     if (!body.ok) return body.response;
     const clerkUserId = c.get('clerkUserId');
     if (await parentOf(clerkUserId)) return c.json({ error: 'already_in_household' }, 409);
-    const email = c.get('email')?.trim().toLowerCase() ?? null;
+    const rawEmail = c.get('email');
+    const email = rawEmail == null ? null : normalizeEmail(rawEmail);
 
     const result = await db.transaction(async (tx) => {
       const [household] = await tx

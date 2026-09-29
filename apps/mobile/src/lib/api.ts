@@ -244,6 +244,10 @@ const noToken: GetToken = () => Promise.resolve(null);
 export const redeemJoinCode = (input: RedeemJoinCodeInput) =>
   call<DeviceSession>(noToken, '/join-codes/redeem', json('POST', input));
 
+/** Public: trades the review email and secret for a Clerk sign-in token (a `ticket`). */
+export const reviewAccess = (email: string, secret: string) =>
+  call<{ token: string }>(noToken, '/review-access', json('POST', { email, secret }));
+
 export type DeviceMe = { child: ChildSummary; household: HouseholdSummary };
 
 /** What the parent photo route answers: a presigned GET and the five minutes it lasts. */

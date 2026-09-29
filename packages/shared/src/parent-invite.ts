@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
 /** An email as it is stored and matched: trimmed and lower-cased, so `A@b.com` finds `a@b.com`. */
+export const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+/** The same normalisation as `normalizeEmail`, then checked as an address. */
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.string().email().max(320));
 
 /** What a parent submits to add their partner. */
