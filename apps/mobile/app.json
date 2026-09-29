@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.mibokids.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#F2F6F1",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
