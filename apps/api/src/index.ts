@@ -6,6 +6,7 @@ import { startCron } from './cron.ts';
 import { createDb } from './db/client.ts';
 import { runMigrations } from './db/migrate.ts';
 import { expoPush } from './push.ts';
+import { clerkSignInTokens } from './review-access.ts';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
@@ -26,6 +27,13 @@ if (r2Values.some(Boolean) && !r2Values.every(Boolean)) {
   throw new Error(
     'R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set together',
   );
+}
+
+// Both or neither: one without the other is a door with no lock or a lock with no door (#100).
+const reviewEmail = process.env.REVIEW_EMAIL;
+const reviewSecret = process.env.REVIEW_SECRET;
+if (Boolean(reviewEmail) !== Boolean(reviewSecret)) {
+  throw new Error('REVIEW_EMAIL and REVIEW_SECRET must be set together');
 }
 
 const db = createDb(databaseUrl);
@@ -50,6 +58,15 @@ const app = createApp(db, {
       }
     : {}),
   revenuecatWebhookSigningSecret,
+  ...(reviewEmail && reviewSecret
+    ? {
+        reviewAccess: {
+          email: reviewEmail,
+          secret: reviewSecret,
+          mintSignInToken: clerkSignInTokens(clerkSecretKey),
+        },
+      }
+    : {}),
 });
 serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
   console.log(`api listening on :${info.port}`);

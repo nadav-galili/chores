@@ -11,13 +11,15 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Button, ErrorText, Field, ProviderButton, ScrollScreen, Title } from '@/components/ui';
+import { ApiError, REVIEW_EMAIL, reviewAccess } from '@/lib/api';
 import { isMissingBrowser } from '@/lib/browser-error';
 import { reportError } from '@/lib/error-reporting';
 import { t } from '@/lib/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type Step = { kind: 'email' } | { kind: 'code'; flow: 'sign-in' | 'sign-up' };
+/** `review` is the App Review account only (#100): a secret in place of the emailed code. */
+type Step = { kind: 'email' } | { kind: 'code'; flow: 'sign-in' | 'sign-up' } | { kind: 'review' };
 
 export function ParentSignIn({
   title = t('signIn.title'),
@@ -55,6 +57,9 @@ export function ParentSignIn({
 
   const sendCode = async () => {
     setError(null);
+    // The review address never gets a code: nobody outside can read its inbox. Every other
+    // address goes on exactly as before.
+    if (email.trim().toLowerCase() === REVIEW_EMAIL) return setStep({ kind: 'review' });
     const { error: createError } = await signIn.create({ identifier: email.trim() });
     if (!createError) {
       const { error: sendError } = await signIn.emailCode.sendCode({ emailAddress: email.trim() });
@@ -92,6 +97,32 @@ export function ParentSignIn({
       return setError(t('signIn.unfinished', { status: signUp.status }));
     const { error: finalizeError } = await signUp.finalize();
     if (finalizeError) setError(finalizeError.message);
+  };
+
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const signInForReview = async () => {
+    setError(null);
+    setReviewBusy(true);
+    try {
+      let ticket: string;
+      try {
+        ({ token: ticket } = await reviewAccess(email.trim(), code));
+      } catch (e) {
+        // A wrong password is the reviewer's to fix; anything else reads as itself. The secret
+        // is never in what is reported — only the status the API answered.
+        if (e instanceof ApiError && e.status === 401) return setError(t('signIn.reviewWrong'));
+        reportError(e, 'parent-sign-in.review');
+        return setError(e instanceof Error ? e.message : String(e));
+      }
+      const { error: createError } = await signIn.create({ strategy: 'ticket', ticket });
+      if (createError) return setError(createError.message);
+      if (signIn.status !== 'complete')
+        return setError(t('signIn.unfinished', { status: signIn.status }));
+      const { error: finalizeError } = await signIn.finalize();
+      if (finalizeError) setError(finalizeError.message);
+    } finally {
+      setReviewBusy(false);
+    }
   };
 
   const sso = async (provider: 'google' | 'apple') => {
@@ -139,22 +170,27 @@ export function ParentSignIn({
   const google = () => sso('google');
   const apple = () => sso('apple');
 
-  if (step.kind === 'code') {
+  if (step.kind === 'code' || step.kind === 'review') {
+    const review = step.kind === 'review';
     return (
       <ScrollScreen>
-        <Title>{t('signIn.codeTitle')}</Title>
+        <Title>{review ? t('signIn.reviewTitle') : t('signIn.codeTitle')}</Title>
         <Field
           label={email}
           value={code}
           onChangeText={setCode}
-          keyboardType="number-pad"
+          keyboardType={review ? 'default' : 'number-pad'}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry={review}
           autoFocus
         />
         <ErrorText>{error}</ErrorText>
-        <Button name="verify_code"
+        <Button
+          name={review ? 'verify_review' : 'verify_code'}
           title={t('common.continue')}
-          onPress={verifyCode}
-          disabled={busy || code.length < 4}
+          onPress={review ? signInForReview : verifyCode}
+          disabled={busy || reviewBusy || code.length < 4}
         />
         <Button name="use_different_email"
           title={t('signIn.differentEmail')}

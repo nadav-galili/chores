@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "seed:review": "tsx src/seed-review-household.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",

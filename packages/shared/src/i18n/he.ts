@@ -148,6 +148,8 @@ export const he: Catalog = {
     title: 'כניסה כהורה',
     codeTitle: 'הזינו את הקוד ששלחנו לאימייל',
     differentEmail: 'להשתמש באימייל אחר',
+    reviewTitle: 'הזינו את סיסמת הבדיקה',
+    reviewWrong: 'הסיסמה שגויה',
     apple: 'המשך עם Apple',
     appleUnfinished: 'הכניסה עם Apple לא הושלמה',
     appleFailed: 'הכניסה עם Apple נכשלה',
