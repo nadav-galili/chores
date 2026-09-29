@@ -29,6 +29,14 @@ Apple forms phrases across title, subtitle and keyword field, so nothing already
 
 Play indexes the long description separately, so the title is the only short high-weight field and carries `for Kids` that iOS puts in the subtitle.
 
+Short and full descriptions, English and Hebrew (`iw-IL`), live in `docs/store/listing.md`.
+
+- **Target audience:** 18+ only, answered as an app for parents (ADR-0018). The listing copy and the first screenshots lead with the Parent side.
+- **Products:** one subscription `premium` with base plans `monthly` ($6.99) and `annual` ($39.99), no offers; one one-time product `premium_lifetime` ($79.99). RevenueCat offering `default` packages them as MONTHLY, ANNUAL and LIFETIME onto entitlement `premium`. Real-time developer notifications feed RevenueCat, which stays the only entitlement writer (ADR-0016).
+- **Screenshots:** English only, phone and 7" and 10" tablet, captured on Android emulators and captioned in the iOS style; the Hebrew listing falls back to them. Plus a 1024×500 feature graphic.
+- **Account deletion:** in the app, from the Parent's own signed-in settings; on the web, a request form at `https://mibokids.app/delete-account` handled by hand (ADR-0019).
+- **Release:** the account is personal, so Production is unlocked only after a closed test with at least 12 testers opted in for 14 continuous days. The closed test runs the `production` build that is later promoted unchanged.
+
 ## Target keywords
 
 AppTweak volume, US iPhone: `chores tracker` 47, `chores` 43, `chore chart` 41, `kids chore app` 34, `chores and allowance` 34, `chore app` 33, `behavior tracker` 31, `chores app` 30, `chores for kids` 27, `kids chores` 25.
