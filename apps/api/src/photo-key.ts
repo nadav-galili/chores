@@ -3,4 +3,7 @@
  * `complete` op's check and the review seed all agree on it because they all call this.
  */
 export const photoKey = (childId: string, completionId: string) =>
-  `children/${childId}/completions/${completionId}`;
+  `${childPhotoPrefix(childId)}${completionId}`;
+
+/** Every photo proof of one child is under this prefix, which is how a Household Deletion finds them. */
+export const childPhotoPrefix = (childId: string) => `children/${childId}/completions/`;

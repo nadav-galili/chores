@@ -103,7 +103,13 @@ export function revenuecatRoutes(db: Db, analytics: Analytics, signingSecret: st
       ? await db.select().from(parents).where(inArray(parents.clerkUserId, candidates))
       : [];
     const householdIds = [...new Set(matches.map((parent) => parent.householdId))];
-    if (householdIds.length === 0) return c.json({ error: 'parent_not_found' }, 422);
+    // No parent is the expected state after an Account Deletion (ADR-0019): the store
+    // subscription outlives the household, and its renewals and expiry keep arriving. Acknowledged
+    // so RevenueCat stops retrying, and dropped: there is no household left to write to.
+    if (householdIds.length === 0) {
+      console.warn('RevenueCat webhook for no known parent dropped', { type: event.type });
+      return c.json({ ok: true, dropped: 'parent_not_found' });
+    }
     if (householdIds.length > 1) return c.json({ error: 'ambiguous_parent' }, 409);
     const householdId = householdIds[0]!;
     const purchasingParent =

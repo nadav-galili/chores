@@ -16,7 +16,7 @@ import { Hono } from 'hono';
 const PRIVACY_CONTACT_EMAIL = 'nadavg1000@gmail.com';
 
 /** The date the text below last changed. A policy without one cannot be reviewed. */
-const PRIVACY_LAST_UPDATED = '26 September 2026';
+const PRIVACY_LAST_UPDATED = '1 October 2026';
 
 const PRIVACY_HTML = `<!doctype html>
 <html lang="en">
@@ -60,8 +60,9 @@ account, gives us no contact details, and is anonymous in everything we measure.
   deleted after 30 days.</li>
   <li>Crash reports are built from a fixed list of allowed technical fields and carry no child
   identifier.</li>
-  <li>A parent can revoke a child’s device at any time, and can have the household and everything
-  in it deleted by asking us.</li>
+  <li>A parent can revoke a child’s device at any time, and can delete their account — and with
+  it, as the household’s last parent, the household and everything in it — from the app or from
+  <a href="/delete-account">mibokids.app/delete-account</a>.</li>
   <li>We do not sell personal information, we show no ads, and we do not track anyone across other
   apps or websites.</li>
 </ul>
@@ -89,7 +90,7 @@ anything else that would identify a child outside their own family’s household
 Join Code that a signed-in parent created. Parent mode is protected by a PIN so a child’s device
 cannot reach it. A parent can, at any time, revoke a child’s device — which immediately and permanently ends
 that device’s access, and the anonymous analytics identifier it was using is never used again — delete chores and
-rewards, or ask us to delete the household outright.</p>
+rewards, or delete the household outright.</p>
 
 <h2>Analytics</h2>
 <p>We use PostHog, hosted in the European Union, to count how the app is used. In parent mode the
@@ -157,13 +158,23 @@ the law requires it.</p>
 <h2>How long we keep things</h2>
 <p>Photo proof is deleted after 30 days. Chores, completions, coins and the grove are kept while
 the household exists, because they are the child’s history in the app and the app would be wrong
-without them. Account and subscription records are kept while the account exists. Everything is
-deleted when a parent asks us to delete the household.</p>
+without them. Account and subscription records are kept while the account exists.</p>
+
+<h2>Deleting an account</h2>
+<p>A parent can delete their account at any time, in the app under <strong>More</strong> →
+<strong>Delete my account</strong>, or, without the app, by the request described at
+<a href="/delete-account">mibokids.app/delete-account</a>. Deletion is immediate and permanent. If
+another parent remains in the household, only the deleting parent’s account, sign-in and phone
+registration go. If they are the household’s last parent, we delete the household and everything
+in it: every child’s profile and history, every child device’s access and every photo proof.
+Nothing is retained. Deleting an account does not cancel a subscription, which is cancelled in
+Google Play or the App Store.</p>
 
 <h2>A parent’s rights</h2>
 <p>A parent may ask to see what we hold about their household or their child, ask us to correct it,
 ask us to delete it, or refuse any further collection about their child by deleting the household —
-in which case the child’s data goes with it. Write to
+in which case the child’s data goes with it. Deleting is self-serve in the app; for anything else,
+write to
 <a href="mailto:${PRIVACY_CONTACT_EMAIL}">${PRIVACY_CONTACT_EMAIL}</a> from the address the parent
 account uses and we will act within 30 days.</p>
 

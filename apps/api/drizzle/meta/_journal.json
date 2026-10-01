@@ -92,6 +92,13 @@
       "when": 1789232313389,
       "tag": "0012_yellow_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790833811640,
+      "tag": "0013_account_deletion",
+      "breakpoints": true
     }
   ]
 }

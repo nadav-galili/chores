@@ -42,6 +42,7 @@ describe('GET /privacy', () => {
     ['crash reports carry no child identifier', /sets no user identity in Sentry/i],
     ['parents can revoke a kid device', /revoke/i],
     ['parents can have everything deleted', /delete the household/i],
+    ['account deletion, in the app and on the web (ADR-0019)', /href="\/delete-account"/],
     ['COPPA is named so a parent can search for it', /COPPA/],
     // Spelled out rather than read from `PRIVACY_CONTACT_EMAIL`: a test that imports the constant
     // passes whatever the constant says, including a typo or a placeholder nobody reads.

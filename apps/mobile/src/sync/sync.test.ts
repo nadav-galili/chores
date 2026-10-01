@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,6 +18,7 @@ import {
   type SyncResponse,
 } from '@chores/shared';
 import { openTestDb, openTestDbAt } from '@/db/test-db';
+import { createDeviceApi, isDeviceRevoked } from '@/lib/api';
 import type { DeviceDb } from '@/db/types';
 import {
   choreAssignees,
@@ -30,7 +31,7 @@ import {
   rewards,
   syncState,
 } from '@/db/schema';
-import { materializeToday, todayList } from './engine';
+import { materializeToday, readCursor, todayList } from './engine';
 import { balanceOf, tapContext, tapDone, type ChildContext } from './local';
 import { xpTotalOf } from './pet';
 import { backoffMs, pendingOps } from './outbox';
@@ -304,6 +305,34 @@ describe('syncNow', () => {
     const [item] = await todayList(db, childId, TODAY);
     expect(item!.status).toBe('redo');
     expect(await xpTotalOf(db, childId)).toBe(0);
+  });
+
+  it('surfaces a Household Deletion as a revoke: the token the server no longer has is device_revoked', async () => {
+    // What `/sync` answers once the household behind this device's token is gone (ADR-0019):
+    // the same 401 a parent's revoke gets, so the device takes the revoked path and nothing new.
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ error: 'device_revoked' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    try {
+      const instance = await seedChore(db);
+      await tapDone(db, tapContext(child, new Date(T)), instance);
+
+      const failure = await syncNow(db, child, createDeviceApi('deleted-household').sync).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isDeviceRevoked(failure)).toBe(true);
+      // Nothing is applied from a refused pull; the outbox is the revoked path's to drop with
+      // the rest of the local copy.
+      expect(await readCursor(db)).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('leaves ops queued and backs off when the request never lands', async () => {

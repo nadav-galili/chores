@@ -50,7 +50,7 @@ import {
   markGroveStage,
   markOpen,
 } from '@/sync/analytics';
-import { ApiError, createDeviceApi } from '@/lib/api';
+import { createDeviceApi, isDeviceRevoked } from '@/lib/api';
 import { POLL_MS } from '@/lib/use-parent-today';
 import { analyticsReady, capture, startKidAnalytics } from '@/lib/analytics';
 import { setKidErrorContext } from '@/lib/error-reporting';
@@ -302,7 +302,7 @@ export function useToday(session: DeviceSession, onRevoked: () => void): Today {
       await syncNow(db, child, createDeviceApi(session.device_token).sync);
       await readLocal(db, false);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'device_revoked') return revoked.current();
+      if (isDeviceRevoked(e)) return revoked.current();
       // Everything that is not a revoke is shown to the child as the offline mark, which is the
       // truth for the common case and calm for the rest. A sync that fails for a reason other
       // than the network looks the same on screen, so the device says which it was.

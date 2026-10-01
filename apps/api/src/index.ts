@@ -1,6 +1,7 @@
 import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { serve } from '@hono/node-server';
 import { posthogAnalytics } from './analytics.ts';
+import { clerkUserDeleter } from './account-deletion.ts';
 import { createApp } from './app.ts';
 import { clerkVerifyToken } from './auth.ts';
 import { startCron } from './cron.ts';
@@ -8,6 +9,7 @@ import { createDb } from './db/client.ts';
 import { runMigrations } from './db/migrate.ts';
 import { expoPush } from './push.ts';
 import { clerkSignInTokens } from './review-access.ts';
+import { r2PhotoPurge, type R2Config } from './uploads.ts';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
@@ -50,19 +52,21 @@ startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
 
 const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY);
 
+const r2: R2Config | undefined =
+  r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
+    ? {
+        endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+        bucket: r2Bucket,
+        accessKeyId: r2AccessKeyId,
+        secretAccessKey: r2SecretAccessKey,
+      }
+    : undefined;
+
 const app = createApp(db, {
   verifyToken: clerkVerifyToken(clerkSecretKey),
   analytics,
-  ...(r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
-    ? {
-        r2: {
-          endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
-          bucket: r2Bucket,
-          accessKeyId: r2AccessKeyId,
-          secretAccessKey: r2SecretAccessKey,
-        },
-      }
-    : {}),
+  ...(r2 ? { r2, purgePhotos: r2PhotoPurge(r2) } : {}),
+  deleteClerkUser: clerkUserDeleter(clerkSecretKey),
   revenuecatWebhookSigningSecret,
   ...(reviewEmail && reviewSecret
     ? {

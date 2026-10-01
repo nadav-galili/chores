@@ -237,10 +237,14 @@ describe('kid device token', () => {
   });
 
   it('refuses missing or unknown tokens', async () => {
-    expect((await app.request('/device/me')).status).toBe(401);
+    const missing = await app.request('/device/me');
+    expect(missing.status).toBe(401);
+    expect(await missing.json()).toEqual({ error: 'unauthenticated' });
+    // An unknown token is what a Household Deletion leaves a device holding, so it is answered
+    // as a revoke (ADR-0019).
     const res = await app.request('/device/me', asKid('not-a-token'));
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'unauthenticated' });
+    expect(await res.json()).toEqual({ error: 'device_revoked' });
   });
 
   it('refuses a revoked device with 401 device_revoked', async () => {

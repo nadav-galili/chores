@@ -1,9 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { accountDeletionRoutes, type DeleteClerkUser } from './account-deletion.ts';
 import { noAnalytics, type Analytics } from './analytics.ts';
 import { requireClerkUser, type VerifyToken } from './auth.ts';
 import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
+import { deleteAccountRoutes } from './delete-account.ts';
 import { householdRoutes } from './households.ts';
 import { joinRoutes } from './join.ts';
 import { landingRoutes } from './landing.ts';
@@ -21,7 +23,7 @@ import { rewardRoutes } from './rewards.ts';
 import { syncRoutes } from './sync.ts';
 import { termsRoutes } from './terms.ts';
 import { todayRoutes } from './today.ts';
-import { uploadRoutes, type R2Config } from './uploads.ts';
+import { uploadRoutes, type PurgePhotos, type R2Config } from './uploads.ts';
 import { weekRoutes } from './week.ts';
 
 export type AppOptions = {
@@ -38,6 +40,10 @@ export type AppOptions = {
   revenuecatWebhookSigningSecret?: string;
   /** The App Review sign-in (#100); left out, `POST /review-access` does not exist. */
   reviewAccess?: ReviewAccess;
+  /** Account Deletion's last step (ADR-0019); left out, `DELETE /me` answers 503. */
+  deleteClerkUser?: DeleteClerkUser;
+  /** Household Deletion's R2 step; left out, there is no bucket to purge. */
+  purgePhotos?: PurgePhotos;
 };
 
 const DEFAULT_SYNC_PAGE_SIZE = 500;
@@ -53,6 +59,8 @@ export function createApp(
     r2,
     revenuecatWebhookSigningSecret,
     reviewAccess,
+    deleteClerkUser,
+    purgePhotos,
   }: AppOptions,
 ) {
   const app = new Hono();
@@ -72,6 +80,8 @@ export function createApp(
   app.route('/', privacyRoutes());
   app.route('/', termsRoutes());
   app.route('/', landingRoutes());
+  // Google Play's account-deletion URL (ADR-0019): read by someone who may no longer have the app.
+  app.route('/', deleteAccountRoutes());
   // Before any account too: it is how the review account gets its session in the first place.
   app.route('/', reviewAccessRoutes(reviewAccess));
 
@@ -79,6 +89,7 @@ export function createApp(
   app.use('/households/*', requireClerkUser(verifyToken));
   app.use('/households', requireClerkUser(verifyToken));
   app.route('/', householdRoutes(db, analytics));
+  app.route('/', accountDeletionRoutes(db, deleteClerkUser, purgePhotos));
   app.route('/', choreRoutes(db, analytics));
   app.route('/', parentDeviceRoutes(db));
   app.route('/', pinRoutes(db, analytics));

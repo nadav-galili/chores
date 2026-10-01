@@ -8,7 +8,7 @@ import { askForReward, cancelRedemption } from '@/sync/redeem';
 import { showShop, type ShopRequest, type ShopReward, type ShopView } from '@/sync/shop';
 import { syncNow } from '@/sync/sync';
 import { capture } from '@/lib/analytics';
-import { ApiError, createDeviceApi } from '@/lib/api';
+import { createDeviceApi, isDeviceRevoked } from '@/lib/api';
 
 /**
  * The reward shop: read from SQLite, written to SQLite, and synced afterwards.
@@ -64,7 +64,7 @@ export function useShop(session: DeviceSession, onRevoked: () => void): Shop {
       await syncNow(db, child, createDeviceApi(session.device_token).sync);
       await read(db);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'device_revoked') return onRevoked();
+      if (isDeviceRevoked(e)) return onRevoked();
       // The shop is drawn from local rows, so a failed sync changes nothing the child can see.
       // It is said out loud rather than swallowed: a request that never leaves the outbox is a
       // parent who is never asked.

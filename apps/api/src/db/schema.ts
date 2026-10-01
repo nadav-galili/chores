@@ -102,12 +102,11 @@ export const parentInvites = pgTable('parent_invites', {
   householdId: uuid('household_id')
     .notNull()
     .references(() => households.id),
-  invitedBy: uuid('invited_by')
-    .notNull()
-    .references(() => parents.id),
+  /** Who invited; a parent who has since deleted their account leaves the id behind (ADR-0019). */
+  invitedBy: uuid('invited_by').notNull(),
   createdAt: timestamptz('created_at').notNull().defaultNow(),
   acceptedAt: timestamptz('accepted_at'),
-  acceptedParentId: uuid('accepted_parent_id').references(() => parents.id),
+  acceptedParentId: uuid('accepted_parent_id'),
 });
 
 export const parentDevices = pgTable('parent_devices', {
@@ -163,9 +162,8 @@ export const joinCodes = pgTable('join_codes', {
   childId: uuid('child_id')
     .notNull()
     .references(() => children.id),
-  createdBy: uuid('created_by')
-    .notNull()
-    .references(() => parents.id),
+  /** Not a foreign key: a parent's Account Deletion leaves the household's history as it was (ADR-0019). */
+  createdBy: uuid('created_by').notNull(),
   expiresAt: timestamptz('expires_at').notNull(),
   redeemedAt: timestamptz('redeemed_at'),
   redeemedDeviceId: uuid('redeemed_device_id').references(() => childDevices.id),
@@ -190,9 +188,8 @@ export const chores = pgTable('chores', {
   version: integer('version').notNull().default(1),
   /** The latest writer clock that landed on any field. */
   updatedAt: timestamptz('updated_at').notNull(),
-  updatedBy: uuid('updated_by')
-    .notNull()
-    .references(() => parents.id),
+  /** Not a foreign key: a parent's Account Deletion leaves the household's history as it was (ADR-0019). */
+  updatedBy: uuid('updated_by').notNull(),
   deletedAt: timestamptz('deleted_at'),
   /** Writer clock per field, for last-writer-wins merges (docs/spec/03-sync.md). */
   fieldClocks: jsonb('field_clocks').$type<ChoreClocks>().notNull().default({}),
@@ -291,7 +288,8 @@ export const completions = pgTable(
     deviceId: uuid('device_id'),
     photoKey: text('photo_key'),
     status: completionStatusEnum('status').notNull(),
-    rejectedBy: uuid('rejected_by').references(() => parents.id),
+    /** Not a foreign key: completions are append-only, and outlive the parent who rejected one (ADR-0019). */
+    rejectedBy: uuid('rejected_by'),
     rejectedAt: timestamptz('rejected_at'),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
   },
@@ -426,7 +424,8 @@ export const redemptions = pgTable(
     status: redemptionStatusEnum('status').notNull(),
     requestedAt: timestamptz('requested_at').notNull(),
     decidedAt: timestamptz('decided_at'),
-    decidedBy: uuid('decided_by').references(() => parents.id),
+    /** Not a foreign key: the decision outlives the parent who made it (ADR-0019). */
+    decidedBy: uuid('decided_by'),
   },
   (t) => [index('redemptions_child').on(t.childId)],
 );
