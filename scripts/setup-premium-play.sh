@@ -626,14 +626,26 @@ elif ! command -v railway >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; 
   warn "railway or psql missing — cannot read the household."
   RESULTS+=("- [ ] Webhook flips household — not yet run: railway or psql missing")
 else
+  db_error=""
   for _ in 1 2 3 4 5 6; do
-    webhook_event=$(_psql_at "$WEBHOOK_SQL" 2>/dev/null | tail -n1 || true)
+    # A query that cannot connect must not read as "no event yet": capture it whole,
+    # and only a successful query's empty answer means the webhook has not landed.
+    if ! db_out=$(_psql_at "$WEBHOOK_SQL" 2>&1); then
+      db_error=$(printf '%s' "$db_out" | tail -n1)
+      break
+    fi
+    webhook_event=$(printf '%s' "$db_out" | tail -n1)
     [[ -n "$webhook_event" ]] && break
     note "  not yet — waiting 5s for the webhook"
     sleep 5
   done
   # The email stays out of the outcome: it is posted to a public issue.
-  if [[ -n "$webhook_event" ]]; then
+  if [[ -n "$db_error" ]]; then
+    warn "Could not read the database: $db_error"
+    note "  'postgres.railway.internal' means the Postgres service has no public proxy:"
+    note "  Railway → Postgres → Settings → Networking → TCP Proxy, then re-run."
+    RESULTS+=("- [ ] Webhook flips household — not yet run: the database is unreachable from here")
+  elif [[ -n "$webhook_event" ]]; then
     record "Webhook flips household" "A Play test purchase reached the webhook ($webhook_event) and the buyer's household is premium." pass
   else
     record "Webhook flips household" "No Play event since $PURCHASE_STARTED left the buyer's household premium." fail
