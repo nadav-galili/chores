@@ -1,7 +1,7 @@
 # Review notes
 
-Two boxes in App Store Connect are filled from this file, so they are pasted, not retyped. Update
-it when the app changes what a reviewer sees (#100).
+Two boxes in App Store Connect and Play Console's App access are filled from this file, so they
+are pasted, not retyped. Update it when the app changes what a reviewer sees (#100, #112).
 
 Before pasting, fill the two marked placeholders:
 
@@ -108,6 +108,30 @@ Please check:
 
 Feedback and screenshots: use TestFlight's "Send Beta Feedback", or write to support@mibokids.app.
 ```
+
+---
+
+## 3. Play Console App access
+
+Play Console → Policy and programs → App content → App access → "All or some functionality is
+restricted" → Add instructions. `scripts/setup-play-listing.sh` puts each value on the clipboard.
+
+**Instruction name:** `Demo parent account`
+
+**Username:** `review@mibokids.app`
+
+**Password:** `<<REVIEW_SECRET>>`
+
+**Any other information** (Android: no Apple sign-in, and Play documents no limit for this box, so
+it is kept under 500 characters, which the wizard checks):
+
+<!-- play-access -->
+```text
+Choose Parent on the first screen. Type review@mibokids.app in the email field and tap "Email me a code". No code is sent: the app asks for the password instead. Type it and tap Continue. You land in a demo household with two children, chores, rewards and a paid subscription. Kid mode needs a second device: Children → a child → Show join code, then choose Kid on the other device and type the code. To leave kid mode, long-press the top-right corner for 2 seconds and enter the Parent PIN 1234.
+```
+
+Play requires credentials that are reusable and skip any one-time code; this account is exactly
+that, which is why the password goes where the code would.
 
 ---
 

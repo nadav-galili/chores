@@ -180,14 +180,25 @@ finish() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────
-# STAGES — M6.5 Play Console listing and internal testing (GitHub issue #103).
+# STAGES — M6.5 Play Console listing and internal testing (GitHub issue #103), and
+# M7.5 App content: access, ads, rating, audience, Data safety (GitHub issue #112).
 #
-#   scripts/setup-play-listing.sh           the wizard
-#   scripts/setup-play-listing.sh --check   only count docs/store/listing.md against
-#                                           the store limits; exits 1 on any failure
+#   scripts/setup-play-listing.sh                the whole wizard
+#   scripts/setup-play-listing.sh --app-content  only the App content stages; reports
+#                                                to #112 instead of #103
+#   scripts/setup-play-listing.sh --check        only count docs/store/listing.md against
+#                                                the store limits; exits 1 on any failure
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=11
+APP_CONTENT_ONLY=0
+case "${1:-}" in
+  "" | --check) ;;
+  --app-content) APP_CONTENT_ONLY=1 ;;
+  *) printf 'usage: %s [--app-content | --check]\n' "$0" >&2; exit 2 ;;
+esac
+# Preflight, contact and policy, six App content stages, verify, report — plus the
+# listing's seven when the whole wizard runs.
+if (( APP_CONTENT_ONLY )); then TOTAL_STAGES=10; else TOTAL_STAGES=17; fi
 
 # Play Console is worked in Chrome, not the default browser — same wrapper as
 # scripts/setup-store-listing.sh.
@@ -212,7 +223,9 @@ TERMS_URL="$API_BASE/terms"
 WEBSITE_URL="$API_BASE"
 PACKAGE="com.mibokids.app"
 PLAY_CONSOLE="https://play.google.com/console"
-ISSUE=103
+DELETE_ACCOUNT_URL="$API_BASE/delete-account"
+REVIEW_NOTES="$REPO_ROOT/docs/store/review-notes.md"
+if (( APP_CONTENT_ONLY )); then ISSUE=112; else ISSUE=103; fi
 
 # The Play title, docs/spec/05-store-listing.md. Play indexes the long description
 # separately, so the title carries the "for Kids" iOS keeps in its subtitle — and
@@ -385,6 +398,31 @@ copy_field() { copy_quiet "$1" "$(listing_field "$2")"; }
 # next_paste "what" — hold the clipboard until the human has pasted the last value.
 next_paste() { pause "Pasted? Enter puts $1 on the clipboard."; }
 
+# play_access_notes — the "Any other information" box for App access: the ```text
+# block after <!-- play-access --> in docs/store/review-notes.md.
+play_access_notes() {
+  awk '
+    index($0, "<!-- play-access -->") == 1 { f = 1; next }
+    f == 1 && /^```/ { f = 2; next }
+    f == 2 && /^```/ { exit }
+    f == 2 { print }
+  ' "$REVIEW_NOTES"
+}
+
+# ds_decl "Category → Type" "required|optional" "purposes" — one Data safety data
+# type, in the order Play asks. Collected, never shared: every recipient is a service
+# provider acting on our instructions (Clerk, Railway, R2, PostHog, Sentry, RevenueCat,
+# Expo), which Play's definition of "shared" exempts. Never ephemeral: all of it is
+# stored. Saying both once keeps the declarations from drifting apart.
+ds_decl() {
+  local type="$1" required="$2" purposes="$3"
+  step "$type"
+  printf '      %s%-22s%s %s\n' "$DIM" "Collected / shared:" "$RESET" "Collected (not shared)"
+  printf '      %s%-22s%s %s\n' "$DIM" "Processed ephemerally:" "$RESET" "No"
+  printf '      %s%-22s%s %s\n' "$DIM" "Required or optional:" "$RESET" "$required"
+  printf '      %s%-22s%s %s\n' "$DIM" "Purposes:" "$RESET" "$purposes"
+}
+
 # check "section" "what must be true" — as scripts/setup-store-listing.sh.
 check() {
   local label="$1" expectation="$2" reply=""
@@ -416,7 +454,11 @@ if [[ "${1:-}" == "--check" ]]; then
   exit $?
 fi
 
-banner "Mibo — Play Console listing and internal testing"
+if (( APP_CONTENT_ONLY )); then
+  banner "Mibo — Play Console App content"
+else
+  banner "Mibo — Play Console listing, App content and internal testing"
+fi
 
 # ── 1 ───────────────────────────────────────────────────────────────────
 stage "Preflight — tools, the copy, and its lengths"
@@ -446,7 +488,7 @@ fi
 say ""
 say "3. The URLs the listing points at:"
 urls_live=1
-for url in "$PRIVACY_URL" "$TERMS_URL" "$WEBSITE_URL"; do
+for url in "$PRIVACY_URL" "$TERMS_URL" "$WEBSITE_URL" "$DELETE_ACCOUNT_URL"; do
   if curl -fsS --max-time 15 -o /dev/null "$url" 2>/dev/null; then
     ok "$url"
   else
@@ -456,10 +498,26 @@ for url in "$PRIVACY_URL" "$TERMS_URL" "$WEBSITE_URL"; do
 done
 if (( ! urls_live )); then
   warn "Deploy before the listing goes live: scripts/deploy-api.sh"
+  warn "Data safety's Delete account URL must load without errors, or Play rejects it."
   SKIPPED+=("deploy the API so the listing's URLs resolve")
 fi
 say ""
-say "4. The build and the contact address:"
+say "4. The App access notes, docs/store/review-notes.md:"
+access_notes=""
+[[ -f "$REVIEW_NOTES" ]] && access_notes=$(play_access_notes)
+if [[ -z "$access_notes" ]]; then
+  printf '  %s✗%s no <!-- play-access --> block\n' "$RED" "$RESET"
+  warn "Restore the Play Console App access section of docs/store/review-notes.md."
+  exit 1
+elif (( $(chars "$access_notes") > 500 )); then
+  printf '  %s✗%s %s/500 — Play documents no limit, so keep it under the old one\n' \
+    "$RED" "$RESET" "$(chars "$access_notes")"
+  exit 1
+else
+  ok "$(printf '%-18s %4s/500' "play-access" "$(chars "$access_notes")")"
+fi
+say ""
+say "5. The build and the contact address:"
 if grep -Fq "\"package\": \"$PACKAGE\"" "$REPO_ROOT/apps/mobile/app.json" 2>/dev/null; then
   ok "apps/mobile/app.json builds $PACKAGE"
 else
@@ -472,10 +530,11 @@ CONTACT_EMAIL=$(sed -nE "s/^const CONTACT_EMAIL = '([^']+)'.*/\1/p" \
 if [[ -n "$CONTACT_EMAIL" ]]; then
   ok "contact address, from apps/api/src/landing.ts: $CONTACT_EMAIL"
 else
-  warn "could not read CONTACT_EMAIL from apps/api/src/landing.ts — stage 8 will ask."
+  warn "could not read CONTACT_EMAIL from apps/api/src/landing.ts — the contact stage will ask."
 fi
 pause "Press Enter when the preflight looks right."
 
+if (( ! APP_CONTENT_ONLY )); then
 # ── 2 ───────────────────────────────────────────────────────────────────
 stage "App details — create the app"
 say "Play Console → Home → Create app. Skip to the next stage if Mibo already exists."
@@ -491,7 +550,7 @@ note "  Free is permanent: a free app can never become paid. Premium is sold in-
 note "  through RevenueCat (scripts/setup-premium.sh), so Free is the right answer."
 step "Tick the Developer Program Policies and US export laws declarations → Create app."
 say ""
-warn "The package name is not asked here. Play binds it on the first upload (stage 9),"
+warn "The package name is not asked here. Play binds it on the first upload (stage 15),"
 warn "and it must be $PACKAGE — it can never change after that."
 pause "Press Enter once the app exists in Play Console."
 
@@ -584,7 +643,7 @@ for class in phone tablet-7 tablet-10; do
   fi
 done
 note "  Captioned from the seeded review household (#100, #111) by the local-only,"
-note "  gitignored nextjs/ generator. A missing set is recorded in stage 10, not blocking."
+note "  gitignored nextjs/ generator. A missing set is recorded in stage 16, not blocking."
 say ""
 step "Upload each folder in file order — the Parent side leads (ADR-0018):"
 note "  1. a parent approving a chore   2. setting chores   3. the allowance"
@@ -606,8 +665,9 @@ step "routines. Play's list is fixed; skip a near miss rather than force it."
 say ""
 warn "Target audience and content (App content) is NOT set here. An age group under"
 warn "13 pulls in the Families policy and its SDK requirements — Play's version of"
-warn "the question ADR-0018 answers for Apple. It belongs to #105."
+warn "the question ADR-0018 answers for Apple. It is stage 12."
 pause "Press Enter once the category and tags are saved."
+fi
 
 # ── 8 ───────────────────────────────────────────────────────────────────
 stage "Contact details and privacy policy"
@@ -626,11 +686,200 @@ next_paste "the privacy policy URL"
 say ""
 step "Policy and programs → App content → Privacy policy:"
 copy "Privacy policy URL" "$PRIVACY_URL"
-note "  The rest of App content — app access, ads, content rating, target audience,"
-note "  data safety — is #100, #104 and #105. This stage sets only the URL."
+note "  The rest of App content is the next six stages."
 pause "Press Enter once contact details and the policy URL are saved."
 
 # ── 9 ───────────────────────────────────────────────────────────────────
+stage "App content — App access"
+say "Policy and programs → App content → App access. Parents sign in, so a reviewer"
+say "needs the #100 review account — the same one App Review gets."
+open_url_chrome "$PLAY_CONSOLE"
+say ""
+step "First, rebuild the review household so the reviewer never inherits the last"
+step "reviewer's state (every R2_* variable is required — docs/store/review-notes.md):"
+note "    DATABASE_URL=… CLERK_SECRET_KEY=… R2_ACCOUNT_ID=… R2_BUCKET=… \\"
+note "    R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… pnpm --filter api seed:review"
+if ! confirm "Re-seeded just now?"; then
+  SKIPPED+=("re-seed the review household before Play reviews it (pnpm --filter api seed:review)")
+fi
+say ""
+step "Choose: All or some functionality is restricted → Add instructions."
+step "Instruction name:"
+copy "Instruction name" "Demo parent account"
+next_paste "the username"
+step "Username:"
+copy "Username" "review@mibokids.app"
+say ""
+step "Password: the value of REVIEW_SECRET on Railway. Type it in Play Console"
+step "only — it is never written into this repo or onto this clipboard."
+pause "Password typed? Enter puts the other information on the clipboard."
+step "Any other information required to access your app:"
+copy_quiet "App access notes" "$(play_access_notes)"
+note "  From docs/store/review-notes.md. Play wants reusable credentials that skip any"
+note "  one-time code; the password typed where the code goes is exactly that."
+step "Leave 'no other information required' unticked → Add → Save."
+pause "Press Enter once App access is saved."
+
+# ── 10 ──────────────────────────────────────────────────────────────────
+stage "App content — Ads, Advertising ID and the declarations that do not apply"
+say "App content lists each of these as its own section. Answer every one: an"
+say "unanswered section blocks every release, including internal testing."
+say ""
+step "Ads → Does your app contain ads? → No."
+note "  No ads and no advertising SDK, on either side of the app."
+step "Advertising ID → Does your app use advertising ID? → No."
+note "  Nothing in the app reads it, and no SDK it carries (PostHog, Sentry,"
+note "  RevenueCat, Expo) adds com.google.android.gms.permission.AD_ID. If Play"
+note "  flags AD_ID in an uploaded bundle anyway, something merged it in: remove it"
+note "  with tools:node=\"remove\" rather than change this answer."
+step "Government apps → No. Mibo is not developed by or for a government."
+step "Financial features → My app doesn't provide any financial features."
+note "  Allowance is a ledger of coins a parent pays out by hand: no money moves"
+note "  through the app, nothing is lent, held, transferred or invested. Say so if"
+note "  asked. The subscription is a Play purchase, not a financial feature."
+step "Health apps → My app doesn't provide any health features."
+step "News apps → No.   COVID-19 apps → not a contact tracing or status app."
+say ""
+warn "Photo and video permissions or Foreground service permissions should not be"
+warn "listed: the camera needs no declaration and the bundle asks for neither"
+warn "READ_MEDIA_* nor a foreground service. If Play lists one, stop — a dependency"
+warn "merged the permission in, and the fix is the manifest, not a declaration."
+pause "Press Enter once each of these sections is saved."
+
+# ── 11 ──────────────────────────────────────────────────────────────────
+stage "App content — Content rating (IARC)"
+say "Content rating → Start new questionnaire. The answers match the iOS age rating"
+say "(scripts/setup-store-listing.sh, 4+): the same app, so the same facts."
+say ""
+step "Email address for IARC correspondence:"
+copy "IARC email" "$CONTACT_EMAIL"
+step "Category: All other app types — not Game, not Social or communication."
+note "  The pet and the grove are rewards inside a chores tool, not a game."
+say ""
+step "Violence, sexuality, language, controlled substances, crude humor, gambling"
+step "and simulated gambling: No to every question."
+step "Users interact or exchange content (voice, text, images, audio): No."
+note "  Google's test is whether users can freely exchange content they made. A"
+note "  child's Photo Proof goes only to a parent of the same household, through a"
+note "  five-minute link (ADR-0017); there is no chat, no feed and no way to reach"
+note "  anyone outside the family. iOS answered the same question the same way."
+step "Shares the user's current physical location with other users: No."
+step "Digital purchases: Yes — the premium subscription, in parent mode only."
+step "Web browser or search engine: No.   News or educational product: No."
+say ""
+step "Summary: expect ESRB Everyone, PEGI 3, USK 0 and IARC 3+, with the"
+step "interactive element In-App Purchases. Anything higher means one descriptor"
+step "was answered wrong — go back rather than accept it for a chores app."
+step "Submit → Apply rating."
+pause "Press Enter once the rating is applied."
+
+# ── 12 ──────────────────────────────────────────────────────────────────
+stage "App content — Target audience and content"
+say "ADR-0018, Google Play: any age group under 13 puts the app under the Families"
+say "policy, whose SDK rules PostHog and Sentry fail. Mibo is for the parent."
+say ""
+step "Target age: tick Ages 18 and over ONLY. Every other box stays empty."
+note "  The child uses a device a parent joins with a Join Code; the person who"
+note "  finds, installs, sets up and pays for Mibo is the parent."
+step "Restrict Minor Access: leave it OFF."
+note "  A kid device is often a supervised child account. Restricting minors would"
+note "  stop the parent installing Mibo on it, and there is no other way to join."
+say ""
+step "Could your store listing unintentionally appeal to children? → No."
+step "If Play asks for a reason:"
+copy "Appeal answer" "Mibo is a chores and allowance app for parents. The parent installs it, creates the household, sets the chores, approves them and pays the allowance. The store listing is written to the parent and its first screenshots show the parent side: approvals, setting chores and the allowance. A child uses it only on a device the parent sets up with a code."
+note "  The listing leads with the Parent side for exactly this question (the screenshots,"
+note "  docs/store/listing.md). If Play objects to 'for Kids' in the title, ADR-0018's"
+note "  prepared fallback is 'Mibo: Chores Tracker' — a title edit, not a form answer."
+step "Ads (on this form): No.   Store presence: nothing to opt into → Save."
+say ""
+warn "If Play rejects this, or forces the Families policy, STOP. That is ADR-0018's"
+warn "'to revisit' — a new decision about the SDKs, not a form to answer differently."
+audience_reply=""
+printf '  %s? Saved with 18 and over only? [y = saved / n = Play pushed back / Enter = not yet]%s ' \
+  "$YELLOW" "$RESET"
+read -r audience_reply || true
+case "$audience_reply" in
+  [Yy]*) ;;
+  [Nn]*)
+    SKIPPED+=("Target audience: Play pushed back on 18+ — reopen ADR-0018, do not change the form")
+    finish
+    exit 1 ;;
+  *) SKIPPED+=("Target audience: save it with Ages 18 and over only") ;;
+esac
+
+# ── 13 ──────────────────────────────────────────────────────────────────
+stage "App content — Data safety: collection, security and deletion"
+say "Data safety → Start. The answers are the iOS App Privacy answers"
+say "(scripts/setup-store-listing.sh, stages 6–10) in Play's words, and both follow"
+say "apps/api/src/privacy.ts — a form that says what the policy does not is the"
+say "inconsistency a reviewer finds first."
+open_url_chrome "$PLAY_CONSOLE"
+say ""
+step "Does your app collect or share any of the required user data types? → Yes."
+step "Is all of the user data collected by your app encrypted in transit? → Yes."
+note "  Every request is HTTPS: the API, Clerk, R2 uploads, PostHog, Sentry,"
+note "  RevenueCat and Expo push."
+step "Account creation methods: OAuth (Sign in with Google) and Username and other"
+step "authentication (email with a one-time code). Not Username and password."
+note "  Only a parent creates an account; a child has none (ADR-0001)."
+step "Delete account URL:"
+copy "Delete account URL" "$DELETE_ACCOUNT_URL"
+note "  Names the app and developer, gives the in-app steps (More → Delete my"
+note "  account) and a request path for anyone without the app (#115, ADR-0019)."
+step "Do you provide a way for users to request that their data is deleted? → Yes."
+note "  In the app and at the same URL. Photo Proof also deletes itself after 30 days."
+step "Independent security review: No."
+pause "Press Enter, then the data types."
+
+# ── 14 ──────────────────────────────────────────────────────────────────
+stage "App content — Data safety: data types and usage"
+say "Tick exactly these types and no others, then answer each one as shown."
+say ""
+ds_decl "Personal info → Name" "Required" "App functionality, Account management"
+note "      The parent's name from their sign-in provider; a child's first name a"
+note "      parent typed. A child gives us no name themselves."
+ds_decl "Personal info → Email address" "Required" "App functionality, Account management"
+note "      The parent's address from Clerk, and a partner-invite address."
+ds_decl "Personal info → User IDs" "Required" "App functionality, Analytics, Account management"
+note "      The parent's Clerk account id, also their id in PostHog and Sentry."
+ds_decl "Financial info → Purchase history" "Optional" "App functionality"
+note "      RevenueCat's subscription status for the household (ADR-0016). Optional:"
+note "      only a parent who subscribes has one. Not User payment info — Google takes"
+note "      the payment and no card detail reaches us."
+ds_decl "Photos and videos → Photos" "Optional" "App functionality"
+note "      Photo Proof, only when a chore asks for it: a private R2 bucket, a"
+note "      five-minute link for a parent of the same household, gone after 30"
+note "      days (ADR-0017)."
+ds_decl "App activity → App interactions" "Required" "Analytics"
+note "      PostHog events: the parent by account id, a Kid Device anonymously by a"
+note "      random per-device id (ADR-0009). Autocapture and replay are off."
+note "      Also covers iOS's Other Usage Data, which Play has no type for: the"
+note "      interface mode, age band, hashed household id, platform and language"
+note "      that ride on those events."
+ds_decl "App activity → Other user-generated content" "Required" "App functionality"
+note "      Chore and reward titles, the pet's name, completions, the coin ledger,"
+note "      redemptions and the grove."
+ds_decl "App info and performance → Crash logs" "Required" "App functionality"
+note "      Sentry, rebuilt from an allowlist; a native crash is sent by Sentry's own"
+note "      code first and carries a stack trace and device details (ADR-0015)."
+ds_decl "Device or other IDs" "Required" "App functionality, Analytics"
+note "      Expo push tokens, the hashed kid-device token and the per-device"
+note "      analytics id issued when a Join Code is redeemed (ADR-0009)."
+say ""
+note "Not ticked, and why: Location, Contacts, Messages, Audio, Files, Calendar,"
+note "Health, Web browsing, In-app search history, Installed apps — never collected."
+note "Diagnostics and Other app performance data — tracing and profiling are off;"
+note "the crash report is the only thing Sentry gets."
+say ""
+step "Preview: every type reads Collected, nothing under Data shared, and the"
+step "badges read Data is encrypted in transit and You can request that data be"
+step "deleted. Then Submit."
+warn "Saved is not submitted: the section shows complete only after Submit."
+pause "Press Enter once Data safety is submitted."
+
+if (( ! APP_CONTENT_ONLY )); then
+# ── 15 ──────────────────────────────────────────────────────────────────
 stage "Internal testing — tester list and the first release"
 say "Test and release → Testing → Internal testing."
 open_url_chrome "$PLAY_CONSOLE"
@@ -665,12 +914,14 @@ warn "A personal developer account made after November 2023 must also run a clos
 warn "test with 12 testers for 14 days before it gets production access. Internal"
 warn "testing does not count toward it — check the Dashboard before planning launch."
 pause "Press Enter once the release is rolled out to internal testing."
+fi
 
-# ── 10 ──────────────────────────────────────────────────────────────────
-stage "Verify every section this ticket covers"
+# ── 16 ──────────────────────────────────────────────────────────────────
+stage "Verify every section this run covers"
 say "One pass over the record. Answer honestly — the point is the list of what is"
 say "still missing, not a clean sheet."
 say ""
+if (( ! APP_CONTENT_ONLY )); then
 check "App details" "Mibo exists in Play Console as a free app, default language en-US."
 check "English listing" "The main store listing shows '$PLAY_TITLE' and the short and full descriptions from docs/store/listing.md."
 check "Hebrew listing" "An iw-IL translation holds the Hebrew short and full descriptions, and its preview reads right to left."
@@ -681,9 +932,18 @@ check "Category and tags" "The app category is Parenting (or the recorded fallba
 check "Contact details" "Email ${CONTACT_EMAIL:-(none)} and website $WEBSITE_URL are saved, and the privacy policy URL is $PRIVACY_URL."
 check "Internal testing" "A release of $PACKAGE is rolled out to Internal testing to a list of $TESTER_COUNT address(es) that includes the #100 demo account."
 check "Install" "A tester installed the build from the opt-in link and it opened."
+fi
+check "Privacy policy" "App content → Privacy policy is $PRIVACY_URL and shows complete."
+check "App access" "Restricted, with the review account and the notes from docs/store/review-notes.md, after a fresh seed:review."
+check "Ads and Advertising ID" "Contains ads: No. Uses advertising ID: No."
+check "Declarations" "Government, Financial features, Health, News and COVID-19 are each answered 'none' and show complete."
+check "Content rating" "IARC category All other app types; the applied rating is Everyone / PEGI 3 / USK 0 with In-App Purchases."
+check "Target audience" "Ages 18 and over only, does not appeal to children, Restrict Minor Access off, and Play accepted it."
+check "Data safety" "Nine data types, all collected and none shared, encrypted in transit, deletion at $DELETE_ACCOUNT_URL — submitted."
+check "App content" "Every section on Policy and programs → App content shows complete."
 pause
 
-# ── 11 ──────────────────────────────────────────────────────────────────
+# ── 17 ──────────────────────────────────────────────────────────────────
 stage "Report back to issue #$ISSUE"
 say "Posting the section-by-section result as a comment."
 if (( ${#RESULTS[@]} == 0 )); then
@@ -693,8 +953,13 @@ if (( ${#RESULTS[@]} == 0 )); then
   exit 0
 fi
 # shellcheck disable=SC2016  # the backticks are Markdown for the issue comment
-comment=$(printf '## Play Console listing — verification\n\nRun via `scripts/setup-play-listing.sh` on %s.\nInternal-testing list: **%s** address(es).\n\n%s\n' \
-  "$(date -u '+%Y-%m-%d %H:%M UTC')" "$TESTER_COUNT" "$(printf '%s\n' "${RESULTS[@]}")")
+if (( APP_CONTENT_ONLY )); then
+  comment=$(printf '## Play Console App content — verification\n\nRun via `scripts/setup-play-listing.sh --app-content` on %s.\n\n%s\n' \
+    "$(date -u '+%Y-%m-%d %H:%M UTC')" "$(printf '%s\n' "${RESULTS[@]}")")
+else
+  comment=$(printf '## Play Console listing and App content — verification\n\nRun via `scripts/setup-play-listing.sh` on %s.\nInternal-testing list: **%s** address(es).\n\n%s\n' \
+    "$(date -u '+%Y-%m-%d %H:%M UTC')" "$TESTER_COUNT" "$(printf '%s\n' "${RESULTS[@]}")")
+fi
 printf '\n%s\n\n' "$comment"
 if confirm "Post this to issue #$ISSUE?"; then
   if printf '%s' "$comment" | gh issue comment "$ISSUE" --body-file - >/dev/null 2>&1; then
@@ -709,6 +974,3 @@ fi
 pause
 
 finish
-note "App content — access, ads, content rating, target audience, data safety — is"
-note "#100, #104 and #105."
-printf '\n'
