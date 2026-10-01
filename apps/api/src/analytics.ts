@@ -1,4 +1,4 @@
-import { ANALYTICS_HOST, type AnalyticsEvent } from '@chores/shared';
+import { ANALYTICS_HOST, withAppEnv, type AnalyticsEvent, type AppEnv } from '@chores/shared';
 import { PostHog } from 'posthog-node';
 
 /**
@@ -29,15 +29,16 @@ export const noAnalytics: Analytics = {
   async shutdown() {},
 };
 
-export function posthogAnalytics(apiKey: string | undefined): Analytics {
+export function posthogAnalytics(apiKey: string | undefined, env: AppEnv): Analytics {
   if (!apiKey) return noAnalytics;
   const client = new PostHog(apiKey, { host: ANALYTICS_HOST });
   return {
     capture({ distinctId, event, groups }) {
+      const tagged = withAppEnv(event, env);
       client.capture({
         distinctId,
-        event: event.event,
-        properties: event.properties,
+        event: tagged.event,
+        properties: tagged.properties,
         ...(groups ? { groups } : {}),
       });
     },

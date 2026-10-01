@@ -3,6 +3,8 @@ import {
   ANALYTICS_HOST,
   activation,
   ageBand,
+  appEnv,
+  withAppEnv,
   buttonTapped,
   paywallStep,
   screenViewed,
@@ -275,5 +277,24 @@ describe('what an event may carry', () => {
     expect(activated.properties).toEqual(
       kidProperties({ ui_mode: child.ui_mode, household_id: householdId }),
     );
+  });
+});
+
+describe('the build an event came from', () => {
+  it('is read from the environment, and anything unrecognised is development', () => {
+    expect(appEnv('production')).toBe('production');
+    expect(appEnv('preview')).toBe('preview');
+    expect(appEnv('development')).toBe('development');
+    expect(appEnv(undefined)).toBe('development');
+    expect(appEnv('')).toBe('development');
+    expect(appEnv('Production')).toBe('development');
+  });
+
+  it('rides every event as app_env, beside what the event already carries', () => {
+    const tagged = withAppEnv(paywallShown({ gate: 'child_quota' }), 'production');
+    expect(tagged).toEqual({
+      event: 'paywall_shown',
+      properties: { gate: 'child_quota', app_env: 'production' },
+    });
   });
 });

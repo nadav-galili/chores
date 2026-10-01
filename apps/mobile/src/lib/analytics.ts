@@ -1,6 +1,8 @@
 import {
   ANALYTICS_HOST,
+  appEnv,
   kidProperties,
+  withAppEnv,
   parentIdentity,
   pushOpened,
   type AnalyticsEvent,
@@ -26,6 +28,8 @@ import { cacheFetchedFlags } from '@/sync/flags';
  */
 
 const apiKey = process.env.EXPO_PUBLIC_POSTHOG_KEY;
+/** Set per EAS profile; a build that does not name one reports as development. */
+const buildEnv = appEnv(process.env.EXPO_PUBLIC_APP_ENV);
 
 type Mode = 'welcome' | 'parent' | 'kid';
 
@@ -127,7 +131,8 @@ export async function startParentAnalytics(
 }
 
 export function capture(event: AnalyticsEvent): void {
-  client?.capture(event.event, event.properties);
+  const tagged = withAppEnv(event, buildEnv);
+  client?.capture(tagged.event, tagged.properties);
 }
 
 /**

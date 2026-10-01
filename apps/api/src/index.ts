@@ -1,4 +1,4 @@
-import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
+import { appEnv, normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { serve } from '@hono/node-server';
 import { posthogAnalytics, posthogPersonDeletion } from './analytics.ts';
 import { clerkUserDeleter } from './account-deletion.ts';
@@ -60,7 +60,7 @@ if (posthogApiKey && !(posthogPersonalApiKey && posthogProjectId)) {
     'POSTHOG_PERSONAL_API_KEY and POSTHOG_PROJECT_ID are required with POSTHOG_API_KEY (account deletion)',
   );
 }
-const analytics = posthogAnalytics(posthogApiKey);
+const analytics = posthogAnalytics(posthogApiKey, appEnv(process.env.APP_ENV));
 
 const r2: R2Config | undefined =
   r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey

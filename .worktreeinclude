@@ -1,0 +1,16 @@
+# Gitignored files copied into new worktrees (claude -w). Secrets only — no build output.
+
+# API: DATABASE_URL, Clerk, PostHog, RevenueCat webhook secret
+apps/api/.env
+
+# Mobile: Clerk, API URL, PostHog, RevenueCat, App Store Connect
+apps/mobile/.env
+# Mobile: Sentry org/project/DSN
+apps/mobile/.env.local
+
+# Wizard inputs
+.env.apple-signin
+scripts/.env.setup-fcm
+
+# Local Claude permissions
+.claude/settings.local.json
