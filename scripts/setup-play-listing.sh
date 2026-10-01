@@ -568,32 +568,30 @@ note "  shows the English ones."
 pause "Press Enter once the icon and feature graphic are uploaded."
 
 # ── 6 ───────────────────────────────────────────────────────────────────
-stage "Screenshots — per device class, per language"
+stage "Screenshots — per device class"
 say "Main store listing → Phone / 7-inch tablet / 10-inch tablet screenshots."
 note "  PNG or JPEG, no transparency, 16:9 or 9:16, each side 320–3840 px"
 note "  (10-inch: 1080–7680 px). Two to eight per class; four or more at 1080 px or"
 note "  wider on phones make the app eligible for Play's recommendations."
 say ""
-say "What docs/store/screenshots/ holds right now:"
-for lang in en he; do
-  for class in android-phone android-tablet-7 android-tablet-10; do
-    n=$(count_images "$SCREENSHOTS/$lang/$class")
-    if (( n >= 2 && n <= 8 )); then
-      ok "$(printf '%-3s %-18s %s' "$lang" "$class" "$n")"
-    else
-      printf '  %s✗%s %-3s %-18s %s — needs 2 to 8\n' "$YELLOW" "$RESET" "$lang" "$class" "$n"
-    fi
-  done
+say "What docs/store/screenshots/android/en/store/ holds right now:"
+for class in phone tablet-7 tablet-10; do
+  n=$(count_images "$SCREENSHOTS/android/en/store/$class")
+  if (( n >= 2 && n <= 8 )); then
+    ok "$(printf '%-10s %s' "$class" "$n")"
+  else
+    printf '  %s✗%s %-10s %s — needs 2 to 8\n' "$YELLOW" "$RESET" "$class" "$n"
+  fi
 done
-note "  Expected at docs/store/screenshots/<en|he>/<class>/, captured from the seeded"
-note "  review household (#100). A missing set is recorded in stage 10, not blocking."
+note "  Captioned from the seeded review household (#100, #111) by the local-only,"
+note "  gitignored nextjs/ generator. A missing set is recorded in stage 10, not blocking."
 say ""
-step "The same four loops as App Store Connect, captioned for a parent:"
-note "  1. the child's done moment   2. the pet reacting to it"
-note "  3. the allowance ledger      4. a parent approving a chore"
+step "Upload each folder in file order — the Parent side leads (ADR-0018):"
+note "  1. a parent approving a chore   2. setting chores   3. the allowance"
+note "  then the child's day, the pet, rewards, and the feature pills."
 warn "apps/mobile/app.json sets supportsTablet: true, so the tablet sets matter —"
 warn "without them Play marks the app as not designed for tablets."
-step "English sets on the default listing; Hebrew sets on the iw-IL translation."
+step "English sets on the default listing only: iw-IL falls back to them."
 pause "Press Enter once every set you have is uploaded."
 
 # ── 7 ───────────────────────────────────────────────────────────────────
@@ -677,8 +675,8 @@ check "App details" "Mibo exists in Play Console as a free app, default language
 check "English listing" "The main store listing shows '$PLAY_TITLE' and the short and full descriptions from docs/store/listing.md."
 check "Hebrew listing" "An iw-IL translation holds the Hebrew short and full descriptions, and its preview reads right to left."
 check "Graphics" "A 512 x 512 icon and a 1024 x 500 feature graphic are uploaded."
-check "Phone screenshots" "Two to eight phone screenshots in each language."
-check "Tablet screenshots" "Two to eight 7-inch and 10-inch tablet screenshots in each language."
+check "Phone screenshots" "Two to eight phone screenshots on the default listing."
+check "Tablet screenshots" "Two to eight 7-inch and 10-inch tablet screenshots on the default listing."
 check "Category and tags" "The app category is Parenting (or the recorded fallback) and tags are chosen."
 check "Contact details" "Email ${CONTACT_EMAIL:-(none)} and website $WEBSITE_URL are saved, and the privacy policy URL is $PRIVACY_URL."
 check "Internal testing" "A release of $PACKAGE is rolled out to Internal testing to a list of $TESTER_COUNT address(es) that includes the #100 demo account."
