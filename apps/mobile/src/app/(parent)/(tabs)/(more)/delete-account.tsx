@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Body, Button, ErrorText, ScrollScreen } from '@/components/ui';
+import { shutdownAnalytics } from '@/lib/analytics';
 import { withCause } from '@/lib/errors';
 import { useHousehold } from '@/lib/household-context';
 import { t } from '@/lib/i18n';
@@ -50,12 +51,18 @@ export default function DeleteAccount() {
   if (state.status !== 'ready') return null;
   const countLoaded = !householdId || parentCount !== null;
   const lastParent = !householdId || parentCount === 1;
+  // A Partner keeps the household, and with it a Premium the leaving parent may be paying for.
+  const premiumStays = !lastParent && state.me.household?.entitlement === 'premium';
   const names = state.me.children.map((c) => c.first_name).join(', ');
 
   const deleteForGood = () => {
     setBusy(true);
     setError(null);
     void (async () => {
+      // Flushed before the server deletes this parent's analytics person, so nothing queued here
+      // lands afterwards and brings it back. A failed deletion leaves analytics off until the
+      // next launch, which costs a few events and nothing else.
+      await shutdownAnalytics();
       try {
         await api.deleteAccount();
       } catch (e) {
@@ -80,7 +87,9 @@ export default function DeleteAccount() {
       {countLoaded ? (
         <Body>{t(lastParent ? 'deleteAccount.lastParent' : 'deleteAccount.partnerStays')}</Body>
       ) : null}
-      <Text style={styles.warning}>{t('deleteAccount.subscription')}</Text>
+      <Text style={styles.warning}>
+        {t(premiumStays ? 'deleteAccount.subscriptionShared' : 'deleteAccount.subscription')}
+      </Text>
       <ErrorText>{error}</ErrorText>
       {armed ? (
         <View style={styles.confirm}>

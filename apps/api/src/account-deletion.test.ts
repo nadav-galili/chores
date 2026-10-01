@@ -41,6 +41,7 @@ let db: Db;
 let app: ReturnType<typeof createApp>;
 let deletedClerkUsers: string[];
 let purgedChildren: string[][];
+let forgottenPersons: string[][];
 
 beforeAll(async () => {
   db = await freshDb();
@@ -49,6 +50,7 @@ beforeAll(async () => {
 beforeEach(() => {
   deletedClerkUsers = [];
   purgedChildren = [];
+  forgottenPersons = [];
   app = createApp(db, {
     verifyToken: fakeVerifyToken,
     revenuecatWebhookSigningSecret: SECRET,
@@ -57,6 +59,9 @@ beforeEach(() => {
     },
     purgePhotos: async (childIds) => {
       purgedChildren.push([...childIds].sort());
+    },
+    deleteAnalyticsPersons: async (distinctIds) => {
+      forgottenPersons.push([...distinctIds].sort());
     },
   });
 });
@@ -201,13 +206,13 @@ function signed(body: string) {
   } satisfies RequestInit;
 }
 
-const renewal = (id: string, appUserId: string) =>
+const event = (id: string, type: string, appUserId: string, at = Date.now()) =>
   JSON.stringify({
     api_version: '1.0',
     event: {
       id,
-      type: 'RENEWAL',
-      event_timestamp_ms: Date.now(),
+      type,
+      event_timestamp_ms: at,
       app_user_id: appUserId,
       original_app_user_id: appUserId,
       aliases: [],
@@ -259,6 +264,8 @@ describe('DELETE /me', () => {
     expect(after.change_log).toBeGreaterThanOrEqual(before.change_log);
     expect(deletedClerkUsers).toEqual([owner]);
     expect(purgedChildren).toEqual([]);
+    // Only the leaving parent's analytics go; the household's and the partner's stay.
+    expect(forgottenPersons).toEqual([[owner]]);
 
     // The household carries on: the partner reads it, and a kid device still syncs.
     const me = (await (await app.request('/me', asParent(partner))).json()) as {
@@ -328,6 +335,10 @@ describe('DELETE /me', () => {
     for (const [table, count] of Object.entries(after)) expect(count, table).toBe(0);
     expect(deletedClerkUsers).toEqual([owner]);
     expect(purgedChildren).toEqual([[fixture.noa.id, fixture.ori.id].sort()]);
+    // The parent's analytics person, and each kid device's anonymous one (ADR-0009).
+    expect(forgottenPersons).toEqual([
+      [owner, fixture.noa.session.analytics_anon_id, fixture.ori.session.analytics_anon_id].sort(),
+    ]);
 
     const sync = await syncAs(app, fixture.noa.session);
     expect(sync.status).toBe(401);
@@ -370,6 +381,24 @@ describe('DELETE /me', () => {
     expect(deletedClerkUsers).toEqual([]);
   });
 
+  it('keeps every row when the analytics persons cannot be deleted, so the parent can try again', async () => {
+    const owner = 'user_del_phfail_at_example.com';
+    const fixture = await setupHousehold(app, owner);
+    const failing = createApp(db, {
+      verifyToken: fakeVerifyToken,
+      deleteClerkUser: async (id) => {
+        deletedClerkUsers.push(id);
+      },
+      deleteAnalyticsPersons: () => Promise.reject(new Error('posthog down')),
+    });
+    const before = await rowsOf(fixture.householdId);
+    const res = await failing.request('/me', asParent(owner, { method: 'DELETE' }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'analytics_deletion_failed' });
+    expect(await rowsOf(fixture.householdId)).toEqual(before);
+    expect(deletedClerkUsers).toEqual([]);
+  });
+
   it('answers 503 and deletes nothing when Clerk deletion is not configured', async () => {
     const owner = 'user_del_unconfigured_at_example.com';
     const fixture = await setupHousehold(app, owner);
@@ -381,6 +410,36 @@ describe('DELETE /me', () => {
   });
 });
 
+describe('a RevenueCat webhook after the purchasing parent deleted their account', () => {
+  it('still reaches the household a Partner holds, so its expiry lands', async () => {
+    const owner = 'user_del_buyer_at_example.com';
+    const partner = 'user_del_stayer_at_example.com';
+    const fixture = await setupHousehold(app, owner);
+    await addPartner(owner, fixture.householdId, partner);
+    const bought = await app.request(
+      '/webhooks/revenuecat',
+      signed(event(uuid7(), 'INITIAL_PURCHASE', owner, Date.now() - 2000)),
+    );
+    expect(bought.status).toBe(200);
+    const premium = await db.query.households.findFirst({
+      where: eq(households.id, fixture.householdId),
+    });
+    expect(premium?.entitlement).toBe('premium');
+
+    expect((await deleteAccount(owner)).status).toBe(200);
+    // The departed parent cancelled in the store; the expiry arrives under their id alone.
+    const expired = await app.request(
+      '/webhooks/revenuecat',
+      signed(event(uuid7(), 'EXPIRATION', owner, Date.now())),
+    );
+    expect(expired.status).toBe(200);
+    const after = await db.query.households.findFirst({
+      where: eq(households.id, fixture.householdId),
+    });
+    expect(after?.entitlement).toBe('free');
+  });
+});
+
 describe('a RevenueCat webhook after a Household Deletion', () => {
   it('is acknowledged with 2xx and writes nothing', async () => {
     const owner = 'user_del_rc_at_example.com';
@@ -389,7 +448,7 @@ describe('a RevenueCat webhook after a Household Deletion', () => {
     const eventsBefore = await db.select({ n: sql<number>`count(*)::int` }).from(revenuecatEvents);
     const householdsBefore = await db.select({ n: sql<number>`count(*)::int` }).from(households);
 
-    const res = await app.request('/webhooks/revenuecat', signed(renewal(uuid7(), owner)));
+    const res = await app.request('/webhooks/revenuecat', signed(event(uuid7(), 'RENEWAL', owner)));
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
 

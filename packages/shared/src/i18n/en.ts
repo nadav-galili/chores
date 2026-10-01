@@ -356,6 +356,8 @@ export const en = {
     subscription:
       'Deleting your account does not cancel a subscription. Cancel it in Google Play or the App Store first, or it keeps renewing.',
     start: 'Delete my account',
+    subscriptionShared:
+      'If you pay for this household’s Premium, deleting your account does not cancel it: it keeps renewing, and the household keeps Premium. Cancel it in Google Play or the App Store and the household returns to the free plan.',
     confirmTitle: 'Delete for good?',
     confirmPartner: 'Only your account goes. This cannot be undone.',
     confirmLast:

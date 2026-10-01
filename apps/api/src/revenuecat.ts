@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { purchaseCompleted } from '@chores/shared';
@@ -70,6 +70,23 @@ function affectsPremium(event: Envelope['event']): boolean {
   return event.entitlement_id === 'premium' || (event.entitlement_ids ?? []).includes('premium');
 }
 
+/** The household an earlier delivery for any of these RevenueCat ids was filed under. */
+async function householdOfEarlierEvents(db: Db, candidates: string[]): Promise<string | undefined> {
+  if (candidates.length === 0) return undefined;
+  const [earlier] = await db
+    .select({ householdId: revenuecatEvents.householdId })
+    .from(revenuecatEvents)
+    .where(
+      or(
+        inArray(sql`${revenuecatEvents.payload}->'event'->>'app_user_id'`, candidates),
+        inArray(sql`${revenuecatEvents.payload}->'event'->>'original_app_user_id'`, candidates),
+      ),
+    )
+    .orderBy(desc(revenuecatEvents.eventTimestampMs))
+    .limit(1);
+  return earlier?.householdId;
+}
+
 export function revenuecatRoutes(db: Db, analytics: Analytics, signingSecret: string | undefined) {
   const app = new Hono();
 
@@ -103,17 +120,19 @@ export function revenuecatRoutes(db: Db, analytics: Analytics, signingSecret: st
       ? await db.select().from(parents).where(inArray(parents.clerkUserId, candidates))
       : [];
     const householdIds = [...new Set(matches.map((parent) => parent.householdId))];
-    // No parent is the expected state after an Account Deletion (ADR-0019): the store
-    // subscription outlives the household, and its renewals and expiry keep arriving. Acknowledged
-    // so RevenueCat stops retrying, and dropped: there is no household left to write to.
-    if (householdIds.length === 0) {
-      console.warn('RevenueCat webhook for no known parent dropped', { type: event.type });
-      return c.json({ ok: true, dropped: 'parent_not_found' });
-    }
     if (householdIds.length > 1) return c.json({ error: 'ambiguous_parent' }, 409);
-    const householdId = householdIds[0]!;
+    // The purchasing parent may have deleted their account while a Partner kept the household
+    // (ADR-0019). Their subscription outlives them, so its renewals and expiry still belong to the
+    // household their earlier events were filed under — found there, not in `parents`.
+    const householdId = householdIds[0] ?? (await householdOfEarlierEvents(db, candidates));
+    // No household at all is a Household Deletion: its events went with it. Acknowledged so
+    // RevenueCat stops retrying, and dropped: there is nothing left to write to.
+    if (!householdId) {
+      console.warn('RevenueCat webhook for no known household dropped', { type: event.type });
+      return c.json({ ok: true, dropped: 'household_not_found' });
+    }
     const purchasingParent =
-      matches.find((parent) => parent.clerkUserId === event.app_user_id) ?? matches[0]!;
+      matches.find((parent) => parent.clerkUserId === event.app_user_id) ?? matches[0];
 
     const applied = await db.transaction(async (tx) => {
       // Serialize every event for one household. Different RevenueCat deliveries may be handled
@@ -173,7 +192,7 @@ export function revenuecatRoutes(db: Db, analytics: Analytics, signingSecret: st
     const completed =
       event.type === 'INITIAL_PURCHASE' ||
       (event.type === 'NON_RENEWING_PURCHASE' && event.expiration_at_ms == null);
-    if (applied && completed && affectsPremium(event)) {
+    if (applied && completed && affectsPremium(event) && purchasingParent) {
       analytics.capture({
         distinctId: purchasingParent.clerkUserId,
         event: purchaseCompleted({

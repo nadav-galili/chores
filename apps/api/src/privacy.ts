@@ -164,9 +164,10 @@ without them. Account and subscription records are kept while the account exists
 <p>A parent can delete their account at any time, in the app under <strong>More</strong> →
 <strong>Delete my account</strong>, or, without the app, by the request described at
 <a href="/delete-account">mibokids.app/delete-account</a>. Deletion is immediate and permanent. If
-another parent remains in the household, only the deleting parent’s account, sign-in and phone
-registration go. If they are the household’s last parent, we delete the household and everything
-in it: every child’s profile and history, every child device’s access and every photo proof.
+another parent remains in the household, only the deleting parent’s account, sign-in, phone
+registration and analytics go; the household’s subscription records stay with it. If they are the
+household’s last parent, we delete the household and everything in it: every child’s profile and
+history, every child device’s access and anonymous analytics, and every photo proof.
 Nothing is retained. Deleting an account does not cancel a subscription, which is cancelled in
 Google Play or the App Store.</p>
 

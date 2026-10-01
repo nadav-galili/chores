@@ -73,16 +73,16 @@ within 30 days.</p>
 
 <h2>What is deleted</h2>
 <ul>
-  <li>Your parent account, your sign-in with our authentication provider, and your phone’s
-  notification registration.</li>
-  <li>If another parent is still in your household, only your account goes; the household and the
-  children’s history stay with them.</li>
+  <li>Your parent account, your sign-in with our authentication provider, your phone’s
+  notification registration, and the usage analytics recorded under your account.</li>
+  <li>If another parent is still in your household, only your account goes; the household, its
+  subscription records and the children’s history stay with them.</li>
   <li>If you are the household’s last parent, the whole household is deleted with you: every child’s
-  profile, chores, completions, coins, rewards, redemptions and grove, every child device’s access,
-  and every photo proof.</li>
+  profile, chores, completions, coins, rewards, redemptions and grove, every child device’s access
+  and anonymous usage analytics, and every photo proof.</li>
 </ul>
-<p>Nothing is retained. Deletion is permanent and cannot be undone; a child’s device that was
-connected to a deleted household returns to its join screen.</p>
+<p>Nothing is retained of what is deleted: it is not archived. Deletion is permanent and cannot be
+undone; a child’s device that was connected to a deleted household returns to its join screen.</p>
 
 <p class="sub">See also the <a href="/privacy">privacy policy</a>.</p>
 </body>

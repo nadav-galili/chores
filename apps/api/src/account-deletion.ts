@@ -1,5 +1,6 @@
 import { count, eq, inArray, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { DeleteAnalyticsPersons } from './analytics.ts';
 import type { AuthVariables } from './auth.ts';
 import type { Db } from './db/client.ts';
 import {
@@ -143,15 +144,24 @@ async function deleteHousehold(tx: Tx, householdId: string) {
  * the last one (ADR-0019). Immediate, with no grace period. A Kid Device is never a Clerk user,
  * so nothing on the kid side of the app can reach this route.
  *
- * The order is what makes a failure retryable. Photos go first, while the children who name
- * them still exist, and a failure there deletes nothing. Clerk goes last: a parent whose rows are
+ * The order is what makes a failure retryable. Photos and analytics go first, while the rows that
+ * name them still exist, and a failure there deletes nothing. Analytics is deleted rather than
+ * merely left behind because the page that offers this says nothing is retained: a parent's
+ * events carry their Clerk id, and a kid device's its anon id (ADR-0009). Clerk goes last: a parent whose rows are
  * gone but whose Clerk user is not can sign in and delete again, and this route then finds no
  * parent row and deletes only the Clerk user.
  */
 export function accountDeletionRoutes(
   db: Db,
-  deleteClerkUser: DeleteClerkUser | undefined,
-  purgePhotos: PurgePhotos | undefined,
+  {
+    deleteClerkUser,
+    purgePhotos,
+    deleteAnalyticsPersons,
+  }: {
+    deleteClerkUser: DeleteClerkUser | undefined;
+    purgePhotos: PurgePhotos | undefined;
+    deleteAnalyticsPersons: DeleteAnalyticsPersons | undefined;
+  },
 ) {
   const app = new Hono<{ Variables: AuthVariables }>();
 
@@ -162,6 +172,8 @@ export function accountDeletionRoutes(
       where: eq(parents.clerkUserId, clerkUserId),
     });
 
+    // The parent's own analytics person, plus — as the last parent — every kid device's.
+    const distinctIds = [clerkUserId];
     let householdDeleted = false;
     if (parent) {
       const { householdId } = parent;
@@ -172,7 +184,15 @@ export function accountDeletionRoutes(
       // Read outside the transaction, so a Partner joining in the same instant can find the
       // photos already gone; a second parent deleting in that instant leaves them to the
       // bucket's own 30-day expiry (ADR-0017). Either way no row outlives the decision below.
-      if ((parentCount?.n ?? 0) <= 1 && purgePhotos) {
+      const last = (parentCount?.n ?? 0) <= 1;
+      if (last) {
+        const devices = await db
+          .select({ anonId: childDevices.analyticsAnonId })
+          .from(childDevices)
+          .where(eq(childDevices.householdId, householdId));
+        distinctIds.push(...devices.map((d) => d.anonId));
+      }
+      if (last && purgePhotos) {
         const childRows = await db
           .select({ id: children.id })
           .from(children)
@@ -193,6 +213,20 @@ export function accountDeletionRoutes(
           }
         }
       }
+    }
+
+    if (deleteAnalyticsPersons) {
+      try {
+        await deleteAnalyticsPersons(distinctIds);
+      } catch (e) {
+        // Our own error, naming a status or a count and never an id.
+        console.error('account deletion: analytics person deletion failed', e);
+        return c.json({ error: 'analytics_deletion_failed' }, 503);
+      }
+    }
+
+    if (parent) {
+      const { householdId } = parent;
 
       householdDeleted = await db.transaction(async (tx) => {
         // Two parents deleting at once must not each see the other and leave a household nobody

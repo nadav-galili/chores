@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { accountDeletionRoutes, type DeleteClerkUser } from './account-deletion.ts';
-import { noAnalytics, type Analytics } from './analytics.ts';
+import { noAnalytics, type Analytics, type DeleteAnalyticsPersons } from './analytics.ts';
 import { requireClerkUser, type VerifyToken } from './auth.ts';
 import type { Db } from './db/client.ts';
 import { choreRoutes } from './chores.ts';
@@ -44,6 +44,8 @@ export type AppOptions = {
   deleteClerkUser?: DeleteClerkUser;
   /** Household Deletion's R2 step; left out, there is no bucket to purge. */
   purgePhotos?: PurgePhotos;
+  /** Account Deletion's analytics step; left out, there is no PostHog project to delete from. */
+  deleteAnalyticsPersons?: DeleteAnalyticsPersons;
 };
 
 const DEFAULT_SYNC_PAGE_SIZE = 500;
@@ -61,6 +63,7 @@ export function createApp(
     reviewAccess,
     deleteClerkUser,
     purgePhotos,
+    deleteAnalyticsPersons,
   }: AppOptions,
 ) {
   const app = new Hono();
@@ -89,7 +92,10 @@ export function createApp(
   app.use('/households/*', requireClerkUser(verifyToken));
   app.use('/households', requireClerkUser(verifyToken));
   app.route('/', householdRoutes(db, analytics));
-  app.route('/', accountDeletionRoutes(db, deleteClerkUser, purgePhotos));
+  app.route(
+    '/',
+    accountDeletionRoutes(db, { deleteClerkUser, purgePhotos, deleteAnalyticsPersons }),
+  );
   app.route('/', choreRoutes(db, analytics));
   app.route('/', parentDeviceRoutes(db));
   app.route('/', pinRoutes(db, analytics));

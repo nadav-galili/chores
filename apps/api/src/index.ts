@@ -1,6 +1,6 @@
 import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { serve } from '@hono/node-server';
-import { posthogAnalytics } from './analytics.ts';
+import { posthogAnalytics, posthogPersonDeletion } from './analytics.ts';
 import { clerkUserDeleter } from './account-deletion.ts';
 import { createApp } from './app.ts';
 import { clerkVerifyToken } from './auth.ts';
@@ -50,7 +50,17 @@ await runMigrations(db);
 // The minute cron lives in this process: one container, one household clock per row (ADR-0003).
 startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
 
-const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY);
+const posthogApiKey = process.env.POSTHOG_API_KEY;
+const posthogPersonalApiKey = process.env.POSTHOG_PERSONAL_API_KEY;
+const posthogProjectId = process.env.POSTHOG_PROJECT_ID;
+// A deployment that sends events must be able to delete them: the account-deletion page promises
+// nothing is retained (ADR-0019), and a key that only writes would make that promise false.
+if (posthogApiKey && !(posthogPersonalApiKey && posthogProjectId)) {
+  throw new Error(
+    'POSTHOG_PERSONAL_API_KEY and POSTHOG_PROJECT_ID are required with POSTHOG_API_KEY (account deletion)',
+  );
+}
+const analytics = posthogAnalytics(posthogApiKey);
 
 const r2: R2Config | undefined =
   r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
@@ -67,6 +77,9 @@ const app = createApp(db, {
   analytics,
   ...(r2 ? { r2, purgePhotos: r2PhotoPurge(r2) } : {}),
   deleteClerkUser: clerkUserDeleter(clerkSecretKey),
+  ...(posthogApiKey && posthogPersonalApiKey && posthogProjectId
+    ? { deleteAnalyticsPersons: posthogPersonDeletion(posthogPersonalApiKey, posthogProjectId) }
+    : {}),
   revenuecatWebhookSigningSecret,
   ...(reviewEmail && reviewSecret
     ? {
