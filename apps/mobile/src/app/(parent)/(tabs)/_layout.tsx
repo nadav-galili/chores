@@ -1,3 +1,4 @@
+import type { AndroidSymbol } from 'expo-symbols';
 import { NativeTabs, type SFSymbolIcon } from 'expo-router/unstable-native-tabs';
 import { isRTL, nativeIsRTL, t, type TranslationKey } from '@/lib/i18n';
 
@@ -18,10 +19,10 @@ import { isRTL, nativeIsRTL, t, type TranslationKey } from '@/lib/i18n';
  *
  * Native rather than the JS tabs: the bar is drawn by UIKit, so it is the one the reviewer
  * expects, it picks up the system's own blur and iOS 26's minimise behaviour, and the icons are
- * SF Symbols the OS already has — no icon package and no bundled asset. Android draws its own
- * bar from the same triggers and shows the labels; the symbols are iOS's and it ignores them.
- * With no icon, Material's default for five items — a label on the selected tab only — leaves the
- * other four as blank, tappable space, so Android is told to label every tab.
+ * SF Symbols the OS already has. Android draws its own bar from the same triggers and ignores SF
+ * Symbols, so each tab also names a Material Symbol, rendered from the font `expo-symbols` bundles;
+ * without one the bar was labels over blank space. Material's default for five items labels only
+ * the selected tab, so Android is told to label every tab.
  *
  * The bar is the OS's, so it is laid out the OS's way, not React Native's: in Hebrew on an iPhone
  * the app reads right to left while UIKit still places the first trigger on the left, and Today
@@ -33,21 +34,26 @@ import { isRTL, nativeIsRTL, t, type TranslationKey } from '@/lib/i18n';
 // router would otherwise take More for the group's first route, and Android's back button with it.
 export const unstable_settings = { initialRouteName: '(today)' };
 
-const TABS: readonly { name: string; sf: SFSymbolIcon['sf']; label: TranslationKey }[] = [
-  { name: '(today)', sf: 'checklist', label: 'parent.tabs.today' },
-  { name: '(children)', sf: 'person.2', label: 'parent.tabs.children' },
-  { name: '(chores)', sf: 'list.bullet.rectangle', label: 'parent.tabs.chores' },
-  { name: '(allowance)', sf: 'banknote', label: 'parent.tabs.allowance' },
-  { name: '(more)', sf: 'ellipsis', label: 'parent.tabs.more' },
+const TABS: readonly {
+  name: string;
+  sf: SFSymbolIcon['sf'];
+  md: AndroidSymbol;
+  label: TranslationKey;
+}[] = [
+  { name: '(today)', sf: 'checklist', md: 'checklist', label: 'parent.tabs.today' },
+  { name: '(children)', sf: 'person.2', md: 'group', label: 'parent.tabs.children' },
+  { name: '(chores)', sf: 'list.bullet.rectangle', md: 'list_alt', label: 'parent.tabs.chores' },
+  { name: '(allowance)', sf: 'banknote', md: 'payments', label: 'parent.tabs.allowance' },
+  { name: '(more)', sf: 'ellipsis', md: 'more_horiz', label: 'parent.tabs.more' },
 ];
 
 export default function ParentTabs() {
   const tabs = isRTL === nativeIsRTL ? TABS : [...TABS].reverse();
   return (
     <NativeTabs labelVisibilityMode="labeled">
-      {tabs.map(({ name, sf, label }) => (
+      {tabs.map(({ name, sf, md, label }) => (
         <NativeTabs.Trigger key={name} name={name}>
-          <NativeTabs.Trigger.Icon sf={sf} />
+          <NativeTabs.Trigger.Icon sf={sf} md={md} />
           <NativeTabs.Trigger.Label>{t(label)}</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
       ))}
