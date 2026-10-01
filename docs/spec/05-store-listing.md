@@ -11,12 +11,14 @@ The brand is child-facing and the keyword tail is parent-facing. A parent finds 
 | field | value | chars |
 |---|---|---|
 | Title (30) | `Mibo: Chores Tracker` | 20 |
-| Subtitle (30) | `Chore Chart & Kids Allowance` | 28 |
+| Subtitle (30) | `Family Chore Chart & Allowance` | 30 |
 
-Keyword field (100 of 100, no spaces after commas):
+No "Kids" in the subtitle, name, icon or screenshots: App Review rejected 1.0.1 under guideline 2.3.8 for `Chore Chart & Kids Allowance`, reading it as a claim the app is made for children, which ADR-0018 rules out. `kids` lives in the keyword field, which is never displayed.
+
+Keyword field (98 of 100, no spaces after commas):
 
 ```
-behavior,reward,routine,task,family,habit,star,job,checklist,pocket,money,daily,sticker,toddler,teen
+behavior,reward,routine,task,kids,habit,star,job,checklist,pocket,money,daily,sticker,toddler,teen
 ```
 
 Apple forms phrases across title, subtitle and keyword field, so nothing already in the first two is repeated here. This buys `behavior tracker`, `sticker chart`, `family chore chart`, `chores for kids`, `reward chart`, `daily routine`, `pocket money`, `chore checklist`. `app` is omitted — Apple indexes it anyway. `ADHD` is omitted deliberately: out of scope per `BUILD-PROMPT.md`, and Joon owns the term.
@@ -27,7 +29,7 @@ Apple forms phrases across title, subtitle and keyword field, so nothing already
 |---|---|---|
 | Title (30) | `Mibo: Chores Tracker for Kids` | 29 |
 
-Play indexes the long description separately, so the title is the only short high-weight field and carries `for Kids` that iOS puts in the subtitle.
+Play indexes the long description separately, so the title is the only short high-weight field and carries `for Kids`, which iOS keeps out of every displayed field (2.3.8) and puts in the keyword field.
 
 Short and full descriptions, English and Hebrew (`iw-IL`), live in `docs/store/listing.md`.
 
