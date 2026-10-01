@@ -12,7 +12,8 @@
       },
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
-        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv",
+        "EXPO_PUBLIC_APP_ENV": "development"
       }
     },
     "preview": {
@@ -25,7 +26,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://mibokids.app",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWlib2tpZHMuYXBwJA",
-        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv",
+        "EXPO_PUBLIC_APP_ENV": "preview"
       }
     },
     "production": {
@@ -35,7 +37,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://mibokids.app",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWlib2tpZHMuYXBwJA",
-        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv"
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_z3Y5v3urdxHky7FBEygiRsz95799rNvwpchpSwzbH6Uv",
+        "EXPO_PUBLIC_APP_ENV": "production"
       }
     },
     "preview-local": {

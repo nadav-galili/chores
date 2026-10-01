@@ -1,4 +1,4 @@
-import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
+import { appEnv, normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { serve } from '@hono/node-server';
 import { posthogAnalytics } from './analytics.ts';
 import { createApp } from './app.ts';
@@ -48,7 +48,7 @@ await runMigrations(db);
 // The minute cron lives in this process: one container, one household clock per row (ADR-0003).
 startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
 
-const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY);
+const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY, appEnv(process.env.APP_ENV));
 
 const app = createApp(db, {
   verifyToken: clerkVerifyToken(clerkSecretKey),

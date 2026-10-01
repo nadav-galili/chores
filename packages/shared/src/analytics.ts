@@ -29,6 +29,22 @@ export type AnalyticsProperties = Record<string, string | number | boolean>;
 export type AnalyticsEvent = { event: string; properties: AnalyticsProperties };
 
 /**
+ * Which build an event came from. Dev clients, store builds and the API all report into one
+ * PostHog project, and the dashboards count only `production`. Anything the build does not name
+ * on purpose is `development`, so a missing variable can never pass for real traffic.
+ */
+export type AppEnv = 'development' | 'preview' | 'production';
+
+export function appEnv(raw: string | undefined): AppEnv {
+  return raw === 'production' || raw === 'preview' ? raw : 'development';
+}
+
+/** The event as it goes on the wire: every sink, device or server, tags it with its build. */
+export function withAppEnv(event: AnalyticsEvent, env: AppEnv): AnalyticsEvent {
+  return { event: event.event, properties: { ...event.properties, app_env: env } };
+}
+
+/**
  * The child's age band, as coarsely as the product knows it. There is no birthdate anywhere in
  * the data model and there will not be one (COPPA-minimal: first name only), so the band is read
  * off the ui mode a parent chose — the one age judgement the product does ask for. `big` cannot
