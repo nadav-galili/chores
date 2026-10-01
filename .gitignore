@@ -18,9 +18,9 @@ expo-env.d.ts
 apps/mobile/android/
 apps/mobile/ios/
 
-# Local EAS build artifacts (`--local` writes these next to eas.json).
-build-*.apk
-build-*.aab
+# Android build artifacts (`eas build --local` writes them next to eas.json).
+*.apk
+*.aab
 
 # Store-screenshot generator (app-store-screenshots skill); local tool, not part of the app.
 nextjs/
