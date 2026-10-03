@@ -866,32 +866,46 @@ fi
 pause
 
 # ── 5 ───────────────────────────────────────────────────────────────────
-stage "Testers — a Google Group on the closed track"
-say "A Google Group rather than an email list: testers join it themselves, and the"
-say "track follows the group's membership without a Console edit per person."
-open_url_chrome "https://groups.google.com/my-groups"
-step "Create group — e.g. mibo-testers. Who can join: anyone can ask, or anyone can join."
-step "Who can see members: group managers only — the testers' addresses are personal."
+stage "Testers — an email list or a Google Group on the closed track"
+say "Either works. A Play Console email list is quicker if one already holds the testers;"
+say "a Google Group lets testers join themselves, without a Console edit per person."
 say ""
-ask TESTER_GROUP "The group's address (…@googlegroups.com):"
-TESTER_GROUP="${TESTER_GROUP//[[:space:]]/}"
-if [[ "$TESTER_GROUP" == *@* ]]; then
+if confirm "Is there already a Play Console email list of testers (Mibo used 'testers')?"; then
+  ask TESTER_GROUP "The email list's name:"
+  TESTER_GROUP="${TESTER_GROUP#"${TESTER_GROUP%%[![:space:]]*}"}"
+  TESTER_GROUP="${TESTER_GROUP%"${TESTER_GROUP##*[![:space:]]}"}"
+  testers_where="Email lists → tick ${TESTER_GROUP:-the list}"
+  testers_join="is on ${TESTER_GROUP:-the list}"
+else
+  open_url_chrome "https://groups.google.com/my-groups"
+  step "Create group — e.g. mibo-testers. Who can join: anyone can ask, or anyone can join."
+  step "Who can see members: group managers only — the testers' addresses are personal."
+  say ""
+  ask TESTER_GROUP "The group's address (…@googlegroups.com):"
+  TESTER_GROUP="${TESTER_GROUP//[[:space:]]/}"
+  if [[ "$TESTER_GROUP" != *@* ]]; then
+    warn "Not an address — not saved."
+    TESTER_GROUP=""
+  fi
+  testers_where="Google Groups → add ${TESTER_GROUP:-the group}"
+  testers_join="joins ${TESTER_GROUP:-the group}"
+fi
+if [[ -n "$TESTER_GROUP" ]]; then
   write_env TESTER_GROUP "$TESTER_GROUP"
 else
-  warn "Not an address — not saved."
-  SKIPPED+=("the tester Google Group's address")
+  SKIPPED+=("the testers' email list or Google Group")
 fi
 say ""
 open_url_chrome "$PLAY_CONSOLE"
-step "Closed testing → the track → Testers → Google Groups → add ${TESTER_GROUP:-the group} → Save."
+step "Closed testing → the track → Testers → $testers_where → Save."
 step "Feedback URL or email address: the support address from the store listing."
 step "Countries / regions: every country a tester is in."
 say ""
 say "Recruit at least $MIN_TESTERS, aim for $AIM_TESTERS or more. Each tester, on the phone's Google account:"
-step "joins ${TESTER_GROUP:-the group}, then opens $OPT_IN_URL"
+step "$testers_join, then opens $OPT_IN_URL"
 step "→ 'Become a tester' → installs Mibo from Play, and keeps it installed."
 note "  The opt-in link answers only once stage 6's release is reviewed and live."
-check "Testers" "The closed track lists ${TESTER_GROUP:-the group}, and the opt-in link has been shared."
+check "Testers" "The closed track lists ${TESTER_GROUP:-the testers}, and the opt-in link has been shared."
 pause
 
 # ── 6 ───────────────────────────────────────────────────────────────────
