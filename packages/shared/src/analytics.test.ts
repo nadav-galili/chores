@@ -28,6 +28,7 @@ import {
   purchaseCompleted,
   pushOpened,
   pushPromptAnswered,
+  pushSent,
   redemptionDecided,
   rewardRequested,
   type AnalyticsEvent,
@@ -163,6 +164,16 @@ describe('the events', () => {
     }
   });
 
+  it('reports a push Expo accepted as its kind alone, the same kind a tap reports', () => {
+    expect(pushSent({ kind: 'parent_digest' })).toEqual({
+      event: 'push_sent',
+      properties: { kind: 'parent_digest' },
+    });
+    for (const kind of notificationKindSchema.options) {
+      expect(pushSent({ kind }).properties).toEqual(pushOpened({ kind }).properties);
+    }
+  });
+
   it('reports an onboarding step by its name alone, for every step the funnel has', () => {
     expect(onboardingStepViewed({ step: 'welcome' })).toEqual({
       event: 'onboarding_step_viewed',
@@ -242,6 +253,7 @@ describe('what an event may carry', () => {
     purchaseCompleted({ product_id: 'mibo_yearly', purchase_kind: 'subscription' }),
     paywallShown({ gate: 'photo_proof' }),
     ...notificationKindSchema.options.map((kind) => pushOpened({ kind })),
+    ...notificationKindSchema.options.map((kind) => pushSent({ kind })),
     ...ONBOARDING_STEPS.map((step) => onboardingStepViewed({ step })),
     pushPromptAnswered({ role: 'kid', granted: true }),
     pushPromptAnswered({ role: 'parent', granted: false }),

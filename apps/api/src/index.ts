@@ -47,9 +47,6 @@ if (reviewEmail && normalizeEmail(reviewEmail) !== REVIEW_EMAIL) {
 const db = createDb(databaseUrl);
 await runMigrations(db);
 
-// The minute cron lives in this process: one container, one household clock per row (ADR-0003).
-startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
-
 const posthogApiKey = process.env.POSTHOG_API_KEY;
 const posthogPersonalApiKey = process.env.POSTHOG_PERSONAL_API_KEY;
 const posthogProjectId = process.env.POSTHOG_PROJECT_ID;
@@ -61,6 +58,9 @@ if (posthogApiKey && !(posthogPersonalApiKey && posthogProjectId)) {
   );
 }
 const analytics = posthogAnalytics(posthogApiKey, appEnv(process.env.APP_ENV));
+
+// The minute cron lives in this process: one container, one household clock per row (ADR-0003).
+startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN), analytics);
 
 const r2: R2Config | undefined =
   r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
