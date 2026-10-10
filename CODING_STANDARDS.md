@@ -73,8 +73,24 @@ Shellcheck does not see this one, which is why it is here. It cost a session a f
 
 **An interactive checklist offers three answers, not two.** Violation: a `[y/n]` prompt over work the person may not have been able to attempt yet — the only way to avoid recording a FAILED for untried work is to abandon the run. Default the bare Enter to *not yet run* and keep it out of both columns.
 
-## Frozen identifiers
+## Tests
+
+**A test runs at one of three seams, and at no other.** These are the pre-agreed seams for `/tdd`:
+
+1. `packages/shared` pure functions, input → output.
+2. API over HTTP with Hono `app.request()` against a real Postgres.
+3. Device sync engine over an in-memory SQLite, fed canned `/sync` responses.
+
+Violation: a UI test, a mock of Postgres or SQLite, a handler-level unit test, or another test outside the three seams. (#1, Testing Decisions)
+
+**Tests never fall back to `DATABASE_URL`.** `DATABASE_URL` names the dev server's database. Every test file begins by dropping the whole `public` schema of the database it is pointed at, so a test that reads `DATABASE_URL` destroys the dev data. Violation: a test, a test helper or a CI step that reads `DATABASE_URL`, or a fallback from `TEST_DATABASE_URL` to it.
+
+This rule is evidence rather than an ADR: one `pnpm test` destroyed the dev data before the tests had their own database (`apps/api/src/test/db.ts`).
+
+## Frozen identifiers and the brand
 
 **`NAMESPACE_CHORES` must never change** — deterministic ids are derived from it, so changing it silently breaks every existing id. Violation: any edit to its value. (ADR-0010)
 
-The npm scope `@chores/shared`, the repo name and the Railway project also keep the original name; the app itself is "Mibo" (`docs/spec/05-store-listing.md`). A diff that renames the former to match the latter is a violation, not a cleanup.
+The npm scope `@chores/shared`, the repo name and the Railway project also keep the original name. A diff that renames one of them to "Mibo" is a violation, not a cleanup.
+
+**The brand is "Mibo" alone.** "Kids" is in the identifier `com.mibokids.app` only. Violation: text a person reads that names the app anything other than "Mibo", for example "Mibo Kids". This includes `app.json`, a catalog string, push copy and a page that the API serves. A store title adds a keyword tail after "Mibo", and the store listing controls that tail. (`docs/spec/05-store-listing.md`)

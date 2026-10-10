@@ -11,50 +11,18 @@ A kids chores and allowance app (iOS + Android) where the child is the primary u
 3. `docs/spec/` — product rules, data model, sync protocol, milestones, and the **approved dependency list**. Any dependency not on that list must be asked for first.
 4. `BUILD-PROMPT.md` — the original brief; product constraints there are settled, not open.
 
-## Ticket workflow
+Three workspaces — `apps/mobile`, `apps/api`, `packages/shared` — laid out and justified in `docs/adr/0007-*`.
 
-Issues live in GitHub Issues on `nadav-galili/chores` via `gh`; conventions in `docs/agents/issue-tracker.md`, labels in `docs/agents/triage-labels.md`. Each milestone has one spec issue that lists its tracer-bullet tickets. The tickets have native "blocked by" edges. A spec issue stays open until all its tickets are closed. Edit a spec issue only to keep it true to its milestone's scope. Record progress on the tickets.
+## Branches
 
 Greenfield rule: all work lands directly on `main`. No feature branches, no PRs, until the first store release.
 
-Exception — `/implement-spec`: when the user explicitly runs that skill, the greenfield rule is suspended for that run. It is expected to create a feature branch and a draft PR, fan implementer subagents out into their own worktrees and branches, merge them back into the PR branch, and mark the PR ready for review. Only that skill gets this exception, and only when invoked by name.
+Exception — `/implement-spec`: when the user explicitly runs that skill, the greenfield rule is suspended for that run. Only that skill gets this exception, and only when invoked by name.
 
-One ticket per session, in this order:
+## Task docs
 
-1. **Pick from the frontier** — a `ready-for-agent` ticket with zero open blockers (`issue_dependencies_summary.blocked_by == 0`). If the user names a ticket, use that one; otherwise take the lowest-numbered frontier ticket and say which.
-2. **`/implement #N`** — it drives `/tdd` at the seams below, typechecks as it goes, runs `/code-review`, and commits to `main`. Done when every acceptance criterion on the ticket is checked off and the full test suite is green.
-3. **Close out** — `git push origin main`, then `gh issue close N --comment` with the commit hash and one line per acceptance criterion that needed a judgement call. Done when the ticket shows closed and the next frontier is listed in the reply.
-4. **`/clear`** before the next ticket. The ticket is self-contained, so this session's context is disposable.
-
-**`ops` tickets are the exception to step 2.** A ticket labelled `ops` has no diff to write — its acceptance criteria live outside the repo, in a dashboard or on a physical device (see `docs/agents/triage-labels.md`). Read the label before exploring: the deliverable is a wizard in `scripts/` that walks a human through the clicking, modelled on `scripts/setup-premium.sh`, not an implementation.
-
-When a ticket exposes a gap in the spec, resolve it in the ticket's comments and keep building; edit `docs/spec/` only if the gap changes a documented rule, and add an ADR only if the decision is hard to reverse.
-
-## Layout and commands (per ADR-0007)
-
-Three workspaces — `apps/mobile`, `apps/api`, `packages/shared` — laid out and justified in `docs/adr/0007-*`.
-
-```
-pnpm --filter <api|mobile> db:generate                 # after you edit that workspace's src/db/schema.ts
-scripts/deploy-api.sh                                  # deploy apps/api, stamped with HEAD's commit
-scripts/check-deploy.sh                                # is the live API this commit? /health reports the sha
-```
-
-A container that boots and passes its healthcheck says nothing about *which* build is in it: an API deployed before a milestone landed answers `/health` normally and silently 404s the routes it has never heard of. Nothing deploys automatically — CI runs typecheck, lint, test and the asset check only — so run `scripts/check-deploy.sh` before trusting anything against the live API.
-
-Live API: https://mibokids.app/health
-
-Local Postgres: `docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`, then `createdb chores_test` inside it.
-
-Two databases on it, and they must stay two. `chores` is the dev server's, named by `DATABASE_URL` in `apps/api/.env`. `chores_test` is the tests', named by `TEST_DATABASE_URL` and defaulted to in `apps/api/src/test/db.ts`. Every test file begins by dropping the whole `public` schema of the database it is pointed at, so pointing the tests at `DATABASE_URL` destroys the dev data — do not reintroduce that fallback.
-
-## Testing seams (pre-agreed for `/tdd`; these three only)
-
-1. `packages/shared` pure functions, input → output.
-2. API over HTTP with Hono `app.request()` against a real Postgres.
-3. Device sync engine over an in-memory SQLite, fed canned `/sync` responses.
-
-No UI tests, no mocking of Postgres or SQLite, no handler-level unit tests.
+- **Tickets**: read `docs/agents/ticket-workflow.md` before you work on a ticket or a spec issue.
+- **Environments**: read `docs/agents/environments.md` before you set up Postgres, edit a `src/db/schema.ts`, deploy the API, or use the live API.
 
 ## Invariants
 
@@ -68,8 +36,10 @@ No UI tests, no mocking of Postgres or SQLite, no handler-level unit tests.
 - anything entitlement-gated
 - a `catch`
 - a shell script in `scripts/`
+- a test (the `/tdd` seams), or the database a test uses
+- text that names the app
 - `NAMESPACE_CHORES`, or another identifier that still says `chores`
 
 ## Working style (from the brief)
 
-Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. The brand is "Mibo" alone (`docs/spec/05-store-listing.md`). Pet name is per-child: a parent sets a starting name, the child may rename it.
+Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. Pet name is per-child: a parent sets a starting name, the child may rename it.

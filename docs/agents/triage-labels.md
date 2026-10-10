@@ -24,7 +24,8 @@ the ticket would not be `ops`.
 
 Apply it at triage, and say in the issue body which dashboards are involved. It is orthogonal to
 `ready-for-agent`: an `ops` ticket can still be agent-ready, because the agent's deliverable is a
-script in `scripts/` that walks a human through the clicking, not a diff against `apps/`.
+wizard in `scripts/` that walks a human through the clicking, not a diff against `apps/`. Use
+`scripts/setup-premium.sh` as the model for the wizard.
 
 It exists because #75 read like four sections of implementation work and was none, and the only way
 to learn that was to read the four files it touched and find them already finished.
