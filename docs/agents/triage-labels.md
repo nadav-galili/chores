@@ -13,19 +13,13 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
-Edit the right-hand column to match whatever vocabulary you actually use.
-
 ## `ops`
 
-`ops` has no counterpart in the skills' vocabulary; it is ours. It marks a ticket whose acceptance
-criteria are all satisfied outside the repo — a RevenueCat offering, an App Store Connect product, a
-Cloudflare token, a hand-test on a physical device. The code such a ticket needs already exists, or
-the ticket would not be `ops`.
+`ops` marks a ticket that has all its acceptance criteria outside the repo (#75). Examples are a
+RevenueCat offering, an App Store Connect product, a Cloudflare token and a hand-test on a physical
+device. The code such a ticket needs already exists, or the ticket would not be `ops`.
 
-Apply it at triage, and say in the issue body which dashboards are involved. It is orthogonal to
-`ready-for-agent`: an `ops` ticket can still be agent-ready, because the agent's deliverable is a
-wizard in `scripts/` that walks a human through the clicking, not a diff against `apps/`. Use
-`scripts/setup-premium.sh` as the model for the wizard.
-
-It exists because #75 read like four sections of implementation work and was none, and the only way
-to learn that was to read the four files it touched and find them already finished.
+Apply it at triage, and say in the issue body which dashboards are involved. An `ops` ticket can
+also be `ready-for-agent`. The deliverable of the agent is then a wizard in `scripts/` that walks a
+human through the clicks, not a diff against `apps/`. Use `scripts/setup-premium.sh` as the model
+for the wizard.

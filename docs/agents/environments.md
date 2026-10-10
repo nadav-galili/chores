@@ -1,19 +1,24 @@
 # Environments
 
 ```
-pnpm --filter <api|mobile> db:generate                 # after you edit that workspace's src/db/schema.ts
-scripts/deploy-api.sh                                  # deploy apps/api, stamped with HEAD's commit
-scripts/check-deploy.sh                                # is the live API this commit? /health reports the sha
+pnpm --filter <api|mobile> db:generate   # run after you edit the src/db/schema.ts of that workspace
+scripts/deploy-api.sh                    # deploys apps/api with the commit of HEAD on it
+scripts/check-deploy.sh                  # tells if the live API runs this commit (/health gives the sha)
 ```
 
 ## Local Postgres
 
-`docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`, then `createdb chores_test` inside it.
+Start it with `docker run -d --name chores-pg -p 5499:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chores postgres:17-alpine`. Then run `createdb chores_test` in the container.
 
-Two databases on it. `chores` is the dev server's, named by `DATABASE_URL` in `apps/api/.env`. `chores_test` is the tests', named by `TEST_DATABASE_URL` and defaulted to in `apps/api/src/test/db.ts`. `CODING_STANDARDS.md` (Tests) keeps them two.
+The container holds two databases:
+
+- `chores` is the database of the dev server. `DATABASE_URL` in `apps/api/.env` names it.
+- `chores_test` is the database of the tests. `TEST_DATABASE_URL` names it, and `apps/api/src/test/db.ts` uses it as the default.
+
+The Tests rules in `CODING_STANDARDS.md` keep the two databases separate.
 
 ## Live API
 
 https://mibokids.app/health
 
-A container that boots and passes its healthcheck says nothing about *which* build is in it: an API deployed before a milestone landed answers `/health` normally and silently 404s the routes it has never heard of. Nothing deploys automatically — CI runs typecheck, lint, test and the asset check only — so run `scripts/check-deploy.sh` before trusting anything against the live API.
+A healthy container does not tell you which build it runs. An API from before a milestone answers `/health` normally, but it gives a 404 for each route of that milestone. Nothing deploys automatically. Run `scripts/check-deploy.sh` before you trust a result from the live API.
