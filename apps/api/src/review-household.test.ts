@@ -14,7 +14,7 @@ import {
   rewards,
 } from './db/schema.ts';
 import {
-  REVIEW_ENTITLEMENT_SOURCE,
+  REVIEW_EXPIRED_SOURCE,
   REVIEW_HOUSEHOLD_NAME,
   seedReviewHousehold,
   type SeededHousehold,
@@ -47,7 +47,7 @@ const balance = async (childId: string) => {
 };
 
 describe('the review household seed', () => {
-  it('signs the review account into The Review Family, premium, with a Parent PIN', async () => {
+  it('signs the review account into The Review Family, its subscription expired, with a Parent PIN', async () => {
     const app = createApp(db, {
       verifyToken: async (t) => (t === REVIEWER ? { clerkUserId: REVIEWER, email: EMAIL } : null),
     });
@@ -58,11 +58,11 @@ describe('the review household seed', () => {
     };
     expect(me.household.id).toBe(second.householdId);
     expect(me.household.name).toBe(REVIEW_HOUSEHOLD_NAME);
-    expect(me.household.entitlement).toBe('premium');
+    expect(me.household.entitlement).toBe('free');
     expect(me.setup.hasPin).toBe(true);
     expect(me.children.map((c) => c.ui_mode).sort()).toEqual(['big', 'little']);
     const [row] = await db.select().from(households).where(eq(households.id, second.householdId));
-    expect(row!.entitlementSource).toBe(REVIEW_ENTITLEMENT_SOURCE);
+    expect(row!.entitlementSource).toBe(REVIEW_EXPIRED_SOURCE);
   });
 
   it('holds a week of work: approved photo chores, and two waiting on a parent', async () => {

@@ -45,3 +45,8 @@ forged signed event would put a row in `revenuecat_events` that reads as a real 
 exception holds because the seed is operator-run with production credentials and is never
 reachable from a route: nothing a phone can send reaches that write. Any other direct write to
 `households.entitlement` is still a violation of this ADR.
+
+The same seed then writes it back to `'free'`, with `entitlement_source = 'manual:review-expired'`
+(App Review rejection of 1.0.1, guideline 2.1): the reviewer needs an account whose subscription
+has expired, and a premium household shows no way into the paywall. Mibo has no expired state of
+its own, so free is where a real EXPIRATION would leave it. Both writes are the one exception.

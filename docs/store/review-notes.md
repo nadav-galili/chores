@@ -27,9 +27,11 @@ in `packages/shared/src/review.ts`, which the app matches on the sign-in screen.
 It builds "The Review Family" (two children — Maya on the little layout, Leo on the big one — a
 week of chores with some done and some approved, one photo chore awaiting approval with no photo
 and a second waiting with its photo proof, a reward catalogue with one request waiting, coins, a
-grove, Parent PIN `1234`) and sets premium by a manual write, not a webhook — the one exception
-the amendment to `docs/adr/0016-revenuecat-webhook-is-the-only-entitlement-writer.md` names
-(`REVIEW_ENTITLEMENT_SOURCE` in `apps/api/src/review-household.ts` says why).
+grove, Parent PIN `1234`). It builds the household premium and then lapses it back to free, by
+manual writes rather than a webhook — the one exception the amendment to
+`docs/adr/0016-revenuecat-webhook-is-the-only-entitlement-writer.md` names. App Review asks for an
+account with an expired subscription, and a premium household shows no way into the paywall
+(rejection of 1.0.1, guideline 2.1; `REVIEW_EXPIRED_SOURCE` in `apps/api/src/review-household.ts`).
 
 ---
 
@@ -47,7 +49,7 @@ App Store Connect → the version → App Review Information.
 
 ```
 SIGNING IN
-Choose "Parent" on the first screen. On the sign-in screen, type review@mibokids.app in the email field and tap "Email me a code". This address is not sent a code: the app asks for a password instead. Type the password given above where the code would go and tap Continue. You land in a demo household, "The Review Family", already set up with two children, a week of chores, rewards and a paid subscription.
+Choose "Parent" on the first screen. On the sign-in screen, type review@mibokids.app in the email field and tap "Email me a code". This address is not sent a code: the app asks for a password instead. Type the password given above where the code would go and tap Continue. You land in a demo household, "The Review Family", already set up with two children, a week of chores and rewards. Its Mibo Premium subscription has expired (see SUBSCRIPTION AND IN-APP PURCHASES below).
 
 HOW CHILDREN USE MIBO
 Children never sign in and have no account (they are not users of any identity provider). A child's side runs on a second device that is joined to one child with a short Join Code:
@@ -61,8 +63,13 @@ If you have only one device, a screen recording of the child's side on a simulat
 LEAVING KID MODE
 Kid mode has no visible way out, by design: a child must not be able to leave it. To leave it, long-press the top-right corner of the child's Today screen for two seconds and enter the Parent PIN: 1234. This PIN is the only way out of kid mode.
 
-SUBSCRIPTION
-The demo household is already premium. Premium unlocks: more than one child, more than two parents, custom rewards, full history, the money ledger and payouts, and photo proof (a chore can ask the child for a photo, which a parent approves). The child's side is never gated. Purchases use the sandbox environment and are fine to make: to see the paywall, sign in with your own Apple ID instead (Continue with Apple), create a household, and add a second child.
+SUBSCRIPTION AND IN-APP PURCHASES
+The demo account has an expired subscription: the household had Mibo Premium and is now back on the free plan. This is how Mibo shows every expired subscription; there is no separate "expired" screen. The In-App Purchases (Mibo Premium Monthly, Yearly and Lifetime) are on the Premium screen. To open it from the demo account:
+1. Tap the Money tab at the bottom of the screen.
+2. Tap "See Premium · from $6.99/month".
+The Premium screen lists the three plans, "Restore purchases", and the Terms of Use and Privacy Policy links.
+Other ways to the same screen: More → Rewards → "Add your own reward · Premium · from $6.99/month"; or Chores → add a chore → turn on "Require a photo".
+Purchases use the sandbox environment and are fine to make. After a purchase, the household becomes premium within a few seconds, and the money ledger and payouts, custom rewards, full history, photo proof, more children and more parents unlock. The child's side is never gated.
 
 WHAT IS WAITING FOR YOU
 In the demo household, on the parent's Today: Leo's "Water the plants" from today is done with a photo and waiting for approval, yesterday's is waiting for approval without a photo, and Maya has asked for a reward that is waiting too.
