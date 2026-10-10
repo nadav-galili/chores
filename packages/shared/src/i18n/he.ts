@@ -31,6 +31,12 @@ export const he: Catalog = {
     petButton: '%{name}, רמה %{level}',
     pushAllow: 'לאפשר',
     pushNotNow: 'לא עכשיו',
+    camera: {
+      title: 'המצלמה כבויה',
+      body: 'המטלה הזאת צריכה תמונה. בקשו ממבוגר להפעיל את המצלמה של Mibo בהגדרות.',
+      settings: 'לפתוח את ההגדרות',
+      ok: 'הבנתי',
+    },
     little: {
       greeting: 'היי %{name}!',
       empty: '🎈 אין מה לעשות היום!',

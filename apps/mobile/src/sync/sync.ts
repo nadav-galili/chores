@@ -177,6 +177,16 @@ async function settle(
 }
 
 /**
+ * Resolves once no sync run holds the database. A run that fails has still finished: what the
+ * caller wants to know is that nothing is about to touch the connection.
+ */
+export function syncSettled(): Promise<void> {
+  return inFlight ? inFlight.then(noop, noop) : Promise.resolve();
+}
+
+const noop = () => undefined;
+
+/**
  * One sync run: drain the outbox and pull every waiting change-log page, applying each atomically
  * and persisting the cursor as it goes. Concurrent callers (a tap, a foreground, a screen opening)
  * share one run. Errors propagate with the ops left queued for the next attempt: the caller decides

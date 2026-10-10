@@ -38,6 +38,15 @@ export const en = {
     // time and the child has completed something, and it says the notification is that reminder.
     pushAllow: 'Allow',
     pushNotNow: 'Not now',
+    // A photo chore tapped after the camera was refused: the OS will not ask again, so the only
+    // way back is Settings, and that is a grown-up's job. One voice for both modes, so no
+    // exclamation mark.
+    camera: {
+      title: 'The camera is off',
+      body: 'This chore needs a photo. Ask a grown-up to turn on the camera for Mibo in Settings.',
+      settings: 'Open Settings',
+      ok: 'OK',
+    },
     // Voice is the third of the three differences between the modes (docs/spec/06-design.md):
     // celebratory for a 7-year-old, neutral for a 10-year-old. `big` carries no exclamation
     // mark anywhere — that is the whole of what "neutral" means here, and it is checkable.

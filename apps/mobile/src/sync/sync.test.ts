@@ -36,7 +36,7 @@ import { balanceOf, tapContext, tapDone, type ChildContext } from './local';
 import { xpTotalOf } from './pet';
 import { backoffMs, pendingOps } from './outbox';
 import { askForReward, cancelRedemption } from './redeem';
-import { syncNow } from './sync';
+import { syncNow, syncSettled } from './sync';
 
 const childId = uuid7();
 const householdId = uuid7();
@@ -361,6 +361,24 @@ describe('syncNow', () => {
     await syncNow(db, child, alive.call);
     expect(alive.sent[0]!.ops).toHaveLength(1);
     expect(await db.select().from(outbox)).toEqual([]);
+  });
+
+  it('says when no run holds the database, a failed run included, so a wipe can wait for it', async () => {
+    let fail!: (e: Error) => void;
+    const hanging = () => new Promise<SyncResponse>((_, reject) => (fail = reject));
+    const run = syncNow(db, child, hanging).catch(() => 'failed');
+
+    let settled = false;
+    const waiting = syncSettled().then(() => (settled = true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settled).toBe(false);
+
+    fail(new Error('offline'));
+    await waiting;
+    expect(await run).toBe('failed');
+    expect(settled).toBe(true);
+    // Nothing running: it answers at once.
+    await expect(syncSettled()).resolves.toBeUndefined();
   });
 
   it('backs off further with every failed attempt, up to a ceiling', () => {

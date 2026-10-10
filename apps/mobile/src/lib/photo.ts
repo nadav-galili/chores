@@ -1,4 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
+import { Alert, Linking } from 'react-native';
+import { t } from '@/lib/i18n';
 
 /**
  * The child's camera (M3.12): one photo, taken in the app at the done moment of a
@@ -17,9 +19,18 @@ export type TakenPhoto = {
  * Opens the camera and returns the photo, or null when the child backs out. A denial is not an
  * error either: the chore stays due and the child can tap it again. The cause of a real failure
  * is logged, never shown — there is nothing a child can do with it.
+ *
+ * Except a denial the OS will not ask about again (on iOS, every one after the first): then a
+ * tap would open nothing at all, so the child is told the camera is off and offered Settings.
+ * The tap that refused it says nothing — the child has just answered the question.
  */
 export async function takePhoto(): Promise<TakenPhoto | null> {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  const current = await ImagePicker.getCameraPermissionsAsync();
+  if (!current.granted && !current.canAskAgain) {
+    explainCameraOff();
+    return null;
+  }
+  const permission = current.granted ? current : await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) return null;
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ['images'],
@@ -58,4 +69,16 @@ export async function putPhoto(
     body,
   });
   if (!res.ok) throw new Error(`photo PUT failed ${res.status}`);
+}
+
+function explainCameraOff() {
+  Alert.alert(t('kid.camera.title'), t('kid.camera.body'), [
+    { text: t('kid.camera.ok'), style: 'cancel' },
+    {
+      text: t('kid.camera.settings'),
+      onPress: () => {
+        Linking.openSettings().catch((e: unknown) => console.error('open settings failed', e));
+      },
+    },
+  ]);
 }
