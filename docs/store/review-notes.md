@@ -71,6 +71,9 @@ The Premium screen lists the three plans, "Restore purchases", and the Terms of 
 Other ways to the same screen: More → Rewards → "Add your own reward · Premium · from $6.99/month"; or Chores → add a chore → turn on "Require a photo".
 Purchases use the sandbox environment and are fine to make. After a purchase, the household becomes premium within a few seconds, and the money ledger and payouts, custom rewards, full history, photo proof, more children and more parents unlock. The child's side is never gated.
 
+ACCOUNT DELETION
+More → "Delete my account", then "Delete for good". The account is deleted at once; for the demo account that also deletes the whole demo household, and the demo sign-in stops working. Please test it last, or with your own Apple ID (Continue with Apple, then create a household).
+
 WHAT IS WAITING FOR YOU
 In the demo household, on the parent's Today: Leo's "Water the plants" from today is done with a photo and waiting for approval, yesterday's is waiting for approval without a photo, and Maya has asked for a reward that is waiting too.
 
@@ -134,7 +137,7 @@ it is kept under 500 characters, which the wizard checks):
 
 <!-- play-access -->
 ```text
-Choose Parent on the first screen. Type review@mibokids.app in the email field and tap "Email me a code". No code is sent: the app asks for the password instead. Type it and tap Continue. You land in a demo household with two children, chores, rewards and a paid subscription. Kid mode needs a second device: Children → a child → Show join code, then choose Kid on the other device and type the code. To leave kid mode, long-press the top-right corner for 2 seconds and enter the Parent PIN 1234.
+Choose Parent on the first screen. Type review@mibokids.app in the email field and tap "Email me a code". No code is sent: the app asks for the password instead. Type it and tap Continue. You land in a demo household with two children, chores, rewards and an expired subscription. Kid mode needs a second device: Children → a child → Show join code, then choose Kid on the other device and type the code. To leave kid mode, long-press the top-right corner for 2 seconds and enter the Parent PIN 1234.
 ```
 
 Play requires credentials that are reusable and skip any one-time code; this account is exactly
