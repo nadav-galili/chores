@@ -6,8 +6,6 @@ Mibo is a chores and allowance app for iOS and Android. Its primary user is the 
 
 Keep replies short. Give the result, with no summary of the work that you did.
 
-Greenfield rule: until the first store release, every commit goes directly on `main`. The only exception is a `/implement-spec` run that the user starts by name.
-
 Read the file for your task before you start the task:
 
 - **Domain:** `docs/agents/domain.md` routes to the glossary, the ADRs and the spec. Read it before you name a domain concept or change what the app does.
