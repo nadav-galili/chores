@@ -1,8 +1,8 @@
 # Coding standards
 
-Read during review, not implementation. Each rule reads *what it is* → *what a violation looks like in a diff*. Terms are `CONTEXT.md`'s; use them verbatim.
+Read this file before you write code that a rule covers. Read it again during review. Each rule reads *what it is* → *what a violation looks like in a diff*. Terms are `CONTEXT.md`'s; use them verbatim.
 
-These are hard violations, not judgement calls — every one of them is a settled decision with an ADR or a spec behind it. Where a rule cites an ADR, the ADR is the authority; this file is the reviewable restatement.
+These are hard violations, not judgement calls. Each one is a settled decision with an ADR, a spec or an issue behind it. Where a rule cites an ADR, the ADR is the authority; this file is the reviewable restatement.
 
 ## Derived values are never stored
 

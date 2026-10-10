@@ -1,19 +1,19 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+ASD-STE100: write all prose for this repo in Simplified Technical English (docs, code comments, commit messages, issue and PR text).
 
 ## What this is
 
-A kids chores and allowance app (iOS + Android) where the child is the primary user. No code exists yet; the design is complete and approved. Read in this order before doing anything:
+A kids chores and allowance app (iOS + Android) where the child is the primary user. Read in this order before doing anything:
 
 1. `CONTEXT.md` — the glossary. Use its terms verbatim (Instance, Chore Date, Day Complete, Clawback, Kid Device, ...). Don't drift to the `_Avoid_` synonyms.
-2. `docs/adr/` — eighteen decisions that look wrong without context. Do not "fix" them: children are not identity-provider users (0001), the ledger is append-only with deterministic ids (0002), instances are materialized not computed (0003), coins and pet XP are separate (0004), Hono + Drizzle on both server and device (0006), pnpm/Node not Bun (0007), one REST `/sync` endpoint (0008), children are anonymous in analytics (0009), deterministic ids use one fixed namespace (0010), the grove is append-only and never clawed back (0011), the Parent PIN is checked on the kid device against a synced hash (0013), a redemption's coins leave the ledger when the child asks rather than when the parent approves (0014), crash reports from a kid device are an allowlist with a known native-crash gap (0015), the RevenueCat webhook is the only writer of an entitlement (0016), photo proof lives in R2 for thirty days and then stops existing (0017), and Mibo ships outside the Kids Category because two SDKs on a kid device cannot satisfy guideline 1.3 (0018).
+2. `docs/adr/` — decisions that look wrong without context. Do not "fix" them.
 3. `docs/spec/` — product rules, data model, sync protocol, milestones, and the **approved dependency list**. Any dependency not on that list must be asked for first.
 4. `BUILD-PROMPT.md` — the original brief; product constraints there are settled, not open.
 
 ## Ticket workflow
 
-Issues live in GitHub Issues on `nadav-galili/chores` via `gh`; conventions in `docs/agents/issue-tracker.md`, labels in `docs/agents/triage-labels.md`. Issue #1 is the M1 spec; #2–#18 are its tracer-bullet tickets with native "blocked by" edges. #1 stays open until every ticket is closed, and is edited only to keep it true to the milestone's scope — never to record progress.
+Issues live in GitHub Issues on `nadav-galili/chores` via `gh`; conventions in `docs/agents/issue-tracker.md`, labels in `docs/agents/triage-labels.md`. Each milestone has one spec issue that lists its tracer-bullet tickets. The tickets have native "blocked by" edges. A spec issue stays open until all its tickets are closed. Edit a spec issue only to keep it true to its milestone's scope. Record progress on the tickets.
 
 Greenfield rule: all work lands directly on `main`. No feature branches, no PRs, until the first store release.
 
@@ -26,17 +26,16 @@ One ticket per session, in this order:
 3. **Close out** — `git push origin main`, then `gh issue close N --comment` with the commit hash and one line per acceptance criterion that needed a judgement call. Done when the ticket shows closed and the next frontier is listed in the reply.
 4. **`/clear`** before the next ticket. The ticket is self-contained, so this session's context is disposable.
 
-**`ops` tickets are the exception to step 2.** A ticket labelled `ops` has no diff to write — its acceptance criteria live in RevenueCat, App Store Connect, Cloudflare or on a physical device (see `docs/agents/triage-labels.md`). Read the label before exploring: the deliverable is a wizard in `scripts/` that walks a human through the clicking, modelled on `scripts/setup-premium.sh`, not an implementation.
+**`ops` tickets are the exception to step 2.** A ticket labelled `ops` has no diff to write — its acceptance criteria live outside the repo, in a dashboard or on a physical device (see `docs/agents/triage-labels.md`). Read the label before exploring: the deliverable is a wizard in `scripts/` that walks a human through the clicking, modelled on `scripts/setup-premium.sh`, not an implementation.
 
 When a ticket exposes a gap in the spec, resolve it in the ticket's comments and keep building; edit `docs/spec/` only if the gap changes a documented rule, and add an ADR only if the decision is hard to reverse.
 
 ## Layout and commands (per ADR-0007)
 
-Three workspaces — `apps/mobile`, `apps/api`, `packages/shared` — laid out and justified in `docs/adr/0007-*`. Everything else is in `package.json` scripts; these three are not:
+Three workspaces — `apps/mobile`, `apps/api`, `packages/shared` — laid out and justified in `docs/adr/0007-*`.
 
 ```
-pnpm dev                                               # concurrently: api (tsx watch) + expo start --dev-client
-pnpm --filter api db:generate                          # drizzle-kit generate after editing src/db/schema.ts
+pnpm --filter <api|mobile> db:generate                 # after you edit that workspace's src/db/schema.ts
 scripts/deploy-api.sh                                  # deploy apps/api, stamped with HEAD's commit
 scripts/check-deploy.sh                                # is the live API this commit? /health reports the sha
 ```
@@ -59,10 +58,18 @@ No UI tests, no mocking of Postgres or SQLite, no handler-level unit tests.
 
 ## Invariants
 
-`CODING_STANDARDS.md` holds the seven, in reviewable form; `/code-review` reads it. Read it before touching a schema or migration, a ledger, XP, completion or growth write, a Chore Date, a kid-device query, an analytics call, or anything entitlement-gated.
+`CODING_STANDARDS.md` holds the invariants in reviewable form. `/code-review` reads it. Read the file before you write code for one of these:
 
-Never stored, always derived: balance is `SUM(coins)`, grove stage is `COUNT(*)`.
+- a schema or migration
+- a ledger, XP, completion or growth write
+- a Chore Date
+- a kid-device query
+- an analytics call, an error message, or anything else sent to a third party
+- anything entitlement-gated
+- a `catch`
+- a shell script in `scripts/`
+- `NAMESPACE_CHORES`, or another identifier that still says `chores`
 
 ## Working style (from the brief)
 
-Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. App name "Mibo" — "Kids" appears in the identifier only, never in the brand, and the store title is `Mibo: Chores Tracker` (`docs/spec/05-store-listing.md`). Bundle id and Android package `com.mibokids.app`. Pet name is per-child: a parent sets a starting name, the child may rename it. The npm scope `@chores/shared`, the repo, the Railway project and `NAMESPACE_CHORES` keep the original name — `NAMESPACE_CHORES` is frozen by ADR-0010 and must never change.
+Terse replies, no summaries of what was just done. Build only what the ticket asks; no speculative abstractions. The brand is "Mibo" alone (`docs/spec/05-store-listing.md`). Pet name is per-child: a parent sets a starting name, the child may rename it.
