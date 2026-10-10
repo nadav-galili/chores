@@ -24,7 +24,7 @@ Competitors lose the child in week two. The test: do a 7-year-old and a 10-year-
 Kinds: `once` (due_date), `daily`, `weekdays` (bit mask Mon=0…Sun=6). Start/end dates. N assignees → one instance per assignee per chore date. Kid can undo own completion same day until a parent has acted on it.
 
 ## Children and devices
-- Child = first name, `ui_mode` (`little` | `big`, set by parent, not derived from age), pet name, optional reminder time.
+- Child = first name, `ui_mode` (`little` | `big`, set by parent, not derived from age), pet name (a parent sets the starting name, and the child may rename it), optional reminder time.
 - One child per device. Parent's phone has no kid mode in v1.
 - Join code: 6 chars, 15 min, single-use, bound to one child. Redeem → device token. Parent can revoke; revoked device wipes local data and shows "ask a parent to reconnect".
 - One binary. First launch asks parent / kid. Kid mode exits only with the parent PIN: one per household, four digits, checked on the device itself so it works offline, and it guards that door and nothing else (ADR-0013). A parent must set one before their first join code is issued. Any signed-in parent can replace it without knowing the old one; an offline kid device keeps accepting the old one until it next syncs.

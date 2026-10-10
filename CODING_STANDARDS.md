@@ -1,80 +1,85 @@
 # Coding standards
 
-Read during review, not implementation. Each rule reads *what it is* → *what a violation looks like in a diff*. Terms are `CONTEXT.md`'s; use them verbatim.
+A break of a rule in this file is a hard violation, not a judgement call. Each rule gives the **rule**, then the violation as it shows in a diff, then the ADR, spec, issue or commit behind it. Where a rule cites an ADR, the ADR is the authority, and this file restates it for review. "Not a violation" names a false positive.
 
-These are hard violations, not judgement calls — every one of them is a settled decision with an ADR or a spec behind it. Where a rule cites an ADR, the ADR is the authority; this file is the reviewable restatement.
+## Derived values
 
-## Derived values are never stored
-
-- **Balance is always `SUM(coins)` over the ledger.** Violation: a `balance` column in a schema or migration, a balance field on an API response computed once and persisted, any write that "updates" a balance.
+- **Balance is always `SUM(coins)` over the ledger.** Violation: a `balance` column in a schema or migration, a balance field on an API response computed once and persisted, any write that "updates" a balance. (ADR-0002, ADR-0014)
 - **Grove stage is always `COUNT(*)` over growth entries.** Violation: a `stage` or `grove_stage` column, or a stage cached on `children`. (ADR-0011)
 
-A derived value in a `SELECT` is fine. A derived value in a `CREATE TABLE`, an `INSERT`, or an `UPDATE` is the violation.
+Not a violation: a `SELECT` that computes either value.
 
 ## Append-only rows
 
-- **Ledger, XP and completion rows are never updated or deleted.** Corrections are new Clawback entries. Violation: `UPDATE` or `DELETE` against those tables, a Drizzle `.update()` / `.delete()` on them, or a migration that rewrites their rows.
+- **Ledger and XP rows are append-only. A correction is a new Clawback entry.** Violation: `UPDATE` or `DELETE` against those tables, a Drizzle `.update()` / `.delete()` on them, or a migration that rewrites their rows. (ADR-0002)
+- **Code writes a completion row once. After that, only its `status` changes.** A Rejection also sets `rejected_by` and `rejected_at`, and a `pending_photo` row gets its `photo_key` one time, when the upload lands. Violation: a `DELETE` of a completion, an update to any other completion column, or a migration that rewrites completion rows. (`docs/spec/02-data-model.md`, ADR-0017)
 - **Growth entries are append-only *and* have no clawback.** A rejection costs coins and the streak, never a tree. Violation: any clawback path that also removes or negates a growth entry. (ADR-0011)
 
-The asymmetry is the point: the ledger corrects by appending a negative entry; the grove does not correct at all.
+These rules cover the rows that the server accepted for a living household. Not a violation:
 
-**The rule governs rows the server accepted.** A device's optimistic rows for an op the server *refused* were never accepted, are the device's own, and that op deletes them — a refused `request_redemption` that leaves its `redemptions` row and its `redeem` entry behind leaves the balance wrong. Flagging that delete is a false positive. (ADR-0014, `docs/spec/03-sync.md`)
+- A device deletes its own optimistic rows for an op that the server refused. A refused `request_redemption` that keeps its `redemptions` row and its `redeem` entry leaves the balance wrong. (ADR-0014, `docs/spec/03-sync.md`)
+- A Household Deletion deletes all the rows of the household. (ADR-0019)
 
-## Dates are household-local, never instants
+## Dates
 
-**Every date-keyed row stores a household-local `chore_date`.** Violation: date arithmetic on a timestamp or `Date` to derive a Chore Date — adding days to an instant, `toISOString().slice(0,10)`, comparing instants to decide which Chore Date a row belongs to. The Chore Date is computed once at the household boundary (ADR-0003) and carried; downstream code reads it, never recomputes it.
+**Every date-keyed row stores a household-local `chore_date`. Code computes the Chore Date once, from the household timezone and Day Boundary, and then carries it.** Violation: a Chore Date derived from an instant. Examples are adding days to a timestamp or `Date`, `toISOString().slice(0,10)`, and a comparison of instants that decides the Chore Date of a row. (ADR-0003)
 
-## Sibling isolation is server-side
+## Sibling isolation
 
-**A Kid Device token scopes every query to one child**, enforced in the query, not in the UI. Violation: a handler that takes a `childId` from the request body or params on a kid-device route rather than deriving it from the token; a query missing the child scope with the filtering done after the fetch, or in a component.
+**A Kid Device token scopes every query to one child, in the query itself.** Violation: a kid-device route that takes a `childId` from the request body or params instead of from the token. Also a violation: a query without the child scope that filters after the fetch or in a component. (`docs/spec/03-sync.md`)
 
-**There are two exceptions, the grove and the reward catalog.** `children` and `growth_entries` reach a Kid Device household-wide because the grove belongs to the household (ADR-0011); `rewards` does too, because it is a per-household catalog carrying no `child_id` at all. `redemptions` stays child-scoped. The three are named in `HOUSEHOLD_WIDE` in `apps/api/src/sync.ts`; flagging one of them as a leak is a false positive. (`docs/spec/03-sync.md`)
+Not a violation: the three tables in `HOUSEHOLD_WIDE` (`apps/api/src/sync.ts`) reach a Kid Device household-wide. `children` and `growth_entries` do because the grove belongs to the household (ADR-0011). `rewards` does because it is a per-household catalog with no `child_id`. `redemptions` stays child-scoped.
 
 ## Child privacy
 
 **Child data is first name only, and nothing about a child reaches analytics or a third party.** Violation: a child's name, age, birthday, photo or id in an analytics call, a crash-report payload, a log line that ships off-device, or any third-party SDK argument. Children are anonymous per-device in analytics. (ADR-0009)
 
-**One carve-out, and only this one: a child's first name may appear in push copy addressed to a registered device of a parent of that child's own household** — the parent digest, which is unreadable without saying which child (`digestCopy` in `packages/shared/src/notification.ts`). Nothing else widens: not analytics, not crash reports, not logs, not the child's own pushes, and never a pet name, chore title, reward title or Join Code. (ADR-0009)
+**One carve-out, and only this one: a child's first name may appear in push copy addressed to a registered device of a parent of that child's own household** — the parent digest (`digestCopy` in `packages/shared/src/notification.ts`). Nothing else widens: not analytics, not crash reports, not logs, not the child's own pushes, and never a pet name, chore title, reward title or Join Code. (ADR-0009)
 
-**An error's own message is part of that payload.** A crash report carries the string a `throw`
-was given, and no scrubber downstream can tell a chore title inside it from a real error. Violation:
-a `throw new Error(...)`, a rejected promise or a `captureException` context that interpolates a
-child's first name, pet name, a chore title or a Join Code. Name the operation that failed, not the
-row it failed on. (ADR-0015)
+**An error message names the operation that failed, not the row it failed on.** A crash report carries the message. Violation: a `throw new Error(...)`, a rejected promise or a `captureException` context that interpolates a child's first name, a pet name, a chore title or a Join Code. (ADR-0015)
 
-**Anything a third-party SDK sends is an allowlist, not a scrub list.** Violation: a `beforeSend`,
-`beforeBreadcrumb` or equivalent that deletes known-bad fields from an object it was handed instead
-of building a new one out of known-good fields — the next SDK release adds a field the deny list has
-never heard of. The allowlists live in `packages/shared/src/error-reporting.ts`. (ADR-0015)
+**Anything a third-party SDK sends is an allowlist, not a scrub list.** Violation: a `beforeSend`, `beforeBreadcrumb` or similar hook that deletes known-bad fields from the object it gets, instead of a new object built from known-good fields. The allowlists are in `packages/shared/src/error-reporting.ts`. (ADR-0015)
 
-## Entitlement never gates the child
+## Entitlement
 
-**The child's side is never gated by entitlement.** Violation: an entitlement, paywall, subscription or free-tier check anywhere under a `(kid)` route, in a kid-device handler, or in shared logic reached from one. Entitlement gates the parent's side only. (ADR-0005)
+**Entitlement gates the parent's side only. The child's side is always available.** Violation: an entitlement, paywall, subscription or free-tier check anywhere under a `(kid)` route, in a kid-device handler, or in shared logic that one of them reaches. (ADR-0005)
 
 ## A catch never discards its cause
 
-**Every `catch` either surfaces the cause, logs it, or says in a comment why the silence is safe.** Violation: `catch {}` or `.catch(() => {})` with no comment, on a path where the failure is real — a write that does not land, a request that does not return, a session that does not activate.
+**Every `catch` either surfaces the cause, logs it, or says in a comment why the silence is safe.** The screen can hide a failure, but the cause always goes to one of these places:
 
-Swallowing the *failure* is often right; swallowing the *cause* never is. Where the person who sees the screen can act on it, the cause reaches them (`chore-form.tsx` appends the status and code to a failed save). Where they cannot — anything a child sees — it is logged instead and the child's screen stays calm. Failure that is genuinely inert may be ignored, with a comment saying so; `haptics.ts` is the honest case, because a buzz that does not fire is not an error.
+- A parent's screen shows the cause (`chore-form.tsx` appends the status and code to a failed save).
+- A child's screen stays calm, and the cause goes to the log.
+- An inert failure gets the comment (`haptics.ts`: a buzz that does not fire is not an error).
 
-Nothing logged may carry a child's first name, pet name, chore title or join code — the privacy rule above outranks this one (ADR-0009).
+Violation: `catch {}` or `.catch(() => {})` with no comment, or a `catch (e)` that binds the cause and then drops it. This applies on a path where the failure is real: a write that does not land, a request that does not return, a session that does not activate. ESLint (`no-empty`, `no-empty-function`) rejects the two empty shapes and accepts them with a comment inside. Only review finds a `catch (e)` that drops its cause. (#36)
 
-The two banned shapes are the two a linter can see, so `no-empty` and `no-empty-function` reject them; both accept a body holding a comment, which is the third shape written down inside the braces. A `catch (e)` that binds the cause and then drops it is beyond either rule and stays a review call.
+Child privacy outranks this rule: a log line carries no first name, pet name, chore title or Join Code. (ADR-0009)
 
-This rule is evidence rather than an ADR: four bugs in one session — a discarded OAuth error, two discarded `uuid7()` failures and one with no `catch` at all — each cost a ten-minute instrumented device build to learn something the device already knew. (#36)
+## Shell scripts
 
-## A shell script's failures are real failures
+Every `scripts/*.sh` runs `set -euo pipefail`.
 
-`scripts/*.sh` all run `set -euo pipefail`, which makes every command in a pipeline load-bearing — including the reader.
+**Capture the output of a long-running or chatty command first, then slice it.** Violation: a pipe from such a command into a filter that stops reading early (`head`, `sed -n '1,5p'`, `grep -q`, `jq -e` on a stream). The filter exits, the writer gets SIGPIPE, `pipefail` reports the pipeline as failed, and the `|| warn` fires on a healthy command. Write `out=$(cmd)`, then `printf '%s\n' "$out" | head -5`. Shellcheck does not catch this. (#75)
 
-**A command whose output is truncated is captured first, then sliced.** Violation: piping a long-running or chatty command into a filter that stops reading early — `head`, `sed -n '1,5p'`, `grep -q`, `jq -e` with `--exit-status` on a stream. The filter exits, the writer gets SIGPIPE, `pipefail` reports the pipeline as failed, and the `|| warn` fires on a perfectly healthy command. Write `out=$(cmd)` and then `printf '%s\n' "$out" | head -5`.
+**An interactive checklist offers three answers: yes, no, and not yet run.** A bare Enter records *not yet run*, which goes in neither column. Violation: a `[y/n]` prompt over work that the person possibly could not try yet. It records untried work as FAILED, or it forces the person to abandon the run. (#75)
 
-Shellcheck does not see this one, which is why it is here. It cost a session a false "railway status failed" against a correctly linked project (#75).
+## Tests
 
-**An interactive checklist offers three answers, not two.** Violation: a `[y/n]` prompt over work the person may not have been able to attempt yet — the only way to avoid recording a FAILED for untried work is to abandon the run. Default the bare Enter to *not yet run* and keep it out of both columns.
+**Every test runs at one of three seams.** These are the pre-agreed seams for `/tdd`:
 
-## Frozen identifiers
+1. `packages/shared` pure functions, input → output.
+2. API over HTTP with Hono `app.request()` against a real Postgres.
+3. Device sync engine over an in-memory SQLite, fed canned `/sync` responses.
 
-**`NAMESPACE_CHORES` must never change** — deterministic ids are derived from it, so changing it silently breaks every existing id. Violation: any edit to its value. (ADR-0010)
+Violation: a UI test, a mock of Postgres or SQLite, a handler-level unit test, or another test outside the three seams. (#1, Testing Decisions)
 
-The npm scope `@chores/shared`, the repo name and the Railway project also keep the original name; the app itself is "Mibo" (`docs/spec/05-store-listing.md`). A diff that renames the former to match the latter is a violation, not a cleanup.
+**Tests use `TEST_DATABASE_URL` (default `chores_test`), never `DATABASE_URL`.** `DATABASE_URL` names the dev server's database, and every test file drops the whole `public` schema of its database. Violation: a test file or a test helper that reads `DATABASE_URL`, or a fallback from `TEST_DATABASE_URL` to it. Not a violation: the server, `drizzle.config.ts` or a script in `scripts/` that reads `DATABASE_URL` for its own database. (`apps/api/src/test/db.ts`)
+
+## Names
+
+**`NAMESPACE_CHORES` is frozen.** Every deterministic id derives from it, so a change breaks every existing id. Violation: any edit to its value. (ADR-0010)
+
+**The npm scope `@chores/shared`, the repo name and the Railway project keep the name `chores`.** Violation: a diff that renames one of them to "Mibo", for a cleanup or for any other reason. (commit 04127e6)
+
+**The brand is "Mibo" alone.** "Kids" is in the identifier `com.mibokids.app` only. Violation: text a person reads that names the app anything other than "Mibo", for example "Mibo Kids". This includes `app.json`, a catalog string, push copy and a page that the API serves. Not a violation: the keyword tail of a store title after "Mibo", which the store listing controls. (`docs/spec/05-store-listing.md`)

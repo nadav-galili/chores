@@ -25,9 +25,9 @@ import { applyPull, materializeToday, redoList, todayList } from './engine';
 import { balanceOf, tapContext, tapDone, tapRedo, type ChildContext } from './local';
 
 /**
- * Seam 3 (CLAUDE.md): the device sync engine over in-memory SQLite fed canned `/sync` responses.
- * The whole redo loop from the child's side — a rejection arrives, the chore comes back, the
- * child does it again on the day it belonged to.
+ * Seam 3 (CODING_STANDARDS.md, Tests): the device sync engine over in-memory SQLite fed canned
+ * `/sync` responses. The whole redo loop from the child's side — a rejection arrives, the chore
+ * comes back, the child does it again on the day it belonged to.
  */
 
 const childId = uuid7();
