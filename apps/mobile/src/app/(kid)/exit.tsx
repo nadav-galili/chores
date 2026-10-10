@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Body, Button, ErrorText, Field, Loading, Screen, Title } from '@/components/ui';
+import { wipeDeviceDb } from '@/db/client';
 import { createDeviceApi } from '@/lib/api';
 import { useDeviceSession } from '@/lib/device-session';
 import { t } from '@/lib/i18n';
@@ -90,6 +91,13 @@ export default function Exit() {
     await device.clear();
     await setRole('parent');
     router.replace('/(parent)/(tabs)/(today)');
+    // Once the kid screens are gone, so nothing is reading the copy as it goes. Without it, the
+    // next child joined on this phone would pull only what changed after this child's cursor.
+    try {
+      await wipeDeviceDb();
+    } catch (e) {
+      console.error('device wipe on exit failed', e);
+    }
   };
 
   if (!unlocked) {
@@ -112,7 +120,8 @@ export default function Exit() {
               ? t('exit.wrongPin')
               : null}
         </ErrorText>
-        <Button name="unlock_exit"
+        <Button
+          name="unlock_exit"
           title={t('exit.unlock')}
           onPress={submit}
           disabled={msLeft > 0 || !pinSchema.safeParse(pin).success}

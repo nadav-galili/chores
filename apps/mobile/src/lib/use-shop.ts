@@ -1,6 +1,6 @@
 import { rewardRequested, type DeviceSession } from '@chores/shared';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { openDeviceDb } from '@/db/client';
 import type { DeviceDb } from '@/db/types';
 import { tapContext, type ChildContext } from '@/sync/local';
@@ -8,7 +8,7 @@ import { askForReward, cancelRedemption } from '@/sync/redeem';
 import { showShop, type ShopRequest, type ShopReward, type ShopView } from '@/sync/shop';
 import { syncNow } from '@/sync/sync';
 import { capture } from '@/lib/analytics';
-import { ApiError, createDeviceApi } from '@/lib/api';
+import { createDeviceApi, isDeviceRevoked } from '@/lib/api';
 
 /**
  * The reward shop: read from SQLite, written to SQLite, and synced afterwards.
@@ -38,6 +38,12 @@ export function useShop(session: DeviceSession, onRevoked: () => void): Shop {
     requests: [],
   });
 
+  // Held in a ref, as `useToday` does: the screen passes a fresh function every render, and a
+  // `refresh` that changed with it would re-run the focus effect, read, re-render and sync again
+  // for as long as the shop is open.
+  const revoked = useRef(onRevoked);
+  revoked.current = onRevoked;
+
   const { id: childId } = session.child;
   const { tz, day_boundary_hour: boundary } = session.household;
 
@@ -64,13 +70,13 @@ export function useShop(session: DeviceSession, onRevoked: () => void): Shop {
       await syncNow(db, child, createDeviceApi(session.device_token).sync);
       await read(db);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'device_revoked') return onRevoked();
+      if (isDeviceRevoked(e)) return revoked.current();
       // The shop is drawn from local rows, so a failed sync changes nothing the child can see.
       // It is said out loud rather than swallowed: a request that never leaves the outbox is a
       // parent who is never asked.
       console.error('shop sync failed', e);
     }
-  }, [read, child, session.device_token, onRevoked]);
+  }, [read, child, session.device_token]);
 
   /** One tap: write it locally, show the result, then let the network catch up. */
   const tap = useCallback(

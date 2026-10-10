@@ -8,8 +8,9 @@
  * The review address is `REVIEW_EMAIL` from `@chores/shared`. Every R2_* variable is required:
  * without them there is no photo proof, and the script stops before touching anything.
  *
- * Premium is set by a manual write, not the RevenueCat webhook — the one exception ADR-0016's
- * amendment names; the reasoning is on `REVIEW_ENTITLEMENT_SOURCE` in `review-household.ts`. It runs no migrations: the target
+ * The entitlement is set by manual writes, not the RevenueCat webhook — the one exception ADR-0016's
+ * amendment names: premium while it is built, then lapsed back to free (`REVIEW_ENTITLEMENT_SOURCE`
+ * and `REVIEW_EXPIRED_SOURCE` in `review-household.ts` say why). It runs no migrations: the target
  * database belongs to the deployed API, which migrates it itself (`scripts/check-deploy.sh` says
  * whether that API is this commit). It never reads or prints REVIEW_SECRET.
  */

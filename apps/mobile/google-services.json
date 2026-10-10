@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "802686044850",
+    "project_id": "mibo-64540",
+    "storage_bucket": "mibo-64540.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:802686044850:android:b7ae79e7239a37f32197ab",
+        "android_client_info": {
+          "package_name": "com.mibokids.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHlkn2rdSxeOmm_UeEysC98Pk0s3ij1v4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

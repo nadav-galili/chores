@@ -49,7 +49,7 @@ Not in M2: custom rewards, the money ledger and photo proof stay behind their M3
 - **Push token rot** — re-register on open; null on `DeviceNotRegistered`.
 
 ## Dependencies (approved once, here)
-- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto, @sentry/react-native, expo-updates
+- mobile: expo-router, expo-sqlite, drizzle-orm, @clerk/clerk-expo, expo-secure-store, expo-notifications, posthog-react-native, react-native-purchases, i18n-js, expo-localization, expo-image-picker, uuid, react-native-reanimated, expo-haptics, expo-font, expo-crypto, @sentry/react-native, expo-updates, expo-symbols
 - api: hono, @hono/node-server, drizzle-orm, postgres, zod, @clerk/backend, posthog-node, expo-server-sdk, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 - tooling: turbo, vitest, tsx, drizzle-kit, eslint, prettier, typescript
 
@@ -100,6 +100,11 @@ everything else reads `preview` — so a value present in only one of them fails
 still the whole of the app's configuration. `metro.config.js` wraps Expo's default config with
 Sentry's, which is what stamps the debug id that matches an uploaded source map to a released
 build.
+
+`expo-symbols` was already in the tree under expo-router; it is direct so the parent tab bar can
+name a Material Symbol beside each SF Symbol. Android ignores SF Symbols and drew the bar as labels
+over blank space. On Android it is JavaScript only: it renders the glyph from a bundled font through
+`expo-font`, so it adds no native module.
 
 `react-dom` is pinned in `apps/mobile` and in `pnpm.overrides` at the same version as `react`. Nothing
 imports it — pnpm auto-installs it as a peer of expo-router's runtime and hoists it, and a hoisted copy

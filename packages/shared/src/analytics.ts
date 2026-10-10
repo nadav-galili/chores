@@ -245,6 +245,16 @@ export function pushOpened(open: { kind: NotificationKind }): AnalyticsEvent {
 }
 
 /**
+ * Expo accepted a push: the denominator `push_opened` is counted against. Sent by the API once per
+ * message Expo took, under the distinct id that message's tap will report from — the parent's
+ * Clerk id, or the kid device's anon id — so sends and opens join per person. The kind is all it
+ * carries, for the same reason a tap's is (ADR-0009).
+ */
+export function pushSent(sent: { kind: NotificationKind }): AnalyticsEvent {
+  return { event: 'push_sent', properties: { kind: sent.kind } };
+}
+
+/**
  * The steps of first run, in the order a new parent meets them (M5). `welcome` is the first screen,
  * before there is a role; the rest are guided setup, ending at the Join Code's `connected`.
  */

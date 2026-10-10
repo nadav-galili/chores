@@ -14,3 +14,7 @@ What staying out costs is guideline 2.3.8, on metadata that markets to children 
 None of this weakens what the app actually does about children. They still have no accounts (ADR-0001), are still anonymous in analytics (ADR-0009), and the privacy labels still declare nothing used for tracking. The Kids Category is a distribution choice, not the privacy posture; conflating the two is what would make this decision look like a retreat.
 
 To revisit: strip Sentry and PostHog from the Kid Device build, or gate them behind a parent-only initialisation that a Kid Device never reaches, then re-read ADR-0015's native-crash gap to check it has actually closed. Until that is true, answering Made for Kids would be declaring something the code does not do.
+
+## Google Play
+
+Play has no Kids Category; its equivalent is the Target audience form, where any age group under 13 puts the app under the Families policy, whose SDK rules fail on the same two SDKs for the same reason. Mibo declares **18+ only** and answers that the app is for parents. The exposed surface is Play's "could your app unintentionally appeal to children?" check, since the product is a pet, a grove and coins, and the Play title carries `for Kids`. The defence is the one iOS uses for 2.3.8: the listing copy and the first screenshots lead with the Parent side (setup, approvals, allowance), and the title's prepared fallback is `Mibo: Chores Tracker` (20). If Play forces Families anyway, that is the "to revisit" above, not a form change.

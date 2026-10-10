@@ -38,6 +38,15 @@ export const en = {
     // time and the child has completed something, and it says the notification is that reminder.
     pushAllow: 'Allow',
     pushNotNow: 'Not now',
+    // A photo chore tapped after the camera was refused: the OS will not ask again, so the only
+    // way back is Settings, and that is a grown-up's job. One voice for both modes, so no
+    // exclamation mark.
+    camera: {
+      title: 'The camera is off',
+      body: 'This chore needs a photo. Ask a grown-up to turn on the camera for Mibo in Settings.',
+      settings: 'Open Settings',
+      ok: 'OK',
+    },
     // Voice is the third of the three differences between the modes (docs/spec/06-design.md):
     // celebratory for a 7-year-old, neutral for a 10-year-old. `big` carries no exclamation
     // mark anywhere — that is the whole of what "neutral" means here, and it is checkable.
@@ -266,6 +275,7 @@ export const en = {
       pin: 'Parent PIN',
       // The way back to the parent-push explanation, shown while the phone can still be asked.
       eveningSummary: 'Evening summary',
+      deleteAccount: 'Delete my account',
       signOut: 'Sign out',
     },
     // A tab's label is not the screen's title: it sits under an icon in a bar five wide, so it is
@@ -342,6 +352,31 @@ export const en = {
       allow: 'Allow',
       notNow: 'Not now',
     },
+  },
+  // Account Deletion (ADR-0019). Two steps, no modal: the first tap arms, the second deletes. The
+  // last parent's second step names the children whose history goes with the household.
+  deleteAccount: {
+    title: 'Delete my account',
+    intro:
+      'Your account, your sign-in and this phone’s notifications are deleted at once. There is no undo.',
+    partnerStays:
+      'Another parent is still in this household, so the household and the children’s history stay with them.',
+    lastParent: 'You are this household’s last parent, so the whole household is deleted with you.',
+    subscription:
+      'Deleting your account does not cancel a subscription. Cancel it in Google Play or the App Store first, or it keeps renewing.',
+    start: 'Delete my account',
+    subscriptionShared:
+      'If you pay for this household’s Premium, deleting your account does not cancel it: it keeps renewing, and the household keeps Premium. Cancel it in Google Play or the App Store and the household returns to the free plan.',
+    confirmTitle: 'Delete for good?',
+    confirmPartner: 'Only your account goes. This cannot be undone.',
+    confirmLast:
+      'Every chore, coin, reward and tree of %{names} is deleted, with every photo, and their devices are disconnected. This cannot be undone.',
+    confirmLastNoChildren: 'The household and everything in it is deleted. This cannot be undone.',
+    confirm: 'Delete for good',
+    cancel: 'Keep my account',
+    deleting: 'Deleting…',
+    failed: 'Could not delete your account. Try again.',
+    loadFailed: 'Could not load who is in this household.',
   },
   partner: {
     title: 'Your partner',

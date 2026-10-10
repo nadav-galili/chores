@@ -31,6 +31,12 @@ export const he: Catalog = {
     petButton: '%{name}, רמה %{level}',
     pushAllow: 'לאפשר',
     pushNotNow: 'לא עכשיו',
+    camera: {
+      title: 'המצלמה כבויה',
+      body: 'המטלה הזאת צריכה תמונה. בקשו ממבוגר להפעיל את המצלמה של Mibo בהגדרות.',
+      settings: 'לפתוח את ההגדרות',
+      ok: 'הבנתי',
+    },
     little: {
       greeting: 'היי %{name}!',
       empty: '🎈 אין מה לעשות היום!',
@@ -243,6 +249,7 @@ export const he: Catalog = {
       allowance: 'דמי כיס',
       pin: 'קוד הורה',
       eveningSummary: 'סיכום ערב',
+      deleteAccount: 'מחיקת החשבון שלי',
       signOut: 'התנתקות',
     },
     tabs: {
@@ -309,6 +316,27 @@ export const he: Catalog = {
       allow: 'לאפשר',
       notNow: 'לא עכשיו',
     },
+  },
+  deleteAccount: {
+    title: 'מחיקת החשבון שלי',
+    intro: 'החשבון שלך, הכניסה שלך וההתראות בטלפון הזה נמחקים מיד. אי אפשר לבטל.',
+    partnerStays: 'הורה נוסף עדיין במשק הבית, ולכן משק הבית וההיסטוריה של הילדים נשארים אצלו.',
+    lastParent: 'את/ה ההורה האחרון/ה במשק הבית, ולכן כל משק הבית נמחק יחד איתך.',
+    subscription:
+      'מחיקת החשבון לא מבטלת מינוי. יש לבטל אותו קודם ב-Google Play או ב-App Store, אחרת הוא ימשיך להתחדש.',
+    start: 'מחיקת החשבון שלי',
+    subscriptionShared:
+      'אם את/ה משלם/ת על Premium של משק הבית, מחיקת החשבון לא מבטלת אותו: הוא ממשיך להתחדש ומשק הבית נשאר ב-Premium. ביטול ב-Google Play או ב-App Store מחזיר את משק הבית למסלול החינמי.',
+    confirmTitle: 'למחוק לצמיתות?',
+    confirmPartner: 'רק החשבון שלך נמחק. אי אפשר לבטל.',
+    confirmLast:
+      'כל המטלות, המטבעות, הפרסים והעצים של %{names} נמחקים, יחד עם כל התמונות, והמכשירים שלהם מתנתקים. אי אפשר לבטל.',
+    confirmLastNoChildren: 'משק הבית וכל מה שבו נמחקים. אי אפשר לבטל.',
+    confirm: 'מחיקה לצמיתות',
+    cancel: 'השארת החשבון',
+    deleting: 'מוחק…',
+    failed: 'לא הצלחנו למחוק את החשבון. נסו שוב.',
+    loadFailed: 'לא הצלחנו לטעון מי נמצא במשק הבית.',
   },
   partner: {
     title: 'בן/בת הזוג',

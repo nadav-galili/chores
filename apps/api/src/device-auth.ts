@@ -29,8 +29,11 @@ export function requireKidDevice(db: Db): MiddlewareHandler<DeviceEnv> {
           where: eq(childDevices.tokenHash, hashDeviceToken(token)),
         })
       : undefined;
-    if (!device) return c.json({ error: 'unauthenticated' }, 401);
-    if (device.revokedAt) return c.json({ error: 'device_revoked' }, 401);
+    if (!token) return c.json({ error: 'unauthenticated' }, 401);
+    // A token with no row is one a Household Deletion took (ADR-0019), and the device must react
+    // exactly as to a revoke: back to the join screen, its local copy wiped. Every unknown token
+    // gets the same answer, so it says nothing about which tokens ever existed.
+    if (!device || device.revokedAt) return c.json({ error: 'device_revoked' }, 401);
     c.set('deviceId', device.id);
     c.set('childId', device.childId);
     c.set('householdId', device.householdId);

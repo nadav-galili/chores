@@ -7,6 +7,7 @@ import {
   type DueRollover,
 } from '@chores/shared';
 import { eq, isNotNull } from 'drizzle-orm';
+import { noAnalytics, type Analytics } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import { children, households } from './db/schema.ts';
 import { writeHouseholdInstances } from './materialize.ts';
@@ -42,7 +43,12 @@ export type TickResult = {
 };
 
 /** One minute of the cron's work. Idempotent: every write it does is claimed by a fixed id. */
-export async function runTick(db: Db, push: Push, now = new Date()): Promise<TickResult> {
+export async function runTick(
+  db: Db,
+  push: Push,
+  now = new Date(),
+  analytics: Analytics = noAnalytics,
+): Promise<TickResult> {
   const householdRows = await db
     .select({
       id: households.id,
@@ -71,17 +77,17 @@ export async function runTick(db: Db, push: Push, now = new Date()): Promise<Tic
   const reminded: DueReminder[] = [];
   let forgotten = 0;
   for (const due of remindersDue(childRows, now)) {
-    const sent = await sendReminder(db, push, due, now);
+    const sent = await sendReminder(db, push, analytics, due, now);
     if (sent.forgotten) forgotten++;
     if (sent.claimed) reminded.push(due);
   }
   // Nothing on a clock asks for these two; the tick is only where the claim row lives.
-  const immediate = await sendImmediates(db, push, now);
+  const immediate = await sendImmediates(db, push, analytics, now);
   forgotten += immediate.forgotten;
 
   const digested: DueDigest[] = [];
   for (const due of digestsDue(householdRows, now)) {
-    const sent = await sendDigest(db, push, due, now);
+    const sent = await sendDigest(db, push, analytics, due, now);
     forgotten += sent.forgotten;
     if (sent.claimed) digested.push(due);
   }
@@ -92,9 +98,11 @@ export async function runTick(db: Db, push: Push, now = new Date()): Promise<Tic
 }
 
 /** Starts the minute cron; returns the stop the process never calls but a test might. */
-export function startCron(db: Db, push: Push): () => void {
+export function startCron(db: Db, push: Push, analytics: Analytics): () => void {
   const timer = setInterval(() => {
-    void runTick(db, push).catch((e: unknown) => console.error('cron tick failed', e));
+    void runTick(db, push, new Date(), analytics).catch((e: unknown) =>
+      console.error('cron tick failed', e),
+    );
   }, TICK_MS);
   return () => clearInterval(timer);
 }

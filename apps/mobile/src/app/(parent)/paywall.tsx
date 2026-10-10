@@ -32,12 +32,26 @@ type Status =
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** A store result is only a reason to poll. The server webhook remains the Entitlement writer. */
-async function waitForServerEntitlement(api: Api, signal: AbortSignal): Promise<void> {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    if (signal.aborted) throw new Error('entitlement check cancelled');
-    const me = await api.me();
-    if (me.household?.entitlement === 'premium') return;
+/**
+ * How long a store result waits for the server. RevenueCat's webhook usually lands in seconds but
+ * is documented to take up to a minute; a wait shorter than that tells a parent who has paid that
+ * the purchase failed.
+ */
+const ENTITLEMENT_WAIT_MS = 90_000;
+
+/**
+ * A store result is only a reason to poll. The server webhook remains the Entitlement writer. A
+ * read of /me that fails on the way is one more reason to keep waiting, not an answer.
+ */
+async function waitForServerEntitlement(api: Api): Promise<void> {
+  const deadline = Date.now() + ENTITLEMENT_WAIT_MS;
+  while (Date.now() < deadline) {
+    try {
+      const me = await api.me();
+      if (me.household?.entitlement === 'premium') return;
+    } catch {
+      // The deadline decides; a blip in the middle does not.
+    }
     await wait(1_000);
   }
   throw new Error('server entitlement did not arrive');
@@ -91,22 +105,28 @@ function GatedPaywall({ gate }: { gate: Gate }) {
   }, [load]);
 
   const confirmWithServer = useCallback(async () => {
+    // Aborted when this screen closes or a retry starts: the wait itself carries on either way,
+    // because a parent who has paid and left still needs the household to say premium.
     abort.current?.abort();
     const check = new AbortController();
     abort.current = check;
     setStatus('verifying');
     setError(null);
     try {
-      await waitForServerEntitlement(api, check.signal);
-      await refresh();
-      setStatus('ready');
-      router.back();
+      await waitForServerEntitlement(api);
     } catch (cause) {
-      if (check.signal.aborted) return;
       reportError(cause, 'paywall_wait_for_entitlement');
+      if (check.signal.aborted) return;
       setStatus('verification_error');
       setError(t('paywall.verificationFailed'));
+      return;
     }
+    // Refreshed even after the parent has left, so the gate they went back to opens without
+    // waiting for some later read of /me.
+    await refresh();
+    if (check.signal.aborted) return;
+    setStatus('ready');
+    router.back();
   }, [api, refresh, router]);
 
   const buy = useCallback(
@@ -200,7 +220,12 @@ function GatedPaywall({ gate }: { gate: Gate }) {
       {status === 'ready' && <Text style={styles.status}>{t('paywall.ready')}</Text>}
       <ErrorText>{error}</ErrorText>
       {status === 'load_error' && (
-        <Button title={t('paywall.retry')} name="retry_load" onPress={() => void load()} secondary />
+        <Button
+          title={t('paywall.retry')}
+          name="retry_load"
+          onPress={() => void load()}
+          secondary
+        />
       )}
       {status === 'verification_error' && (
         <Button

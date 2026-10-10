@@ -22,6 +22,14 @@ _Avoid_: Kid (in code and docs; fine in UI copy), user, member
 The household's second parent, in UI copy. Added by the first parent by email; they become a Parent on their first sign-in with that address.
 _Avoid_: Spouse, co-parent, invitee
 
+**Account Deletion**:
+A parent removing themselves from a household for good. The household and its children live on while another parent remains; the last parent's account deletion is a household deletion.
+_Avoid_: Unsubscribe, leave household, cancel
+
+**Household Deletion**:
+The permanent end of a household and everything in it — children, ledger, grove, photos and every kid device's token — triggered only by its last parent's account deletion. It does not cancel a store subscription. (ADR-0019)
+_Avoid_: Reset, archive, wipe
+
 **Kid Device**:
 A phone or tablet bound to exactly one child by redeeming a join code. Holds a device token scoped to that child.
 _Avoid_: Child account, child login

@@ -44,6 +44,14 @@ const HISTORY_DAYS = 6;
  * may return the household to free — the next rerun restores it).
  */
 export const REVIEW_ENTITLEMENT_SOURCE = 'manual:review-household';
+/**
+ * How the seed leaves it: lapsed. App Review asks for an account whose subscription has expired,
+ * so it can walk the whole purchase flow, and a premium household hides every way into the
+ * paywall. Mibo has no expired state of its own — an EXPIRATION returns a household to free — so
+ * the household is built premium (the second child and the photo chore need it) and then set back
+ * to free, which is exactly where a real expiry would leave it.
+ */
+export const REVIEW_EXPIRED_SOURCE = 'manual:review-expired';
 
 export type SeedOptions = {
   clerkUserId: string;
@@ -251,6 +259,12 @@ export async function seedReviewHousehold(db: Db, options: SeedOptions): Promise
       },
     },
   ]);
+
+  // The subscription lapses last, once everything premium is in place.
+  await db
+    .update(households)
+    .set({ entitlement: 'free', entitlementSource: REVIEW_EXPIRED_SOURCE })
+    .where(eq(households.id, household.id));
 
   // The seed's own devices were only ever a way to write the child's side; the reviewer joins
   // their own. Revoked, they stop answering and show as ended in the parent's device list.

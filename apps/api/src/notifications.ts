@@ -3,6 +3,8 @@ import {
   digestWorthSending,
   kidReminderCopy,
   notificationId,
+  parentIdentity,
+  pushSent,
   redemptionRequestedCopy,
   rewardApprovedCopy,
   type DigestSummary,
@@ -14,6 +16,7 @@ import {
   type NotificationTarget,
 } from '@chores/shared';
 import { and, asc, desc, eq, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import type { Analytics, SentEvent } from './analytics.ts';
 import type { Db } from './db/client.ts';
 import {
   childDevices,
@@ -39,6 +42,20 @@ export const RECEIPT_DELAY_MS = 15 * 60_000;
 const RECEIPT_BATCH = 100;
 
 export type Sent = { claimed: boolean; forgotten: boolean };
+
+/**
+ * Who a push is for, as analytics knows them: the id its tap will report under, so a
+ * `push_sent` and the `push_opened` it may become join per person (ADR-0009). A parent is their
+ * Clerk id grouped by household; a kid device is its anon id and nothing else.
+ */
+type Recipient = Omit<SentEvent, 'event'>;
+
+const kidRecipient = (device: { anonId: string }): Recipient => ({ distinctId: device.anonId });
+
+function parentRecipient(device: { clerkUserId: string; householdId: string }): Recipient {
+  const { distinct_id, groups } = parentIdentity(device.clerkUserId, device.householdId);
+  return { distinctId: distinct_id, groups };
+}
 
 const reminderIdOf = (due: DueReminder) =>
   notificationId('kid_reminder', due.child_id, due.chore_date);
@@ -70,6 +87,7 @@ async function pushableDevice(db: Db, childId: string) {
       id: childDevices.id,
       token: childDevices.expoPushToken,
       locale: childDevices.locale,
+      anonId: childDevices.analyticsAnonId,
     })
     .from(childDevices)
     .where(
@@ -143,7 +161,13 @@ const claimReminder = (
  * recorded and nothing is sent: the device's own local notification is the delivery, which is
  * what a child with no push credentials, or no network at their last open, gets.
  */
-export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Date): Promise<Sent> {
+export async function sendReminder(
+  db: Db,
+  push: Push,
+  analytics: Analytics,
+  due: DueReminder,
+  now: Date,
+): Promise<Sent> {
   const device = await pushableDevice(db, due.child_id);
   if (!(await claimReminder(db, due, now, device))) return { claimed: false, forgotten: false };
   if (!device?.token) return { claimed: true, forgotten: false };
@@ -167,8 +191,9 @@ export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Da
     db,
     reminderIdOf(due),
     'child_device',
-    [{ device, result: results[0] }],
+    [{ device, result: results[0], recipient: kidRecipient(device) }],
     now,
+    { analytics, kind: 'kid_reminder' },
   );
   return { claimed: true, forgotten: forgotten > 0 };
 }
@@ -179,14 +204,20 @@ export async function sendReminder(db: Db, push: Push, due: DueReminder, now: Da
  * claim row is what makes it one notification — so the row records the first device that took it,
  * which is the one a receipt can later be traded against. A device Expo refuses is forgotten
  * whatever the others answered, and a row nothing got through to keeps the failure in its payload
- * so the next tick knows whether to try again.
+ * so the next tick knows whether to try again. Every message Expo took is one `push_sent` — the
+ * denominator of an open rate — and a refused one is none.
  */
 async function recordSends(
   db: Db,
   id: string,
   target: NotificationTarget,
-  attempts: readonly { device: { id: string }; result: PushSend | undefined }[],
+  attempts: readonly {
+    device: { id: string };
+    result: PushSend | undefined;
+    recipient: Recipient;
+  }[],
   now: Date,
+  report: { analytics: Analytics; kind: NotificationKind },
 ): Promise<number> {
   const delivered = attempts.find((a) => a.result?.ok);
   if (delivered?.result?.ok) {
@@ -205,6 +236,9 @@ async function recordSends(
 
   let forgotten = 0;
   for (const attempt of attempts) {
+    if (attempt.result?.ok) {
+      report.analytics.capture({ ...attempt.recipient, event: pushSent({ kind: report.kind }) });
+    }
     if (attempt.result?.ok === false && attempt.result.error === 'DeviceNotRegistered') {
       await forgetToken(db, target, attempt.device.id);
       forgotten++;
@@ -240,8 +274,11 @@ async function pushableParentDevices(db: Db, parentId: string) {
       id: parentDevices.id,
       token: parentDevices.expoPushToken,
       locale: parentDevices.locale,
+      clerkUserId: parents.clerkUserId,
+      householdId: parents.householdId,
     })
     .from(parentDevices)
+    .innerJoin(parents, eq(parents.id, parentDevices.parentId))
     .where(and(eq(parentDevices.parentId, parentId), isNotNull(parentDevices.expoPushToken)))
     .orderBy(desc(parentDevices.lastSeenAt));
 }
@@ -252,7 +289,7 @@ async function pushableParentDevices(db: Db, parentId: string) {
  * One claim row per parent — the id the spec fixes is `(redemption, parent)` — which is what
  * makes a phone and a tablet one notification rather than two.
  */
-async function sendRequests(db: Db, push: Push, now: Date) {
+async function sendRequests(db: Db, push: Push, analytics: Analytics, now: Date) {
   const waiting = await db
     .select({
       redemptionId: redemptions.id,
@@ -311,15 +348,20 @@ async function sendRequests(db: Db, push: Push, now: Date) {
       db,
       id,
       'parent_device',
-      devices.map((device, i) => ({ device, result: results[i] })),
+      devices.map((device, i) => ({
+        device,
+        result: results[i],
+        recipient: parentRecipient(device),
+      })),
       now,
+      { analytics, kind: 'redemption_requested' },
     );
   }
   return { announced, forgotten };
 }
 
 /** An approval is told to the child straight away, on their newest live device with a token. */
-async function sendApprovals(db: Db, push: Push, now: Date) {
+async function sendApprovals(db: Db, push: Push, analytics: Analytics, now: Date) {
   const decided = await db
     .select({ redemptionId: redemptions.id, childId: redemptions.childId })
     .from(redemptions)
@@ -366,7 +408,14 @@ async function sendApprovals(db: Db, push: Push, now: Date) {
         },
       },
     ]);
-    forgotten += await recordSends(db, id, 'child_device', [{ device, result: results[0] }], now);
+    forgotten += await recordSends(
+      db,
+      id,
+      'child_device',
+      [{ device, result: results[0], recipient: kidRecipient(device) }],
+      now,
+      { analytics, kind: 'reward_approved' },
+    );
   }
   return { announced, forgotten };
 }
@@ -375,10 +424,11 @@ async function sendApprovals(db: Db, push: Push, now: Date) {
 export async function sendImmediates(
   db: Db,
   push: Push,
+  analytics: Analytics,
   now: Date,
 ): Promise<{ announced: DueImmediate[]; forgotten: number }> {
-  const requests = await sendRequests(db, push, now);
-  const approvals = await sendApprovals(db, push, now);
+  const requests = await sendRequests(db, push, analytics, now);
+  const approvals = await sendApprovals(db, push, analytics, now);
   return {
     announced: [...requests.announced, ...approvals.announced],
     forgotten: requests.forgotten + approvals.forgotten,
@@ -392,8 +442,11 @@ async function pushableParentDevice(db: Db, parentId: string) {
       id: parentDevices.id,
       token: parentDevices.expoPushToken,
       locale: parentDevices.locale,
+      clerkUserId: parents.clerkUserId,
+      householdId: parents.householdId,
     })
     .from(parentDevices)
+    .innerJoin(parents, eq(parents.id, parentDevices.parentId))
     .where(and(eq(parentDevices.parentId, parentId), isNotNull(parentDevices.expoPushToken)))
     .orderBy(desc(parentDevices.lastSeenAt))
     .limit(1);
@@ -462,6 +515,7 @@ export type DigestSent = { claimed: boolean; forgotten: number };
 export async function sendDigest(
   db: Db,
   push: Push,
+  analytics: Analytics,
   due: DueDigest,
   now: Date,
 ): Promise<DigestSent> {
@@ -510,7 +564,14 @@ export async function sendDigest(
         },
       },
     ]);
-    forgotten += await recordSends(db, id, 'parent_device', [{ device, result: results[0] }], now);
+    forgotten += await recordSends(
+      db,
+      id,
+      'parent_device',
+      [{ device, result: results[0], recipient: parentRecipient(device) }],
+      now,
+      { analytics, kind: 'parent_digest' },
+    );
   }
   return { claimed, forgotten };
 }

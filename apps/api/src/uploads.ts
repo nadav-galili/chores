@@ -1,4 +1,10 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -7,7 +13,7 @@ import type { Db } from './db/client.ts';
 import { completions } from './db/schema.ts';
 import { requireKidDevice, type DeviceEnv } from './device-auth.ts';
 import { parseBody } from './parse-body.ts';
-import { photoKey } from './photo-key.ts';
+import { childPhotoPrefix, photoKey } from './photo-key.ts';
 import { householdScope, type ScopedEnv } from './scope.ts';
 
 export type R2Config = {
@@ -23,19 +29,56 @@ const uploadBody = z.object({
   content_type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
 });
 
+/** Removes every Photo Proof object of these children from R2 (ADR-0017). */
+export type PurgePhotos = (childIds: readonly string[]) => Promise<void>;
+
+const r2Client = (config: R2Config) =>
+  new S3Client({
+    region: 'auto',
+    endpoint: config.endpoint,
+    forcePathStyle: true,
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+  });
+
+/**
+ * Household Deletion's photo step (ADR-0019): every object under each child's prefix, a listing
+ * page at a time. A page holds at most 1000 keys, which is also what one batch delete accepts.
+ */
+export function r2PhotoPurge(config: R2Config): PurgePhotos {
+  const client = r2Client(config);
+  return async (childIds) => {
+    for (const childId of childIds) {
+      let token: string | undefined;
+      do {
+        const page = await client.send(
+          new ListObjectsV2Command({
+            Bucket: config.bucket,
+            Prefix: childPhotoPrefix(childId),
+            ContinuationToken: token,
+          }),
+        );
+        const keys = (page.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []));
+        if (keys.length) {
+          const deleted = await client.send(
+            new DeleteObjectsCommand({
+              Bucket: config.bucket,
+              Delete: { Objects: keys, Quiet: true },
+            }),
+          );
+          // A batch delete answers 200 with per-key errors inside it; a partial purge is a failure.
+          if (deleted.Errors?.length) {
+            throw new Error(`r2 photo purge failed for ${deleted.Errors.length} objects`);
+          }
+        }
+        token = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (token);
+    }
+  };
+}
+
 /** Photo Proof uses private R2 objects; possession of a five-minute URL grants one operation. */
 export function uploadRoutes(db: Db, config?: R2Config) {
-  const client = config
-    ? new S3Client({
-        region: 'auto',
-        endpoint: config.endpoint,
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId: config.accessKeyId,
-          secretAccessKey: config.secretAccessKey,
-        },
-      })
-    : null;
+  const client = config ? r2Client(config) : null;
 
   const kid = new Hono<DeviceEnv>();
   kid.use('/uploads/presign', requireKidDevice(db));

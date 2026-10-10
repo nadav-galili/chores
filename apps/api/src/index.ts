@@ -1,6 +1,7 @@
 import { appEnv, normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
 import { serve } from '@hono/node-server';
-import { posthogAnalytics } from './analytics.ts';
+import { posthogAnalytics, posthogPersonDeletion } from './analytics.ts';
+import { clerkUserDeleter } from './account-deletion.ts';
 import { createApp } from './app.ts';
 import { clerkVerifyToken } from './auth.ts';
 import { startCron } from './cron.ts';
@@ -8,6 +9,7 @@ import { createDb } from './db/client.ts';
 import { runMigrations } from './db/migrate.ts';
 import { expoPush } from './push.ts';
 import { clerkSignInTokens } from './review-access.ts';
+import { r2PhotoPurge, type R2Config } from './uploads.ts';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
@@ -45,23 +47,38 @@ if (reviewEmail && normalizeEmail(reviewEmail) !== REVIEW_EMAIL) {
 const db = createDb(databaseUrl);
 await runMigrations(db);
 
-// The minute cron lives in this process: one container, one household clock per row (ADR-0003).
-startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN));
+const posthogApiKey = process.env.POSTHOG_API_KEY;
+const posthogPersonalApiKey = process.env.POSTHOG_PERSONAL_API_KEY;
+const posthogProjectId = process.env.POSTHOG_PROJECT_ID;
+// A deployment that sends events must be able to delete them: the account-deletion page promises
+// nothing is retained (ADR-0019), and a key that only writes would make that promise false.
+if (posthogApiKey && !(posthogPersonalApiKey && posthogProjectId)) {
+  throw new Error(
+    'POSTHOG_PERSONAL_API_KEY and POSTHOG_PROJECT_ID are required with POSTHOG_API_KEY (account deletion)',
+  );
+}
+const analytics = posthogAnalytics(posthogApiKey, appEnv(process.env.APP_ENV));
 
-const analytics = posthogAnalytics(process.env.POSTHOG_API_KEY, appEnv(process.env.APP_ENV));
+// The minute cron lives in this process: one container, one household clock per row (ADR-0003).
+startCron(db, expoPush(process.env.EXPO_ACCESS_TOKEN), analytics);
+
+const r2: R2Config | undefined =
+  r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
+    ? {
+        endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+        bucket: r2Bucket,
+        accessKeyId: r2AccessKeyId,
+        secretAccessKey: r2SecretAccessKey,
+      }
+    : undefined;
 
 const app = createApp(db, {
   verifyToken: clerkVerifyToken(clerkSecretKey),
   analytics,
-  ...(r2AccountId && r2Bucket && r2AccessKeyId && r2SecretAccessKey
-    ? {
-        r2: {
-          endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
-          bucket: r2Bucket,
-          accessKeyId: r2AccessKeyId,
-          secretAccessKey: r2SecretAccessKey,
-        },
-      }
+  ...(r2 ? { r2, purgePhotos: r2PhotoPurge(r2) } : {}),
+  deleteClerkUser: clerkUserDeleter(clerkSecretKey),
+  ...(posthogApiKey && posthogPersonalApiKey && posthogProjectId
+    ? { deleteAnalyticsPersons: posthogPersonDeletion(posthogPersonalApiKey, posthogProjectId) }
     : {}),
   revenuecatWebhookSigningSecret,
   ...(reviewEmail && reviewSecret

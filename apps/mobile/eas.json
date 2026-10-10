@@ -34,6 +34,7 @@
       "distribution": "store",
       "environment": "production",
       "channel": "production",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://mibokids.app",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsubWlib2tpZHMuYXBwJA",
@@ -53,6 +54,10 @@
       "ios": {
         "ascAppId": "6812645404",
         "appleTeamId": "ZULBDS9DK6"
+      },
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "draft"
       }
     }
   }

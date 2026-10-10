@@ -64,6 +64,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The server no longer honours this Kid Device's token: a parent revoked it, the device left, or
+ * a Household Deletion took the household behind it (ADR-0019). All three end the same way —
+ * back to the join screen with the local copy wiped — so the device asks only this.
+ */
+export const isDeviceRevoked = (e: unknown): boolean =>
+  e instanceof ApiError && e.code === 'device_revoked';
+
 type GetToken = () => Promise<string | null>;
 type OnGate = (gate: Gate) => void;
 
@@ -104,6 +112,8 @@ export function createApi(getToken: GetToken, onGate?: OnGate) {
   const request = <T>(path: string, init?: RequestInit) => call<T>(getToken, path, init, onGate);
   return {
     me: () => request<Me>('/me'),
+    // Account Deletion (ADR-0019); as the household's last parent, Household Deletion too.
+    deleteAccount: () => request<{ household_deleted: boolean }>('/me', { method: 'DELETE' }),
     createHousehold: (input: CreateHouseholdInput) =>
       request<{ household: Household; parent: Parent }>('/households', json('POST', input)),
     createChild: (householdId: string, input: ChildInput) =>

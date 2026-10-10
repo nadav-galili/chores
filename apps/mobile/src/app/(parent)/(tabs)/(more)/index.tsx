@@ -11,8 +11,8 @@ import { canAskForPush } from '@/lib/notifications';
  *
  * This is where the today screen's menu went. The four destinations a parent returns to are tabs
  * now; what is left here is configuration — the shop's catalogue, the second parent, the PIN that
- * guards kid mode — plus signing out, which is grouped apart and drawn in `danger` so it cannot
- * be reached for by accident on the way to something else.
+ * guards kid mode — plus signing out and deleting the account, which are grouped apart and drawn
+ * in `danger` so neither can be reached for by accident on the way to something else.
  *
  * Evening summary is the parent's other way to the push explanation (spec #86, Parent push), for
  * a parent who said "Not now" after "connected", a Partner, or a parent whose child joined from
@@ -61,7 +61,14 @@ export default function More() {
             ...(askable ? [eveningSummary] : []),
             { title: t('language.title'), onPress: () => router.push('/language') },
           ],
-          [{ title: t('parent.nav.signOut'), onPress: () => void signOut(), destructive: true }],
+          [
+            { title: t('parent.nav.signOut'), onPress: () => void signOut(), destructive: true },
+            {
+              title: t('parent.nav.deleteAccount'),
+              onPress: () => router.push('/delete-account'),
+              destructive: true,
+            },
+          ],
         ]}
       />
     </Screen>

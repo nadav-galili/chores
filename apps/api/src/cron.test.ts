@@ -9,9 +9,11 @@ import {
   openedNotificationDestination,
   openedNotificationKind,
   parentDeviceId,
+  pushSent,
   uuid7,
   type DeviceSession,
 } from '@chores/shared';
+import { recordingAnalytics } from './analytics.ts';
 import { createApp } from './app.ts';
 import { runTick } from './cron.ts';
 import type { Db } from './db/client.ts';
@@ -650,5 +652,64 @@ describe('evening digest', () => {
       parent_id: parentId,
       chore_date: '2026-09-09',
     });
+  });
+});
+
+describe('push_sent', () => {
+  const at = (utc: string) => new Date(utc);
+  const anonIdOf = async (deviceId: string) => {
+    const [row] = await db.select().from(childDevices).where(eq(childDevices.id, deviceId));
+    return row!.analyticsAnonId;
+  };
+
+  it('is one event per push Expo took, under the id its tap will report from', async () => {
+    const fixture = await setup('user_push_sent', {
+      tz: 'Asia/Jerusalem',
+      reminder: '21:00',
+      digestHour: 21,
+    });
+    const { householdId, session } = fixture;
+    await registerToken(session!, 'ExponentPushToken[push-sent-kid]');
+    await registerParent(householdId, 'user_push_sent', 'ExponentPushToken[push-sent-parent]');
+    const push = fakePush('push-sent');
+    await runTick(db, push.push, at('2026-09-19T21:00:20Z')); // the boundary of the 20th
+
+    const analytics = recordingAnalytics();
+    await runTick(db, push.push, at('2026-09-20T18:00:20Z'), analytics); // 21:00 in Jerusalem
+    expect(push.sent.map((m) => m.data?.['kind']).sort()).toEqual([
+      'kid_reminder',
+      'parent_digest',
+    ]);
+    // The parent's open arrives under their Clerk id grouped by household; the kid device's under
+    // its own anon id and nothing else (ADR-0009), so each send joins the open it can become.
+    expect(analytics.sent).toHaveLength(2);
+    expect(analytics.sent).toEqual(
+      expect.arrayContaining([
+        {
+          distinctId: await anonIdOf(session!.device_id),
+          event: pushSent({ kind: 'kid_reminder' }),
+        },
+        {
+          distinctId: 'user_push_sent',
+          event: pushSent({ kind: 'parent_digest' }),
+          groups: { household: householdId },
+        },
+      ]),
+    );
+  });
+
+  it('is not sent for a push Expo refused', async () => {
+    const { session } = await setup('user_push_refused', {
+      tz: 'Asia/Jerusalem',
+      reminder: '21:30',
+    });
+    await registerToken(session!, 'ExponentPushToken[push-refused]');
+    const push = fakePush('push-refused');
+    push.send = { ok: false, error: 'MessageRateExceeded' };
+
+    const analytics = recordingAnalytics();
+    await runTick(db, push.push, at('2026-09-21T18:30:20Z'), analytics); // 21:30 in Jerusalem
+    expect(push.sent).toHaveLength(1);
+    expect(analytics.sent).toEqual([]);
   });
 });
