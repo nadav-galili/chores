@@ -735,11 +735,10 @@ say "needs the #100 review account — the same one App Review gets."
 open_url_chrome "$PLAY_CONSOLE"
 say ""
 step "First, rebuild the review household so the reviewer never inherits the last"
-step "reviewer's state (every R2_* variable is required — docs/store/review-notes.md):"
-note "    DATABASE_URL=… CLERK_SECRET_KEY=… R2_ACCOUNT_ID=… R2_BUCKET=… \\"
-note "    R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… pnpm --filter api seed:review"
+step "reviewer's state. It runs inside the API container (docs/store/review-notes.md):"
+note "    railway ssh --service api -- sh -c 'cd /repo/apps/api && pnpm seed:review'"
 if ! confirm "Re-seeded just now?"; then
-  SKIPPED+=("re-seed the review household before Play reviews it (pnpm --filter api seed:review)")
+  SKIPPED+=("re-seed the review household before Play reviews it (docs/store/review-notes.md)")
 fi
 say ""
 step "Choose: All or some functionality is restricted → Add instructions."

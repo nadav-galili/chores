@@ -15,6 +15,8 @@ The brand is child-facing and the keyword tail is parent-facing. A parent finds 
 
 No "Kids" in the subtitle, name, icon or screenshots: App Review rejected 1.0.1 under guideline 2.3.8 for `Chore Chart & Kids Allowance`, reading it as a claim the app is made for children, which ADR-0018 rules out. `kids` lives in the keyword field, which is never displayed.
 
+Age rating: 4+, and every In-App Control is No. App Review rejected 1.0.1 under guideline 2.3.6 for "Parental Controls: Yes". The Parent PIN only gates leaving kid mode, so it is not a Parental Control in Apple's terms.
+
 Keyword field (98 of 100, no spaces after commas):
 
 ```
