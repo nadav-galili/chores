@@ -14,10 +14,13 @@ Before every submission, rebuild the household the reviewer lands in, so they ne
 last reviewer's state:
 
 ```
-DATABASE_URL=… CLERK_SECRET_KEY=… \
-R2_ACCOUNT_ID=… R2_BUCKET=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… \
-pnpm --filter api seed:review
+railway ssh --service api -- sh -c 'cd /repo/apps/api && pnpm seed:review'
 ```
+
+The seed runs inside the live API container. Only that container can reach the Railway Postgres
+(`postgres.railway.internal`), and it already has `DATABASE_URL`, `CLERK_SECRET_KEY` and every
+`R2_*` variable. Deploy first (`scripts/deploy-api.sh`): the container runs the seed of the commit
+that is live. It ends with `seeded household … for review@mibokids.app`.
 
 Every `R2_*` variable is required: the photo proof is stored in R2, and the seed stops before
 writing anything when one is missing. The review address is not an input; it is `REVIEW_EMAIL`
@@ -151,7 +154,7 @@ App Review accepts a demo video for a reviewer with one device. Record it on a s
 freshly seeded household, then put the link where `<<SCREEN_RECORDING_URL>>` stands above (an
 unlisted video or a shared file link that needs no sign-in):
 
-1. `pnpm --filter api seed:review`.
+1. Run the seed (the command at the top of this file).
 2. Simulator A signed in as the review account: Children → Leo → Show join code.
 3. Simulator B: Kid → the Join Code. Show Today, mark a chore done (coins and the pet react), the
    Shop and a reward request, the grove. (A simulator has no camera; the photo proof already

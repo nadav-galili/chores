@@ -1,9 +1,10 @@
 /**
  * Builds "The Review Family" for the App Review account (#100). Rerun it after every review:
  *
- *   DATABASE_URL=<Railway Postgres> CLERK_SECRET_KEY=<production sk_live_…> \
- *   R2_ACCOUNT_ID=… R2_BUCKET=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… \
- *   pnpm --filter api seed:review
+ *   railway ssh --service api -- sh -c 'cd /repo/apps/api && pnpm seed:review'
+ *
+ * It runs inside the live API container: only that container can reach the Railway Postgres, and
+ * it already has DATABASE_URL, CLERK_SECRET_KEY and the R2_* variables.
  *
  * The review address is `REVIEW_EMAIL` from `@chores/shared`. Every R2_* variable is required:
  * without them there is no photo proof, and the script stops before touching anything.
@@ -62,7 +63,9 @@ function photoUploader() {
     credentials: { accessKeyId, secretAccessKey },
   });
   // A watered plant for "Water the plants": the grove's own art, so no photo of anyone is used.
-  const image = new URL('../../mobile/assets/grove/tree-s5.webp', import.meta.url);
+  // A copy of apps/mobile/assets/grove/tree-s5.webp: the API image has no apps/mobile, and the
+  // seed runs inside that image.
+  const image = new URL('../assets/review-photo-proof.webp', import.meta.url);
   return async (key: string) => {
     await client.send(
       new PutObjectCommand({
