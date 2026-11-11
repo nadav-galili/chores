@@ -288,6 +288,39 @@ url_serves() {
   return 1
 }
 
+# The Keychain item that holds the Sentry organization token on this Mac. EAS has a token
+# too, but as a secret: an EAS builder can read it and no local command can. Save one here
+# one time, with a prompt that does not put the token in the shell history:
+#   read -s "T?Sentry token: " && security add-generic-password -U -a "$USER" -s mibo-sentry-auth-token -w "$T"; unset T
+# Do not use the prompt of `security ... -w` itself: it keeps the first 128 characters only,
+# and an organization token is longer.
+SENTRY_KEYCHAIN_ITEM="mibo-sentry-auth-token"
+
+# sentry_token — the token for the OTA source-map upload: SENTRY_AUTH_TOKEN of this shell,
+# else the Keychain item. It prints nothing when there is no token.
+sentry_token() {
+  if [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
+    printf '%s' "$SENTRY_AUTH_TOKEN"
+    return 0
+  fi
+  command -v security >/dev/null 2>&1 || return 0
+  security find-generic-password -a "$USER" -s "$SENTRY_KEYCHAIN_ITEM" -w 2>/dev/null || true
+}
+
+# upload_ota_source_maps TOKEN — sends the bundles and source maps in apps/mobile/dist to Sentry.
+#
+# `pnpm exec` runs the copy of the tool that the app is built with. `npx --package` gets the
+# newest release of @sentry/react-native, which is a different major version.
+#
+# SENTRY_URL is not optional. Without it the tool asks the Expo config for the settings of
+# the Sentry plugin, by a plugin name that app.config.ts does not use, and it stops there.
+# With it the tool reads SENTRY_ORG and SENTRY_PROJECT from apps/mobile/.env.local, where
+# scripts/setup-sentry.sh wrote them.
+upload_ota_source_maps() {
+  (cd "$MOBILE" && SENTRY_URL="https://sentry.io/" SENTRY_AUTH_TOKEN="$1" \
+    pnpm exec sentry-expo-upload-sourcemaps dist)
+}
+
 # manifest_serves RUNTIME — does the updates server offer an update to a client
 # claiming to be this binary? The three ways criterion 4 fails are all server-side
 # and all invisible on the device: an update group published against the wrong
@@ -838,8 +871,10 @@ say "Two commands, and the second one is the one that gets forgotten:"
 printf '      %spnpm --filter @chores/shared build%s\n' "$BOLD" "$RESET"
 printf '      %scd apps/mobile && eas update --channel %s --environment %s --clear-cache --message "..."%s\n' \
   "$BOLD" "$CHANNEL" "$ENVIRONMENT" "$RESET"
-printf '      %scd apps/mobile && npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist%s\n' \
-  "$BOLD" "$RESET"
+# shellcheck disable=SC2016  # the $(...) is printed for a human to copy, not run here
+printf '      %s%s%s\n' "$BOLD" \
+  'cd apps/mobile && SENTRY_URL=https://sentry.io/ SENTRY_AUTH_TOKEN="$(security find-generic-password -a "$USER" -s mibo-sentry-auth-token -w)" pnpm exec sentry-expo-upload-sourcemaps dist' \
+  "$RESET"
 say ""
 note "The build-time source-map upload #78 set up covers the binary's own bundle"
 note "and nothing else. An OTA bundle is a different bundle with different debug"
@@ -863,9 +898,11 @@ note "per file, and a rebuilt dependency it believes it has already seen can be"
 note "served from that cache."
 note ""
 note "'eas update' exports to dist/ — its --input-dir default — with source maps,"
-note "and dist/ is what the second command reads. SENTRY_AUTH_TOKEN has to be in"
-note "this shell's environment for it: the token is an EAS secret, readable on a"
-note "builder and not from here, so export it by hand for this one command."
+note "and dist/ is what the second command reads. The token in EAS is a secret,"
+note "readable on a builder and not from here. So this wizard takes the token from"
+note "SENTRY_AUTH_TOKEN of this shell, else from the Keychain item"
+note "'$SENTRY_KEYCHAIN_ITEM'. The comment above sentry_token in this script"
+note "tells how to save it."
 say ""
 warn "An update is instant and irreversible for anyone who fetches it. Publish a"
 warn "copy fix, not a behaviour change."
@@ -898,10 +935,12 @@ if confirm "Publish an update to the '$CHANNEL' channel now?"; then
       SKIPPED+=("investigate why $CHANNEL serves no ios manifest for runtime $app_version")
     fi
     say ""
-    if [[ -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
-      warn "SENTRY_AUTH_TOKEN is not set, so the source maps were not uploaded."
-      SKIPPED+=("upload the OTA source maps: SENTRY_AUTH_TOKEN=... npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist")
-    elif (cd "$MOBILE" && npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist); then
+    ota_sentry_token=$(sentry_token)
+    if [[ -z "$ota_sentry_token" ]]; then
+      warn "No Sentry token: SENTRY_AUTH_TOKEN is not set, and the Keychain has no"
+      warn "'$SENTRY_KEYCHAIN_ITEM'. The source maps were not uploaded."
+      SKIPPED+=("save a Sentry token in the Keychain item '$SENTRY_KEYCHAIN_ITEM', then upload the OTA source maps: cd apps/mobile && SENTRY_URL=https://sentry.io/ SENTRY_AUTH_TOKEN=... pnpm exec sentry-expo-upload-sourcemaps dist")
+    elif upload_ota_source_maps "$ota_sentry_token"; then
       printf '  %s✓ source maps uploaded%s\n' "$GREEN" "$RESET"
     else
       warn "The source-map upload failed. The update is live either way; its stack"
