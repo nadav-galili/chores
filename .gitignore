@@ -24,3 +24,6 @@ apps/mobile/ios/
 
 # Store-screenshot generator (app-store-screenshots skill); local tool, not part of the app.
 nextjs/
+
+# Daily analytics reports (local only)
+reports/

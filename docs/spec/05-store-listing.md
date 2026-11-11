@@ -25,11 +25,32 @@ behavior,reward,routine,task,kids,habit,star,job,checklist,pocket,money,daily,st
 
 Apple forms phrases across title, subtitle and keyword field, so nothing already in the first two is repeated here. This buys `behavior tracker`, `sticker chart`, `family chore chart`, `chores for kids`, `reward chart`, `daily routine`, `pocket money`, `chore checklist`. `app` is omitted — Apple indexes it anyway. `ADHD` is omitted deliberately: out of scope per `BUILD-PROMPT.md`, and Joon owns the term.
 
+### Hebrew (`he`)
+
+The Hebrew localization has its own title, subtitle and keyword field. In the Israel store, Mibo had 0 impressions in its first week (App Store Connect, 2026-11-03 to 2026-11-09), and the Hebrew terms have almost no competition: the top results for `מטלות בית`, `משימות לילדים`, `טבלת משימות` and `מטלות ודמי כיס` have 0 to 9 ratings (iTunes Search API, Israel, 2026-11-11).
+
+| field | value | chars |
+|---|---|---|
+| Title (30) | `Mibo: מטלות בית, לוח משימות` | 27 |
+| Subtitle (30) | `דמי כיס, פרסים, הרגלים למשפחה` | 29 |
+
+Keyword field (100 of 100, no spaces after commas):
+
+```
+לילדים,ילדים,משפחה,רשימת,טבלת,חיזוקים,תורנות,מעקב,יומיות,יומי,התנהגות,שגרה,כוכבים,מדבקות,מתבגרים,פרס
+```
+
+- The App Store suggests these searches in Israel: `מטלות`, `מטלות בית`, `רשימת מטלות`, `לוח משימות`, `רשימת משימות`, `משימות יומיות`, `מעקב הרגלים`, `מעקב תורנות`. The three fields together make each of these phrases. They also make `מטלות לילדים`, `משימות לילדים`, `טבלת משימות`, `טבלת חיזוקים` and `דמי כיס`.
+- No word is in two fields. Each important word is written without a prefix letter (`ו`, `ל`, `ה`), because it is not known that Apple removes Hebrew prefixes. `לילדים` and `ילדים` are two different words for the search, so the keyword field has the two.
+- `ילדים` and `לילדים` are in the keyword field only. They are not in the title or the subtitle, for the same reason as `kids` in English (guideline 2.3.8, ADR-0018).
+- `דמי כיס` is in the subtitle, not in the title, for the same reason as `Allowance` in English.
+
 ## Google Play
 
 | field | value | chars |
 |---|---|---|
 | Title (30) | `Mibo: Chores Tracker for Kids` | 29 |
+| Title, Hebrew `iw-IL` (30) | `Mibo: מטלות ודמי כיס לילדים` | 27 |
 
 Play indexes the long description separately, so the title is the only short high-weight field and carries `for Kids`, which iOS keeps out of every displayed field (2.3.8) and puts in the keyword field.
 
