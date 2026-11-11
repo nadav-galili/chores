@@ -106,13 +106,16 @@ describe('connectedOnOpen', () => {
 });
 
 describe('appLinkMessage', () => {
-  it('is the one line, then both store links', () => {
+  it('is the one line, then the App Store link', () => {
     const message = appLinkMessage('Get Mibo on your child’s device:');
     expect(message.split('\n')).toEqual([
       'Get Mibo on your child’s device:',
       `App Store: ${APP_STORE_URL}`,
-      `Google Play: ${PLAY_STORE_URL}`,
     ]);
+  });
+
+  it('has no Google Play link while that listing is not public (#114)', () => {
+    expect(appLinkMessage('Get Mibo:')).not.toContain('play.google.com');
   });
 
   it('links the store listings of this app', () => {

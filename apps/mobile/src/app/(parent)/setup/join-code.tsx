@@ -70,7 +70,7 @@ export default function SetupJoinCode() {
   );
 }
 
-/** The share sheet with both store links and one line. Never the Join Code. */
+/** The share sheet with one line and the App Store link. Never the Join Code. */
 async function sendAppLink() {
   try {
     await Share.share({ message: appLinkMessage(t('setup.appLink.message')) });
