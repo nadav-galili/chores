@@ -1,4 +1,11 @@
-import { normalizeEmail, REVIEW_EMAIL } from '@chores/shared';
+import {
+  normalizeEmail,
+  onboardingStepViewed,
+  REVIEW_EMAIL,
+  signInStep,
+  type SignInMethod,
+  type SignInStep,
+} from '@chores/shared';
 import { isClerkAPIResponseError, useClerk, useSignIn, useSignUp } from '@clerk/expo';
 // Core 3's SSO hook, to match the `future` sign-in and sign-up resources this screen already
 // uses. The default `useSSO` is the legacy one: it reads `createdSessionId` off a legacy resource
@@ -12,12 +19,23 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Button, ErrorText, Field, ProviderButton, ScrollScreen, Title } from '@/components/ui';
+import { captureInteraction } from '@/lib/analytics';
 import { ApiError, reviewAccess } from '@/lib/api';
 import { isMissingBrowser } from '@/lib/browser-error';
 import { reportError } from '@/lib/error-reporting';
 import { t } from '@/lib/i18n';
 
 WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * Reports a step of the sign-in. The screen comes after the welcome screen, so the client is the
+ * anonymous welcome one, and `identify` joins these to the parent who signs in. `captureInteraction`
+ * drops the report on a client in kid mode: a parent's sign-in must not go to a child's anonymous
+ * id (ADR-0009). The App Review account's own path reports nothing: it is not a parent's.
+ */
+function report(step: SignInStep, method: SignInMethod): void {
+  captureInteraction(signInStep({ step, method }));
+}
 
 /** `review` is the App Review account only (#100): a secret in place of the emailed code. */
 type Step = { kind: 'email' } | { kind: 'code'; flow: 'sign-in' | 'sign-up' } | { kind: 'review' };
@@ -39,6 +57,16 @@ export function ParentSignIn({
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = signInFetch === 'fetching' || signUpFetch === 'fetching';
+
+  useEffect(() => {
+    captureInteraction(onboardingStepViewed({ step: 'sign_in' }));
+  }, []);
+
+  /** The emailed code did not get to a session, and not because the parent typed a wrong code. */
+  const failEmail = (message: string) => {
+    report('failed', 'email');
+    setError(message);
+  };
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -64,17 +92,19 @@ export function ParentSignIn({
     const { error: createError } = await signIn.create({ identifier: email.trim() });
     if (!createError) {
       const { error: sendError } = await signIn.emailCode.sendCode({ emailAddress: email.trim() });
-      if (sendError) return setError(sendError.message);
+      if (sendError) return failEmail(sendError.message);
+      report('code_sent', 'email');
       return setStep({ kind: 'code', flow: 'sign-in' });
     }
     const notFound =
       isClerkAPIResponseError(createError) &&
       createError.errors[0]?.code === 'form_identifier_not_found';
-    if (!notFound) return setError(createError.message);
+    if (!notFound) return failEmail(createError.message);
     const { error: signUpError } = await signUp.create({ emailAddress: email.trim() });
-    if (signUpError) return setError(signUpError.message);
+    if (signUpError) return failEmail(signUpError.message);
     const { error: sendError } = await signUp.verifications.sendEmailCode();
-    if (sendError) return setError(sendError.message);
+    if (sendError) return failEmail(sendError.message);
+    report('code_sent', 'email');
     setStep({ kind: 'code', flow: 'sign-up' });
   };
 
@@ -83,21 +113,28 @@ export function ParentSignIn({
     setError(null);
     if (step.flow === 'sign-in') {
       const { error: verifyError } = await signIn.emailCode.verifyCode({ code: code.trim() });
-      if (verifyError) return setError(verifyError.message);
+      if (verifyError) {
+        report('code_rejected', 'email');
+        return setError(verifyError.message);
+      }
       if (signIn.status !== 'complete')
-        return setError(t('signIn.unfinished', { status: signIn.status }));
+        return failEmail(t('signIn.unfinished', { status: signIn.status }));
       const { error: finalizeError } = await signIn.finalize();
-      if (finalizeError) setError(finalizeError.message);
-      return;
+      if (finalizeError) return failEmail(finalizeError.message);
+      return report('completed', 'email');
     }
     const { error: verifyError } = await signUp.verifications.verifyEmailCode({
       code: code.trim(),
     });
-    if (verifyError) return setError(verifyError.message);
+    if (verifyError) {
+      report('code_rejected', 'email');
+      return setError(verifyError.message);
+    }
     if (signUp.status !== 'complete')
-      return setError(t('signIn.unfinished', { status: signUp.status }));
+      return failEmail(t('signIn.unfinished', { status: signUp.status }));
     const { error: finalizeError } = await signUp.finalize();
-    if (finalizeError) setError(finalizeError.message);
+    if (finalizeError) return failEmail(finalizeError.message);
+    report('completed', 'email');
   };
 
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -140,12 +177,13 @@ export function ParentSignIn({
         redirectUrl: AuthSession.makeRedirectUri({ scheme: 'mibo', path: 'sso-callback' }),
       });
       // A parent who closed the browser themselves has said everything they mean to; the screen
-      // stays as it was and nothing is reported.
-      if (authSessionResult?.type === 'cancel') return;
+      // stays as it was and no error is reported. The funnel counts it.
+      if (authSessionResult?.type === 'cancel') return report('cancelled', provider);
       // Whether we are signed in is Clerk's to answer, not the return value's: the hook activates
       // the session, and a sign-in that resolved to an existing one creates no new id. Reading
       // `createdSessionId` instead is what turned a working sign-in into an error (MIBO-3).
       if (clerk.session) {
+        report('completed', provider);
         // The redirect left us on `/sso-callback`, which sits outside the `(parent)` group and
         // so has no gate to send a signed-in parent home. Say it explicitly.
         router.replace('/(parent)/(tabs)/(today)');
@@ -155,11 +193,13 @@ export function ParentSignIn({
       // because this branch went silent once already and cost MIBO-1 its diagnosis.
       const kind = authSessionResult?.type ?? 'none';
       reportError(new Error(`SSO returned no session (${kind})`), `parent-sign-in.${provider}`);
+      report('failed', provider);
       setError(provider === 'google' ? t('signIn.googleUnfinished') : t('signIn.appleUnfinished'));
     } catch (e) {
       // The screen says what went wrong, and so does the dashboard: this is the catch that went
       // silent on a real device and cost an instrumented build to read (#35).
       reportError(e, `parent-sign-in.${provider}`);
+      report('failed', provider);
       // The one failure the parent can act on: this phone has no browser at all, and the email
       // code below needs none. Every other cause reads as itself.
       if (isMissingBrowser(e)) return setError(t('signIn.googleNoBrowser'));

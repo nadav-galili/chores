@@ -256,9 +256,10 @@ export function pushSent(sent: { kind: NotificationKind }): AnalyticsEvent {
 
 /**
  * The steps of first run, in the order a new parent meets them (M5). `welcome` is the first screen,
- * before there is a role; the rest are guided setup, ending at the Join Code's `connected`.
+ * before there is a role, and `sign_in` is the screen a parent gets after they pick the role; the
+ * rest are guided setup, ending at the Join Code's `connected`.
  */
-export const ONBOARDING_STEPS = ['welcome', ...SETUP_STEPS, 'connected'] as const;
+export const ONBOARDING_STEPS = ['welcome', 'sign_in', ...SETUP_STEPS, 'connected'] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -330,4 +331,22 @@ export function paywallStep(step: {
       ...(step.product_id ? { product_id: step.product_id } : {}),
     },
   };
+}
+
+/** How a parent signs in: one of the two providers, or the emailed code. */
+export type SignInMethod = 'apple' | 'google' | 'email';
+
+/**
+ * What a sign-in attempt came to. `code_sent` and `code_rejected` are the emailed code's own two
+ * steps; `cancelled` is a parent who closed the provider's browser themselves.
+ */
+export type SignInStep = 'code_sent' | 'code_rejected' | 'cancelled' | 'failed' | 'completed';
+
+/**
+ * A step of a parent's sign-in, between the `sign_in` onboarding step and the first setup step:
+ * where a parent who saw the sign-in screen stopped. It carries the method and nothing else —
+ * never the email address, the code, or the words of an error (ADR-0009).
+ */
+export function signInStep(step: { step: SignInStep; method: SignInMethod }): AnalyticsEvent {
+  return { event: `sign_in_${step.step}`, properties: { method: step.method } };
 }
