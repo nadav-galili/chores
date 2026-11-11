@@ -203,6 +203,6 @@ Mibo הופכת את לוח המטלות של הבית למשהו שהילדים
 Mibo Premium הוא מינוי חודשי או שנתי שמתחדש אוטומטית עד שתבטלו אותו ב־Google Play, או רכישה חד־פעמית לכל החיים שאינה מתחדשת. המחירים מוצגים באפליקציה לפני הרכישה. תנאי שימוש: https://mibokids.app/terms  מדיניות פרטיות: https://mibokids.app/privacy
 ```
 
-## Not localised here
+## Not in this file
 
-The title and subtitle stay as `docs/spec/05-store-listing.md` fixes them, in English, on the Hebrew listing too. A Hebrew title is an ASO decision the spec has not made; until it does, the `he` listing inherits the default title rather than one invented here.
+The title, the subtitle and the keyword field are in `docs/spec/05-store-listing.md`, for English and for Hebrew. The Hebrew listing uses the Hebrew values from that file.
