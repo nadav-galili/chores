@@ -331,6 +331,39 @@ latest_build() {
              | map(. // "-") | @tsv' 2>/dev/null || true
 }
 
+# The Keychain item that holds the Sentry organization token on this Mac. EAS has a token
+# too, but as a secret: an EAS builder can read it and no local command can. Save one here
+# one time, with a prompt that does not put the token in the shell history:
+#   read -s "T?Sentry token: " && security add-generic-password -U -a "$USER" -s mibo-sentry-auth-token -w "$T"; unset T
+# Do not use the prompt of `security ... -w` itself: it keeps the first 128 characters only,
+# and an organization token is longer.
+SENTRY_KEYCHAIN_ITEM="mibo-sentry-auth-token"
+
+# sentry_token — the token for the OTA source-map upload: SENTRY_AUTH_TOKEN of this shell,
+# else the Keychain item. It prints nothing when there is no token.
+sentry_token() {
+  if [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
+    printf '%s' "$SENTRY_AUTH_TOKEN"
+    return 0
+  fi
+  command -v security >/dev/null 2>&1 || return 0
+  security find-generic-password -a "$USER" -s "$SENTRY_KEYCHAIN_ITEM" -w 2>/dev/null || true
+}
+
+# upload_ota_source_maps TOKEN — sends the bundles and source maps in apps/mobile/dist to Sentry.
+#
+# `pnpm exec` runs the copy of the tool that the app is built with. `npx --package` gets the
+# newest release of @sentry/react-native, which is a different major version.
+#
+# SENTRY_URL is not optional. Without it the tool asks the Expo config for the settings of
+# the Sentry plugin, by a plugin name that app.config.ts does not use, and it stops there.
+# With it the tool reads SENTRY_ORG and SENTRY_PROJECT from apps/mobile/.env.local, where
+# scripts/setup-sentry.sh wrote them.
+upload_ota_source_maps() {
+  (cd "$MOBILE" && SENTRY_URL="https://sentry.io/" SENTRY_AUTH_TOKEN="$1" \
+    pnpm exec sentry-expo-upload-sourcemaps dist)
+}
+
 # check_eas_env — every REQUIRED_VAR and every EXPO_PUBLIC_ variable in eas.json is in
 # the EAS production environment. Returns 1 on a gap or an unreadable environment.
 check_eas_env() {
@@ -620,8 +653,10 @@ if [[ "$MODE" == production ]]; then
   printf '      %spnpm --filter @chores/shared build%s\n' "$BOLD" "$RESET"
   printf '      %scd apps/mobile && eas update --channel %s --environment %s --platform android --clear-cache --message "..."%s\n' \
     "$BOLD" "$CHANNEL" "$ENVIRONMENT" "$RESET"
-  printf '      %scd apps/mobile && npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist%s\n' \
-    "$BOLD" "$RESET"
+  # shellcheck disable=SC2016  # the $(...) is printed for a human to copy, not run here
+  printf '      %s%s%s\n' "$BOLD" \
+    'cd apps/mobile && SENTRY_URL=https://sentry.io/ SENTRY_AUTH_TOKEN="$(security find-generic-password -a "$USER" -s mibo-sentry-auth-token -w)" pnpm exec sentry-expo-upload-sourcemaps dist' \
+    "$RESET"
   say ""
   note "--platform android because an iOS binary on version $app_version shares this runtime and"
   note "this channel: an update for both would reach iPhones with nobody watching them."
@@ -650,11 +685,12 @@ if [[ "$MODE" == production ]]; then
       else
         RESULTS+=("- [ ] The $CHANNEL channel — FAILED: no android manifest for runtime $app_version")
       fi
-      if [[ -z "${SENTRY_AUTH_TOKEN:-}" || -z "${SENTRY_ORG:-}" || -z "${SENTRY_PROJECT:-}" ]]; then
-        warn "SENTRY_AUTH_TOKEN, SENTRY_ORG and SENTRY_PROJECT are not all set in this shell,"
-        warn "so the OTA source maps were not uploaded."
-        SKIPPED+=("upload the OTA source maps: SENTRY_AUTH_TOKEN=... SENTRY_ORG=... SENTRY_PROJECT=... npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist")
-      elif (cd "$MOBILE" && npx --package=@sentry/react-native sentry-expo-upload-sourcemaps dist); then
+      ota_sentry_token=$(sentry_token)
+      if [[ -z "$ota_sentry_token" ]]; then
+        warn "No Sentry token: SENTRY_AUTH_TOKEN is not set, and the Keychain has no"
+        warn "'$SENTRY_KEYCHAIN_ITEM'. The OTA source maps were not uploaded."
+        SKIPPED+=("save a Sentry token in the Keychain item '$SENTRY_KEYCHAIN_ITEM', then upload the OTA source maps: cd apps/mobile && SENTRY_URL=https://sentry.io/ SENTRY_AUTH_TOKEN=... pnpm exec sentry-expo-upload-sourcemaps dist")
+      elif upload_ota_source_maps "$ota_sentry_token"; then
         record "OTA source maps" "uploaded from apps/mobile/dist" pass
       else
         record "OTA source maps" "the upload from apps/mobile/dist" fail
