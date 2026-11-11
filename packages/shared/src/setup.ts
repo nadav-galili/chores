@@ -65,13 +65,19 @@ export function connectedOnOpen(
 
 /** Mibo's App Store listing, by App Store Connect's own numeric app id (`ascAppId` in eas.json). */
 export const APP_STORE_URL = 'https://apps.apple.com/app/id6812645404';
-/** Mibo's Google Play listing, by the Android package. */
+/**
+ * Mibo's Google Play listing, by the Android package. The listing is not public before the closed
+ * test ends (#114), and until then the link gives a 404, so nothing shows it to a parent.
+ */
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.mibokids.app';
 
 /**
- * What "Send the app link" shares: one line, then both store links. It takes no Join Code and so
+ * What "Send the app link" shares: one line, then the App Store link. It takes no Join Code and so
  * can never carry one — a fifteen-minute, single-use code does not belong in a chat thread.
+ *
+ * The Google Play link goes back in when the Android listing is public (#114): a link that gives a
+ * 404 on the child's device stops the setup at its last step.
  */
 export function appLinkMessage(line: string): string {
-  return [line, `App Store: ${APP_STORE_URL}`, `Google Play: ${PLAY_STORE_URL}`].join('\n');
+  return [line, `App Store: ${APP_STORE_URL}`].join('\n');
 }
