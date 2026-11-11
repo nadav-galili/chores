@@ -8,6 +8,7 @@ import {
   buttonTapped,
   paywallStep,
   screenViewed,
+  signInStep,
   childCreated,
   choreCreated,
   choreCompleted,
@@ -181,6 +182,7 @@ describe('the events', () => {
     });
     expect([...ONBOARDING_STEPS]).toEqual([
       'welcome',
+      'sign_in',
       'household',
       'child',
       'chore',
@@ -228,6 +230,25 @@ describe('the events', () => {
     });
   });
 
+  it('names every sign-in step by the method alone', () => {
+    expect(signInStep({ step: 'code_sent', method: 'email' })).toEqual({
+      event: 'sign_in_code_sent',
+      properties: { method: 'email' },
+    });
+    expect(signInStep({ step: 'code_rejected', method: 'email' }).event).toBe(
+      'sign_in_code_rejected',
+    );
+    expect(signInStep({ step: 'cancelled', method: 'apple' })).toEqual({
+      event: 'sign_in_cancelled',
+      properties: { method: 'apple' },
+    });
+    expect(signInStep({ step: 'failed', method: 'google' }).event).toBe('sign_in_failed');
+    expect(signInStep({ step: 'completed', method: 'google' })).toEqual({
+      event: 'sign_in_completed',
+      properties: { method: 'google' },
+    });
+  });
+
   it('never reports a pet reaction as having happened before the tap', () => {
     expect(petReacted({ tapped_at: 1000, shown_at: 900 }).properties).toEqual({ ms: 0 });
   });
@@ -260,6 +281,7 @@ describe('what an event may carry', () => {
     screenViewed({ screen: '(parent)/(tabs)/children/[id]' }),
     buttonTapped({ screen: '(parent)/(tabs)/children/[id]', button: 'add_chore' }),
     paywallStep({ step: 'plan_selected', gate: 'photo_proof', product_id: 'mibo_yearly' }),
+    signInStep({ step: 'completed', method: 'email' }),
   ];
 
   it('is never the child id, their first name, their pet name or a reward title (ADR-0009)', () => {
